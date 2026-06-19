@@ -257,36 +257,24 @@ export default function ParallelogramArea() {
     ctx.fillText(`b = ${base}`, baseLineCenter, bottom + 54)
 
     const centerX = (points.a.x + points.c.x) / 2
-    const centerY = top + visualHeight / 2
-    const formulaScale = clamp(Math.min(visualBase / 170, visualHeight / 92), 0.68, 1)
-    const formulaBoxWidth = clamp(visualBase * 0.74, 112, 190)
-    const formulaBoxHeight = clamp(visualHeight * 0.58, 48, 70)
-    const formulaFontSize = Math.round(20 * formulaScale)
-    const valueFontSize = Math.round(25 * formulaScale)
-    ctx.fillStyle = 'rgba(248, 250, 252, 0.76)'
-    ctx.beginPath()
-    ctx.roundRect(
-      centerX - formulaBoxWidth / 2,
-      centerY - formulaBoxHeight / 2,
-      formulaBoxWidth,
-      formulaBoxHeight,
-      8,
-    )
-    ctx.fill()
+    const formulaY = canvasHeight - 18
+    const formulaParts = [
+      { text: 'Area = ', color: '#0f172a' },
+      { text: 'b', color: '#1d4ed8' },
+      { text: ' x ', color: '#0f172a' },
+      { text: 'h', color: '#ea580c' },
+      { text: ` = ${area.toLocaleString()}`, color: '#0f172a' },
+    ]
 
-    ctx.fillStyle = '#0f172a'
-    ctx.font = `700 ${formulaFontSize}px Inter, system-ui, sans-serif`
-    ctx.textAlign = 'center'
-    ctx.fillText('Area = b x h', centerX, centerY - 5 * formulaScale)
-    ctx.fillStyle = '#1d4ed8'
-    ctx.font = `800 ${valueFontSize}px Inter, system-ui, sans-serif`
-    ctx.fillText(area.toLocaleString(), centerX, centerY + 23 * formulaScale)
-
-    if (phase === 'ready') {
-      ctx.fillStyle = '#475569'
-      ctx.font = '600 12px Inter, system-ui, sans-serif'
-      ctx.fillText('Drag the striped triangle, or use the slide button.', centerX, 320)
-    }
+    ctx.font = '800 22px Inter, system-ui, sans-serif'
+    const formulaWidth = formulaParts.reduce((sum, part) => sum + ctx.measureText(part.text).width, 0)
+    let formulaX = centerX - formulaWidth / 2
+    formulaParts.forEach((part) => {
+      ctx.fillStyle = part.color
+      ctx.textAlign = 'left'
+      ctx.fillText(part.text, formulaX, formulaY)
+      formulaX += ctx.measureText(part.text).width
+    })
   }, [area, base, geometry, height, phase, progress])
 
   useEffect(() => {
