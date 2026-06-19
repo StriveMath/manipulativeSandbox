@@ -1,24 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 
 const defaultProblem = {
-  totalAmount: 20,
-  numberOfGroups: 10,
+  totalAmount: '20',
+  numberOfGroups: '10',
 }
 
-const fractionStarterProblem = {
-  whole: '2',
+const defaultCustomTry = {
+  whole: '0',
   numerator: '0',
   denominator: '1',
-  numberOfGroups: '6',
 }
-
-const fractionChoices = [
-  { key: '1/5', label: '1/5', fraction: { numerator: 1, denominator: 5 } },
-  { key: '1/4', label: '1/4', fraction: { numerator: 1, denominator: 4 } },
-  { key: '1/3', label: '1/3', fraction: { numerator: 1, denominator: 3 } },
-  { key: '1/2', label: '1/2', fraction: { numerator: 1, denominator: 2 } },
-  { key: '1', label: '1', fraction: { numerator: 1, denominator: 1 } },
-]
 
 function gcd(a, b) {
   let first = Math.abs(a)
@@ -91,17 +82,12 @@ function formatFraction(fraction) {
   return `${sign}${whole} ${remainder}/${denominator}`
 }
 
-const fractionHelpers = {
-  gcd,
-  simplifyFraction,
-  mixedToImproper,
-  multiplyFractionByInteger,
-  compareFractions,
-  fractionToNumber,
-  formatFraction,
+function parsePositiveWholeNumber(value) {
+  const parsedValue = Number(value)
+  return Number.isFinite(parsedValue) && parsedValue > 0 ? Math.floor(parsedValue) : null
 }
 
-function getFeedbackType(tileValue, attemptedTotal, totalAmount) {
+function getFeedbackType(attemptedTotal, totalAmount) {
   if (attemptedTotal === null) return 'placeholder'
   if (attemptedTotal === totalAmount) return 'success'
   return 'warning'
@@ -153,68 +139,6 @@ function CompactInputField({ id, label, type = 'text', value, onChange, min, cla
   )
 }
 
-function FractionProblemFields({ value, denominatorIsValid, onChange }) {
-  const updatePart = (part, nextValue) => {
-    onChange({
-      ...value,
-      [part]: nextValue,
-    })
-  }
-
-  return (
-    <>
-      <div>
-        <div className="flex items-end gap-1">
-          <span className="mb-1 whitespace-nowrap text-[10px] font-black uppercase tracking-wide text-slate-600">
-            Total amount:
-          </span>
-          <CompactInputField
-            id="fraction-total-whole"
-            label="Whole"
-            type="number"
-            min="0"
-            value={value.whole}
-            onChange={(nextValue) => updatePart('whole', nextValue)}
-            className="w-[70px]"
-          />
-          <CompactInputField
-            id="fraction-total-numerator"
-            label="Numerator"
-            type="number"
-            min="0"
-            value={value.numerator}
-            onChange={(nextValue) => updatePart('numerator', nextValue)}
-            className="w-20"
-          />
-          <span className="pb-1 text-sm font-black text-slate-500">/</span>
-          <CompactInputField
-            id="fraction-total-denominator"
-            label="Denominator"
-            type="number"
-            min="1"
-            value={value.denominator}
-            onChange={(nextValue) => updatePart('denominator', nextValue)}
-            className="w-20"
-          />
-        </div>
-        {!denominatorIsValid && (
-          <p className="text-[10px] font-black text-rose-700">
-            Use a denominator greater than 0.
-          </p>
-        )}
-      </div>
-      <InputField
-        id="fraction-number-of-groups"
-        label="Number of groups"
-        type="number"
-        min="1"
-        value={value.numberOfGroups}
-        onChange={(nextValue) => updatePart('numberOfGroups', nextValue)}
-      />
-    </>
-  )
-}
-
 function CompactMixedFractionInputs({ value, onChange }) {
   const updatePart = (part, nextValue) => {
     onChange({
@@ -260,75 +184,34 @@ function CompactMixedFractionInputs({ value, onChange }) {
 function BuildUnitRateForm({
   totalAmount,
   numberOfGroups,
-  fractionProblem,
-  fractionDenominatorIsValid,
   onTotalAmountChange,
   onNumberOfGroupsChange,
-  onFractionProblemChange,
-  mode,
-  onModeChange,
 }) {
   return (
     <div className="rounded-lg bg-amber-50 px-2 py-0.5">
-      <div className="flex items-center justify-between gap-2">
-        <span aria-hidden="true" />
-        <div className="flex items-center gap-1">
-          {mode === 'Fractions' && (
-            <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black text-sky-800">
-              Fraction Mode
-            </span>
-          )}
-          <div className="flex rounded-md bg-white p-0.5 text-[10px] font-black shadow-sm">
-            {['Whole Numbers', 'Fractions'].map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => onModeChange(option)}
-                className={`rounded px-1.5 py-0.5 ${
-                  mode === option
-                    ? 'bg-sky-600 text-white'
-                    : 'text-slate-600 hover:bg-sky-50'
-                }`}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-      <div className={`mt-0.5 gap-2 ${mode === 'Fractions' ? 'grid grid-cols-[1fr_150px]' : 'flex items-end'}`}>
-        {mode === 'Whole Numbers' ? (
-          <>
-            <InputField
-              id="total-amount"
-              label="Total amount"
-              type="number"
-              min="1"
-              value={totalAmount}
-              onChange={onTotalAmountChange}
-              className="w-[180px]"
-              labelClassName="text-xs"
-              inputClassName="h-7 text-base"
-            />
-            <InputField
-              id="number-of-groups"
-              label="Number of groups"
-              type="number"
-              min="1"
-              value={numberOfGroups}
-              onChange={onNumberOfGroupsChange}
-              className="w-[180px]"
-              labelClassName="text-xs"
-              inputClassName="h-7 text-base"
-            />
-          </>
-        ) : (
-          <FractionProblemFields
-            value={fractionProblem}
-            denominatorIsValid={fractionDenominatorIsValid}
-            onChange={onFractionProblemChange}
-          />
-        )}
+      <div className="flex items-end gap-2">
+        <InputField
+          id="total-amount"
+          label="Total amount"
+          type="number"
+          min="1"
+          value={totalAmount}
+          onChange={onTotalAmountChange}
+          className="w-[180px]"
+          labelClassName="text-xs"
+          inputClassName="h-7 text-base"
+        />
+        <InputField
+          id="number-of-groups"
+          label="Number of groups"
+          type="number"
+          min="1"
+          value={numberOfGroups}
+          onChange={onNumberOfGroupsChange}
+          className="w-[180px]"
+          labelClassName="text-xs"
+          inputClassName="h-7 text-base"
+        />
       </div>
     </div>
   )
@@ -341,9 +224,6 @@ function BarModel({
   tileValue,
   tileValueLabel,
   onTileValueChange,
-  fractionChoices,
-  selectedFractionKey,
-  onFractionChoice,
   customFractionTry,
   customFractionDenominatorIsValid,
   onCustomFractionTryChange,
@@ -352,14 +232,14 @@ function BarModel({
   hasTested,
   visibleTileCount,
   animationComplete,
-  mode,
 }) {
   const unitTilePercent = totalAmount > 0 ? (tileValue / totalAmount) * 100 : 0
+  const groupCount = Number.isFinite(numberOfGroups) && numberOfGroups > 0 ? numberOfGroups : 0
   const tileWidthPercent = Math.min(unitTilePercent, 100)
   const attemptedPercent =
     totalAmount > 0 && attemptedTotal !== null ? (attemptedTotal / totalAmount) * 100 : 0
   const repeatedWidthPercent = Math.min(attemptedPercent, 124)
-  const showTileLabels = numberOfGroups <= 8 && tileValue > 0
+  const showTileLabels = groupCount <= 8 && tileValue > 0
   const tileWidth = tileValue === 0 ? '4px' : `${tileWidthPercent}%`
   const unitTileLabel = tileValue > 0 ? tileValueLabel : '?'
   const showTileLabelInside = tileValue > 0 && tileWidthPercent >= 14
@@ -374,16 +254,6 @@ function BarModel({
     : 'text-sky-900'
   const repeatedTileTextSize =
     tileWidthPercent >= 10 ? 'text-[10px]' : tileWidthPercent >= 5 ? 'text-[9px]' : 'text-[8px]'
-  const isWholeNumbersMode = mode === 'Whole Numbers'
-  const totalLabelSize = isWholeNumbersMode ? 'text-sm' : 'text-xs'
-  const totalBarHeight = isWholeNumbersMode ? 'h-10' : 'h-8'
-  const repeatedTileHeight = isWholeNumbersMode ? 'h-6' : 'h-5'
-  const unitLabelSize = isWholeNumbersMode ? 'text-xs' : 'text-[10px]'
-  const unitLaneHeight = isWholeNumbersMode ? 'h-8' : 'h-6'
-  const unitTileHeight = isWholeNumbersMode ? 'h-8' : 'h-6'
-  const unitTextSize = isWholeNumbersMode ? 'text-sm' : 'text-[10px]'
-  const controlLabelSize = isWholeNumbersMode ? 'text-sm' : 'text-[11px]'
-  const currentTrySize = isWholeNumbersMode ? 'text-xs' : 'text-[10px]'
 
   return (
     <div className="rounded-lg bg-sky-50 px-1 py-0.5">
@@ -396,22 +266,22 @@ function BarModel({
         `}
       </style>
       <div className="barScale box-border w-full">
-        <div className={`totalLabel mb-0.5 text-center font-black ${totalLabelSize} ${resultLabelClass}`}>
+        <div className={`totalLabel mb-0.5 text-center text-sm font-black ${resultLabelClass}`}>
           {resultLabel}
         </div>
-        <div className={`totalBar relative box-border w-full overflow-visible rounded-lg bg-white shadow-[inset_0_0_0_2px_rgb(125_211_252)] ${totalBarHeight}`}>
+        <div className="totalBar relative box-border h-10 w-full overflow-visible rounded-lg bg-white shadow-[inset_0_0_0_2px_rgb(125_211_252)]">
           <div className="absolute inset-0 flex overflow-hidden rounded-lg">
-            {Array.from({ length: numberOfGroups }, (_, index) => (
+            {Array.from({ length: groupCount }, (_, index) => (
               <div
                 key={index}
                 className="h-full border-r border-sky-200 bg-sky-100/70 last:border-r-0"
-                style={{ width: `${100 / numberOfGroups}%` }}
+                style={{ width: `${100 / groupCount}%` }}
                 aria-hidden="true"
               />
             ))}
           </div>
-          {hasTested && visibleTileCount > 0 && (
-            <div className={`absolute inset-x-0 top-1/2 -translate-y-1/2 overflow-visible ${repeatedTileHeight}`}>
+          {hasTested && groupCount > 0 && visibleTileCount > 0 && (
+            <div className="absolute inset-x-0 top-1/2 h-6 -translate-y-1/2 overflow-visible">
               <div
                 className="flex h-full overflow-visible"
                 style={{
@@ -428,7 +298,7 @@ function BarModel({
                           ? 'bg-emerald-400 text-emerald-950'
                           : 'bg-amber-300 text-amber-950'
                       }`}
-                      style={{ width: `${100 / numberOfGroups}%` }}
+                      style={{ width: `${100 / groupCount}%` }}
                       title={`${tileValueLabel}`}
                     >
                       <span className={`${repeatedTileTextSize} leading-none`}>
@@ -447,12 +317,12 @@ function BarModel({
           )}
         </div>
 
-        <div className={`unitLabel font-black text-slate-600 ${unitLabelSize}`}>
+        <div className="unitLabel text-xs font-black text-slate-600">
           One unit tile
         </div>
-        <div className={`unitLane relative block box-border w-full overflow-visible bg-transparent p-0 ${unitLaneHeight}`}>
+        <div className="unitLane relative block box-border h-8 w-full overflow-visible bg-transparent p-0">
           <div
-            className={`unitTile absolute left-0 top-0 box-border flex flex-shrink-0 items-center justify-center overflow-hidden rounded-md border-2 border-dashed border-amber-400 bg-amber-100 text-center text-xs font-black text-amber-950 ${unitTileHeight}`}
+            className="unitTile absolute left-0 top-0 box-border flex h-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-md border-2 border-dashed border-amber-400 bg-amber-100 text-center text-xs font-black text-amber-950"
             style={{ width: tileWidth, marginLeft: 0 }}
             title={`1 group = ${unitTileLabel}`}
           >
@@ -461,78 +331,53 @@ function BarModel({
             </span>
           </div>
         </div>
-        <div className={`unitText font-black text-slate-700 ${unitTextSize}`}>
+        <div className="unitText text-sm font-black text-slate-700">
           1 group = {unitTileLabel}
         </div>
       </div>
 
       <div className="mt-0.5 rounded-lg bg-white px-2 py-0.5">
         <div className="flex items-center justify-between gap-3">
-          <label className={`font-black text-slate-800 ${controlLabelSize}`} htmlFor="tile-value-slider">
-            {mode === 'Fractions'
-              ? 'Choose the value of 1 group'
-              : 'Change the value of 1 group'}
+          <label className="text-sm font-black text-slate-800" htmlFor="tile-value-slider">
+            Try a whole number
           </label>
           <span className="rounded-full bg-sky-100 px-3 py-1 text-sm font-black text-sky-900">
             {tileValueLabel}
           </span>
         </div>
-        {mode === 'Fractions' ? (
-          <div className="mt-1">
-            <div className="flex gap-1">
-              {fractionChoices.map((choice) => (
-                <button
-                  key={choice.key}
-                  type="button"
-                  onClick={() => onFractionChoice(choice)}
-                  className={`flex-1 rounded-md px-2 py-1 text-xs font-black ${
-                    selectedFractionKey === choice.key
-                      ? 'bg-sky-600 text-white'
-                      : 'bg-sky-50 text-sky-800 hover:bg-sky-100'
-                  }`}
-                >
-                  {choice.label}
-                </button>
-              ))}
-            </div>
-            <div className="mt-0.5 rounded-md bg-slate-50 px-2 py-0.5">
-              <p className="text-[10px] font-black text-slate-600">
-                Custom try for 1 group - Current try: {tileValueLabel}
-              </p>
-              <CompactMixedFractionInputs
-                value={customFractionTry}
-                onChange={onCustomFractionTryChange}
-              />
-              {!customFractionDenominatorIsValid && (
-                <p className="text-[10px] font-black text-rose-700">
-                  Use a denominator greater than 0.
-                </p>
-              )}
-            </div>
-          </div>
-        ) : (
-          <input
-            id="tile-value-slider"
-            type="range"
-            min="0"
-            max={totalAmount}
-            step="1"
-            value={tileValue}
-            onChange={(event) => onTileValueChange(event.target.value)}
-            className="mt-0.5 w-full accent-sky-600"
-          />
-        )}
-        {mode === 'Whole Numbers' && (
-          <p className={`${currentTrySize} font-black text-slate-700`}>
-            Current try: {tileValueLabel}
+        <input
+          id="tile-value-slider"
+          type="range"
+          min="0"
+          max={Math.max(0, Math.floor(totalAmount))}
+          step="1"
+          value={Math.min(Math.floor(tileValue), Math.max(0, Math.floor(totalAmount)))}
+          onChange={(event) => onTileValueChange(event.target.value)}
+          className="mt-0.5 w-full accent-sky-600"
+        />
+        <p className="text-xs font-black text-slate-700">
+          Current try: {tileValueLabel}
+        </p>
+        <div className="mt-0.5 rounded-md bg-slate-50 px-2 py-0.5">
+          <p className="text-[10px] font-black text-slate-600">
+            Or try a fraction
           </p>
-        )}
+          <CompactMixedFractionInputs
+            value={customFractionTry}
+            onChange={onCustomFractionTryChange}
+          />
+          {!customFractionDenominatorIsValid && (
+            <p className="text-[10px] font-black text-rose-700">
+              Use a denominator greater than 0.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
-function FeedbackBox({ feedbackType, message, mode }) {
+function FeedbackBox({ feedbackType, message }) {
   const classes = {
     placeholder: 'border-slate-200 bg-slate-50 text-slate-500',
     warning: 'border-amber-200 bg-amber-50 text-amber-900',
@@ -540,52 +385,24 @@ function FeedbackBox({ feedbackType, message, mode }) {
   }
 
   return (
-    <div className={`min-h-[32px] rounded-lg border px-3 py-1 font-bold ${mode === 'Whole Numbers' ? 'text-base' : 'text-sm'} ${classes[feedbackType]}`}>
+    <div className={`min-h-[32px] rounded-lg border px-3 py-1 text-base font-bold ${classes[feedbackType]}`}>
       {message}
     </div>
   )
 }
 
 export default function UnitRateSplitterLab() {
-  const [mode, setMode] = useState('Whole Numbers')
   const [totalAmount, setTotalAmount] = useState(defaultProblem.totalAmount)
-  const [fractionProblem, setFractionProblem] = useState(fractionStarterProblem)
   const [numberOfGroups, setNumberOfGroups] = useState(defaultProblem.numberOfGroups)
   const [tileValue, setTileValue] = useState(0)
-  const [selectedFraction, setSelectedFraction] = useState({ numerator: 0, denominator: 1 })
-  const [selectedFractionKey, setSelectedFractionKey] = useState(null)
-  const [customFractionTry, setCustomFractionTry] = useState({
-    whole: '0',
-    numerator: '0',
-    denominator: '1',
-  })
+  const [trySource, setTrySource] = useState('slider')
+  const [customFractionTry, setCustomFractionTry] = useState(defaultCustomTry)
   const [hasTested, setHasTested] = useState(false)
   const [testRun, setTestRun] = useState(0)
   const [visibleTileCount, setVisibleTileCount] = useState(0)
   const [animationComplete, setAnimationComplete] = useState(false)
   const [feedback, setFeedback] = useState('Feedback will appear here.')
 
-  const fractionDenominatorNumber = Number(fractionProblem.denominator)
-  const fractionDenominatorIsValid =
-    fractionProblem.denominator !== '' &&
-    Number.isFinite(fractionDenominatorNumber) &&
-    fractionDenominatorNumber > 0
-  const fractionTotal = useMemo(
-    () =>
-      fractionDenominatorIsValid
-        ? mixedToImproper(
-            Number(fractionProblem.whole) || 0,
-            Number(fractionProblem.numerator) || 0,
-            fractionDenominatorNumber,
-          )
-        : { numerator: 0, denominator: 1 },
-    [
-      fractionDenominatorIsValid,
-      fractionDenominatorNumber,
-      fractionProblem.numerator,
-      fractionProblem.whole,
-    ],
-  )
   const customFractionDenominatorNumber = Number(customFractionTry.denominator)
   const customFractionDenominatorIsValid =
     customFractionTry.denominator !== '' &&
@@ -607,63 +424,42 @@ export default function UnitRateSplitterLab() {
       customFractionTry.whole,
     ],
   )
-  const safeTotalAmount = Math.max(1, Number(totalAmount) || 1)
-  const safeNumberOfGroups =
-    mode === 'Fractions'
-      ? Math.max(1, Number(fractionProblem.numberOfGroups) || 1)
-      : Math.max(1, Number(numberOfGroups) || 1)
-  const activeSelectedFraction = mode === 'Fractions' ? customSelectedFraction : selectedFraction
+  const parsedTotalAmount = parsePositiveWholeNumber(totalAmount)
+  const parsedNumberOfGroups = parsePositiveWholeNumber(numberOfGroups)
+  const totalAmountIsValid = parsedTotalAmount !== null
+  const groupCountIsValid = parsedNumberOfGroups !== null
+  const inputsAreValid = totalAmountIsValid && groupCountIsValid
+  const safeTotalAmount = totalAmountIsValid ? parsedTotalAmount : 0
+  const safeNumberOfGroups = groupCountIsValid ? parsedNumberOfGroups : 0
+  const totalFraction = useMemo(
+    () => ({ numerator: safeTotalAmount, denominator: 1 }),
+    [safeTotalAmount],
+  )
+  const sliderTryFraction = useMemo(
+    () => ({ numerator: tileValue, denominator: 1 }),
+    [tileValue],
+  )
+  const activeSelectedFraction =
+    trySource === 'custom' && customFractionDenominatorIsValid
+      ? customSelectedFraction
+      : sliderTryFraction
+  const activeTileValue = fractionToNumber(activeSelectedFraction)
+  const tileValueLabel = formatFraction(activeSelectedFraction)
   const attemptedFractionTotal = useMemo(
     () => multiplyFractionByInteger(activeSelectedFraction, safeNumberOfGroups),
     [activeSelectedFraction, safeNumberOfGroups],
   )
-  const activeTotalAmount =
-    mode === 'Fractions' ? Math.max(fractionToNumber(fractionTotal), 0.01) : safeTotalAmount
-  const totalAmountLabel =
-    mode === 'Fractions' ? formatFraction(fractionTotal) : `${safeTotalAmount}`
-  const activeTileValue =
-    mode === 'Fractions' ? fractionToNumber(activeSelectedFraction) : tileValue
-  const tileValueLabel =
-    mode === 'Fractions' ? formatFraction(activeSelectedFraction) : `${tileValue}`
-  const attemptedTotal =
-    hasTested && mode === 'Fractions'
-      ? fractionToNumber(attemptedFractionTotal)
-      : hasTested
-        ? tileValue * safeNumberOfGroups
-        : null
-  const attemptedTotalLabel =
-    mode === 'Fractions' ? formatFraction(attemptedFractionTotal) : `${attemptedTotal}`
-  const feedbackType = animationComplete
-    ? getFeedbackType(activeTileValue, attemptedTotal, activeTotalAmount)
-    : 'placeholder'
-  const availableFractionHelpers = fractionHelpers
-
-  const updateMode = (nextMode) => {
-    setMode(nextMode)
-
-    if (nextMode === 'Fractions') {
-      setFractionProblem(fractionStarterProblem)
-      setTileValue(0)
-      setSelectedFraction({ numerator: 0, denominator: 1 })
-      setSelectedFractionKey(null)
-      setCustomFractionTry({ whole: '0', numerator: '0', denominator: '1' })
-      resetAttempt()
-      return
-    }
-
-    if (nextMode === 'Whole Numbers') {
-      setTotalAmount(defaultProblem.totalAmount)
-      setNumberOfGroups(defaultProblem.numberOfGroups)
-      setTileValue(0)
-      setSelectedFraction({ numerator: 0, denominator: 1 })
-      setSelectedFractionKey(null)
-      setCustomFractionTry({ whole: '0', numerator: '0', denominator: '1' })
-      resetAttempt()
-    }
-  }
+  const attemptedTotal = hasTested ? fractionToNumber(attemptedFractionTotal) : null
+  const attemptedTotalLabel = formatFraction(attemptedFractionTotal)
+  const feedbackType =
+    feedback === 'Enter values'
+      ? 'warning'
+      : animationComplete
+        ? getFeedbackType(attemptedTotal, safeTotalAmount)
+        : 'placeholder'
 
   useEffect(() => {
-    if (!hasTested) return undefined
+    if (!hasTested || !inputsAreValid) return undefined
 
     let nextCount = 0
     const intervalId = window.setInterval(() => {
@@ -674,27 +470,16 @@ export default function UnitRateSplitterLab() {
         window.clearInterval(intervalId)
         setAnimationComplete(true)
 
-        if (mode === 'Fractions') {
-          const comparison = compareFractions(attemptedFractionTotal, fractionTotal)
-          const attemptedLabel = formatFraction(attemptedFractionTotal)
-          const tryLabel = formatFraction(activeSelectedFraction)
-          if (comparison < 0) {
-            setFeedback(`Too small: ${attemptedLabel} ÷ ${safeNumberOfGroups} = ${tryLabel}`)
-          } else if (comparison > 0) {
-            setFeedback(`Too big: ${attemptedLabel} ÷ ${safeNumberOfGroups} = ${tryLabel}`)
-          } else {
-            setFeedback(`Perfect fit: ${attemptedLabel} ÷ ${safeNumberOfGroups} = ${tryLabel}`)
-          }
-          return
-        }
+        const comparison = compareFractions(attemptedFractionTotal, totalFraction)
+        const attemptedLabel = formatFraction(attemptedFractionTotal)
+        const tryLabel = formatFraction(activeSelectedFraction)
 
-        const nextAttemptedTotal = tileValue * safeNumberOfGroups
-        if (nextAttemptedTotal < activeTotalAmount) {
-          setFeedback(`Too small: ${nextAttemptedTotal} ÷ ${safeNumberOfGroups} = ${tileValue}`)
-        } else if (nextAttemptedTotal > activeTotalAmount) {
-          setFeedback(`Too big: ${nextAttemptedTotal} ÷ ${safeNumberOfGroups} = ${tileValue}`)
+        if (comparison < 0) {
+          setFeedback(`Too small: ${attemptedLabel} ÷ ${safeNumberOfGroups} = ${tryLabel}`)
+        } else if (comparison > 0) {
+          setFeedback(`Too big: ${attemptedLabel} ÷ ${safeNumberOfGroups} = ${tryLabel}`)
         } else {
-          setFeedback(`Perfect fit: ${nextAttemptedTotal} ÷ ${safeNumberOfGroups} = ${tileValue}`)
+          setFeedback(`Perfect fit: ${attemptedLabel} ÷ ${safeNumberOfGroups} = ${tryLabel}`)
         }
       }
     }, 150)
@@ -702,10 +487,17 @@ export default function UnitRateSplitterLab() {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [activeSelectedFraction, activeTotalAmount, attemptedFractionTotal, fractionTotal, hasTested, mode, safeNumberOfGroups, testRun, tileValue])
+  }, [
+    activeSelectedFraction,
+    attemptedFractionTotal,
+    hasTested,
+    inputsAreValid,
+    safeNumberOfGroups,
+    testRun,
+    totalFraction,
+  ])
 
-  const resetAttempt = () => {
-    setTileValue(0)
+  const clearAttempt = () => {
     setHasTested(false)
     setTestRun(0)
     setVisibleTileCount(0)
@@ -714,65 +506,39 @@ export default function UnitRateSplitterLab() {
   }
 
   const updateTotalAmount = (value) => {
-    setTotalAmount(Math.max(1, Number(value) || 1))
-    resetAttempt()
+    setTotalAmount(value)
+    clearAttempt()
   }
 
   const updateNumberOfGroups = (value) => {
-    setNumberOfGroups(Math.max(1, Number(value) || 1))
-    resetAttempt()
-  }
-
-  const updateFractionProblem = (value) => {
-    setFractionProblem(value)
-    setSelectedFraction({ numerator: 0, denominator: 1 })
-    setSelectedFractionKey(null)
-    setCustomFractionTry({ whole: '0', numerator: '0', denominator: '1' })
-    resetAttempt()
+    setNumberOfGroups(value)
+    clearAttempt()
   }
 
   const updateCustomFractionTry = (value) => {
     setCustomFractionTry(value)
-    setSelectedFractionKey(null)
-    setHasTested(false)
-    setTestRun(0)
-    setVisibleTileCount(0)
-    setAnimationComplete(false)
-    setFeedback('Feedback will appear here.')
+    setTrySource('custom')
+    clearAttempt()
   }
 
   const updateTileValue = (value) => {
     setTileValue(Number(value))
-    setHasTested(false)
-    setTestRun(0)
-    setVisibleTileCount(0)
-    setAnimationComplete(false)
-    setFeedback('Feedback will appear here.')
-  }
-
-  const updateFractionChoice = (choice) => {
-    const simplifiedChoice = simplifyFraction(
-      choice.fraction.numerator,
-      choice.fraction.denominator,
-    )
-    setSelectedFraction(simplifiedChoice)
-    setSelectedFractionKey(choice.key)
-    setCustomFractionTry({
-      whole: '0',
-      numerator: `${simplifiedChoice.numerator}`,
-      denominator: `${simplifiedChoice.denominator}`,
-    })
-    setTileValue(fractionToNumber(simplifiedChoice))
-    setHasTested(false)
-    setTestRun(0)
-    setVisibleTileCount(0)
-    setAnimationComplete(false)
-    setFeedback('Feedback will appear here.')
+    setTrySource('slider')
+    setCustomFractionTry(defaultCustomTry)
+    clearAttempt()
   }
 
   const testForAllGroups = () => {
     setVisibleTileCount(0)
     setAnimationComplete(false)
+
+    if (!inputsAreValid || !customFractionDenominatorIsValid) {
+      setHasTested(false)
+      setTestRun(0)
+      setFeedback('Enter values')
+      return
+    }
+
     setFeedback('Feedback will appear here.')
     setHasTested(true)
     setTestRun((currentRun) => currentRun + 1)
@@ -794,41 +560,24 @@ export default function UnitRateSplitterLab() {
           <BuildUnitRateForm
             totalAmount={totalAmount}
             numberOfGroups={numberOfGroups}
-            fractionProblem={fractionProblem}
-            fractionDenominatorIsValid={fractionDenominatorIsValid}
             onTotalAmountChange={updateTotalAmount}
             onNumberOfGroupsChange={updateNumberOfGroups}
-            onFractionProblemChange={updateFractionProblem}
-            mode={mode}
-            onModeChange={updateMode}
           />
-
-          {mode === 'Fractions' && (
-            <span
-              className="sr-only"
-              data-helper-count={Object.keys(availableFractionHelpers).length}
-            >
-              Fraction Mode
-            </span>
-          )}
 
           <div>
             <div className="text-center">
-              <p className={`${mode === 'Whole Numbers' ? 'text-sm' : 'text-xs'} font-black text-sky-900`}>
+              <p className="text-sm font-black text-sky-900">
                 Find the value of 1 group.
               </p>
             </div>
 
             <BarModel
-              totalAmount={activeTotalAmount}
-              totalAmountLabel={totalAmountLabel}
+              totalAmount={safeTotalAmount}
+              totalAmountLabel={inputsAreValid ? `${safeTotalAmount}` : '?'}
               numberOfGroups={safeNumberOfGroups}
               tileValue={activeTileValue}
               tileValueLabel={tileValueLabel}
               onTileValueChange={updateTileValue}
-              fractionChoices={fractionChoices}
-              selectedFractionKey={selectedFractionKey}
-              onFractionChoice={updateFractionChoice}
               customFractionTry={customFractionTry}
               customFractionDenominatorIsValid={customFractionDenominatorIsValid}
               onCustomFractionTryChange={updateCustomFractionTry}
@@ -837,11 +586,10 @@ export default function UnitRateSplitterLab() {
               hasTested={hasTested}
               visibleTileCount={visibleTileCount}
               animationComplete={animationComplete}
-              mode={mode}
             />
 
             <div className="mt-0.5 grid grid-cols-[1fr_150px] gap-2">
-              <FeedbackBox feedbackType={feedbackType} message={feedback} mode={mode} />
+              <FeedbackBox feedbackType={feedbackType} message={feedback} />
               <button
                 type="button"
                 onClick={testForAllGroups}
