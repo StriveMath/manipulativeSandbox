@@ -1,7 +1,13 @@
 import FactorTree from './factor-tree.jsx'
+import NumberLineExplorer from './number-line-explorer.jsx'
 import TwoFactorTrees from './two-factor-trees.jsx'
 
 export const manipulatives = [
+  {
+    id: 'number-line-explorer',
+    name: 'Number Line Explorer',
+    component: NumberLineExplorer,
+  },
   {
     id: 'factor-tree',
     name: 'Factor Tree',
