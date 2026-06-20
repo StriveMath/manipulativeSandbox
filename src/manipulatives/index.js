@@ -1,27 +1,20 @@
-import AreaOfParallelogram from './area-of-parallelogram.jsx'
-import FactorTree from './factor-tree.jsx'
-import TwoFactorTrees from './two-factor-trees.jsx'
-import UnitRateSplitterLab from './unit-rate-splitter-lab.jsx'
+import { createElement } from 'react'
+
+function BlankSandbox() {
+  return createElement(
+    'div',
+    {
+      className:
+        'flex h-[500px] w-[800px] items-center justify-center bg-slate-50 text-slate-500',
+    },
+    createElement('p', { className: 'text-lg font-semibold' }, 'Blank sandbox'),
+  )
+}
 
 export const manipulatives = [
   {
-    id: 'unit-rate-splitter-lab',
-    name: 'Ratios - Unit rates',
-    component: UnitRateSplitterLab,
-  },
-  {
-    id: 'area-of-parallelogram',
-    name: 'Area of Parallelogram',
-    component: AreaOfParallelogram,
-  },
-  {
-    id: 'factor-tree',
-    name: 'Factor Tree',
-    component: FactorTree,
-  },
-  {
-    id: 'two-factor-trees',
-    name: 'Two Factor Trees',
-    component: TwoFactorTrees,
+    id: 'blank-sandbox',
+    name: 'Blank Sandbox',
+    component: BlankSandbox,
   },
 ]
