@@ -161,14 +161,15 @@ export default function ParallelogramArea() {
       ctx.save()
       drawTrianglePath()
       ctx.clip()
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.42)'
-      ctx.lineWidth = 3
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.42)'
 
       for (let x = triangle[0].x - visualHeight - 25; x < triangle[2].x + visualHeight; x += 13) {
-        ctx.beginPath()
-        ctx.moveTo(x, bottom + 18)
-        ctx.lineTo(x + visualHeight + 48, top - 18)
-        ctx.stroke()
+        for (let y = bottom + 18; y > top - 18; y -= 13) {
+          const dotX = x + (bottom + 18 - y) * 0.9
+          ctx.beginPath()
+          ctx.arc(dotX, y, 2.1, 0, Math.PI * 2)
+          ctx.fill()
+        }
       }
 
       ctx.restore()
@@ -231,30 +232,35 @@ export default function ParallelogramArea() {
     ctx.textAlign = 'right'
     ctx.fillText(`h = ${height}`, heightLineX - 10, top + height / 2 + 6)
 
-    const baseLineStart = points.a.x
-    const baseLineEnd = points.d.x
+    const isRectangle = progress >= 1
+    const baseLineStart = isRectangle ? rectangleLeft : points.a.x
+    const baseLineEnd = isRectangle ? rectangleLeft + visualBase : points.d.x
     const baseLineCenter = baseLineStart + visualBase / 2
+    const baseLineY = isRectangle ? top - 20 : bottom + 28
+    const baseTickTop = isRectangle ? top - 29 : bottom + 19
+    const baseTickBottom = isRectangle ? top - 11 : bottom + 37
+    const baseLabelY = isRectangle ? top - 26 : bottom + 54
 
     ctx.setLineDash([7, 6])
     ctx.strokeStyle = '#2563eb'
     ctx.beginPath()
-    ctx.moveTo(baseLineStart, bottom + 28)
-    ctx.lineTo(baseLineEnd, bottom + 28)
+    ctx.moveTo(baseLineStart, baseLineY)
+    ctx.lineTo(baseLineEnd, baseLineY)
     ctx.stroke()
     ctx.setLineDash([])
 
     ctx.lineWidth = 2.5
     ctx.beginPath()
-    ctx.moveTo(baseLineStart, bottom + 19)
-    ctx.lineTo(baseLineStart, bottom + 37)
-    ctx.moveTo(baseLineEnd, bottom + 19)
-    ctx.lineTo(baseLineEnd, bottom + 37)
+    ctx.moveTo(baseLineStart, baseTickTop)
+    ctx.lineTo(baseLineStart, baseTickBottom)
+    ctx.moveTo(baseLineEnd, baseTickTop)
+    ctx.lineTo(baseLineEnd, baseTickBottom)
     ctx.stroke()
 
     ctx.fillStyle = '#1d4ed8'
     ctx.font = '700 17px Inter, system-ui, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText(`b = ${base}`, baseLineCenter, bottom + 54)
+    ctx.fillText(`b = ${base}`, baseLineCenter, baseLabelY)
 
     const centerX = (points.a.x + points.c.x) / 2
     const formulaY = canvasHeight - 18
