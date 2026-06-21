@@ -18,6 +18,12 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
+function parseCoordinateInput(value) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 0
+  return clamp(Math.round(parsed), minCoord, maxCoord)
+}
+
 function getQuadrant(point) {
   if (!point) return '-'
   if (point.x === 0 && point.y === 0) return 'Origin'
@@ -185,8 +191,8 @@ export default function CoordinateTreasureMap() {
   const wrapRef = useRef(null)
   const [canvasSize, setCanvasSize] = useState({ width: 560, height: 560 })
   const [selected, setSelected] = useState({ x: 3, y: 2 })
-  const [manualX, setManualX] = useState(3)
-  const [manualY, setManualY] = useState(2)
+  const [manualX, setManualX] = useState('3')
+  const [manualY, setManualY] = useState('2')
   const [hoveredLandmark, setHoveredLandmark] = useState(null)
   const [hoverPoint, setHoverPoint] = useState(null)
 
@@ -381,13 +387,47 @@ export default function CoordinateTreasureMap() {
 
   const plotManual = useCallback(() => {
     const point = {
-      x: clamp(Number(manualX) || 0, minCoord, maxCoord),
-      y: clamp(Number(manualY) || 0, minCoord, maxCoord),
+      x: parseCoordinateInput(manualX),
+      y: parseCoordinateInput(manualY),
     }
-    setManualX(point.x)
-    setManualY(point.y)
+    setManualX(String(point.x))
+    setManualY(String(point.y))
     setSelected(point)
   }, [manualX, manualY])
+
+  const commitAxisValue = useCallback((axis) => {
+    if (axis === 'x') {
+      const value = parseCoordinateInput(manualX)
+      setManualX(String(value))
+      return value
+    }
+
+    const value = parseCoordinateInput(manualY)
+    setManualY(String(value))
+    return value
+  }, [manualX, manualY])
+
+  const handleManualChange = (axis, value) => {
+    if (!/^-?\d*$/.test(value)) return
+    if (axis === 'x') setManualX(value)
+    else setManualY(value)
+  }
+
+  const handleAxisKeyDown = (axis, event) => {
+    if (event.key === 'Enter') {
+      plotManual()
+      event.currentTarget.blur()
+      return
+    }
+
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+
+    event.preventDefault()
+    const currentValue = commitAxisValue(axis)
+    const nextValue = clamp(currentValue + (event.key === 'ArrowUp' ? 1 : -1), minCoord, maxCoord)
+    if (axis === 'x') setManualX(String(nextValue))
+    else setManualY(String(nextValue))
+  }
 
   const handleCanvasClick = (event) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -395,8 +435,8 @@ export default function CoordinateTreasureMap() {
     const scaleY = canvasSize.height / rect.height
     const point = fromScreen((event.clientX - rect.left) * scaleX, (event.clientY - rect.top) * scaleY)
     setSelected(point)
-    setManualX(point.x)
-    setManualY(point.y)
+    setManualX(String(point.x))
+    setManualY(String(point.y))
   }
 
   const handleMouseMove = (event) => {
@@ -411,18 +451,6 @@ export default function CoordinateTreasureMap() {
       return Math.hypot(point.x - x, point.y - y) < 18
     })
     setHoveredLandmark(match?.name ?? null)
-  }
-
-  const handleKeyDown = (event) => {
-    if (event.key === 'Enter') {
-      plotManual()
-      return
-    }
-
-    if (event.key === 'ArrowUp') setManualY((value) => clamp(Number(value) + 1, minCoord, maxCoord))
-    if (event.key === 'ArrowDown') setManualY((value) => clamp(Number(value) - 1, minCoord, maxCoord))
-    if (event.key === 'ArrowRight') setManualX((value) => clamp(Number(value) + 1, minCoord, maxCoord))
-    if (event.key === 'ArrowLeft') setManualX((value) => clamp(Number(value) - 1, minCoord, maxCoord))
   }
 
   return (
@@ -443,7 +471,7 @@ export default function CoordinateTreasureMap() {
           </section>
 
           <aside className="flex min-w-0 flex-col gap-2 rounded-xl border border-[#E0DDD6] bg-white p-2">
-            <div className="rounded-xl border border-[#E0DDD6] bg-white p-3" onKeyDown={handleKeyDown}>
+            <div className="rounded-xl border border-[#E0DDD6] bg-white p-3">
               <p className="text-[13px] text-[#5F5E5A]">Click the map or enter a coordinate pair.</p>
               <div className="mt-3 flex items-end justify-center gap-2 rounded-xl bg-[#F8F6F0] px-3 py-4">
                 <span className="pb-2 font-['Fredoka_One'] text-4xl text-[#1A1A2E]">(</span>
@@ -451,11 +479,12 @@ export default function CoordinateTreasureMap() {
                   x
                   <input
                     value={manualX}
-                    onChange={(event) => setManualX(clamp(Number(event.target.value), minCoord, maxCoord))}
+                    onChange={(event) => handleManualChange('x', event.target.value)}
+                    onBlur={() => commitAxisValue('x')}
+                    onKeyDown={(event) => handleAxisKeyDown('x', event)}
                     className="mt-1 w-full rounded-lg border border-[#E0DDD6] bg-white px-2 py-3 text-center font-['Fredoka_One'] text-2xl text-[#D85A30]"
-                    type="number"
-                    min={minCoord}
-                    max={maxCoord}
+                    type="text"
+                    inputMode="numeric"
                   />
                 </label>
                 <span className="pb-2 font-['Fredoka_One'] text-3xl text-slate-400">,</span>
@@ -463,11 +492,12 @@ export default function CoordinateTreasureMap() {
                   y
                   <input
                     value={manualY}
-                    onChange={(event) => setManualY(clamp(Number(event.target.value), minCoord, maxCoord))}
+                    onChange={(event) => handleManualChange('y', event.target.value)}
+                    onBlur={() => commitAxisValue('y')}
+                    onKeyDown={(event) => handleAxisKeyDown('y', event)}
                     className="mt-1 w-full rounded-lg border border-[#E0DDD6] bg-white px-2 py-3 text-center font-['Fredoka_One'] text-2xl text-[#7F77DD]"
-                    type="number"
-                    min={minCoord}
-                    max={maxCoord}
+                    type="text"
+                    inputMode="numeric"
                   />
                 </label>
                 <span className="pb-2 font-['Fredoka_One'] text-4xl text-[#1A1A2E]">)</span>
