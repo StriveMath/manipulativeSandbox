@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
+  Calculator,
   Volume2, 
   VolumeX
 } from 'lucide-react';
@@ -73,10 +74,58 @@ export default function App() {
   const formattedCalc = calculatedVal.toFixed(isFloat ? (calculatedVal % 0.1 === 0 ? 1 : 2) : 0);
 
   return (
-    <div className="bg-slate-100/90 w-full h-screen text-slate-800 font-sans flex items-center justify-center p-0 lg:p-3 overflow-hidden selection:bg-blue-200 select-none">
+    <div className="min-h-screen bg-[#050918] text-slate-800 font-sans overflow-hidden selection:bg-blue-200 select-none">
+      <div className="min-h-screen grid grid-cols-1 md:grid-cols-[254px_minmax(0,1fr)] bg-[linear-gradient(rgba(72,94,140,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(72,94,140,0.12)_1px,transparent_1px)] bg-[size:48px_48px]">
+        <aside className="hidden md:flex bg-[#111827]/95 border-r border-slate-700/70 text-white p-5 flex-col">
+          <div className="space-y-3">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-300">
+              Sandbox Environment
+            </p>
+            <div className="flex items-center gap-2 text-base font-black">
+              <Calculator className="w-4 h-4 text-amber-300" />
+              <span>Math Manipulatives</span>
+            </div>
+          </div>
+
+          <div className="h-px bg-slate-700/80 my-6" />
+
+          <nav className="space-y-3">
+            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-blue-200">
+              Active Tools
+            </p>
+            <button className="w-full rounded-lg bg-indigo-600 px-3.5 py-3 text-left text-sm font-extrabold text-white shadow-lg shadow-indigo-950/30">
+              Percent Decimal Fraction
+            </button>
+            <button className="w-full rounded-lg px-3.5 py-3 text-left text-sm font-semibold text-slate-400">
+              Factor Tree
+            </button>
+            <button className="w-full rounded-lg px-3.5 py-3 text-left text-sm font-semibold text-slate-400">
+              Two Factor Trees
+            </button>
+          </nav>
+
+          <div className="mt-auto rounded-xl bg-[#0b1224] border border-slate-800 px-4 py-4">
+            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-200">
+              Instructions
+            </p>
+            <p className="mt-3 text-xs leading-5 text-blue-200/80">
+              Select any model from the list. The sandbox guarantees fluid sizing and real-time state preservation inside the workspace canvas.
+            </p>
+          </div>
+        </aside>
+
+        <main className="min-w-0 h-screen px-4 py-4 md:px-10 lg:px-16 flex flex-col items-center overflow-hidden">
+          <div className="rounded-full bg-indigo-950/90 border border-indigo-500/30 px-4 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-indigo-300">
+            Active Workspace
+          </div>
+          <h1 className="mt-2 text-center text-2xl font-black text-white drop-shadow">
+            Percent Decimal Fraction Manipulative
+          </h1>
+
+          <section className="mt-4 w-full max-w-[900px] h-[min(600px,calc(100vh-120px))] min-h-[560px] rounded-[18px] border border-slate-300/90 bg-slate-100 p-4 shadow-2xl shadow-black/40 overflow-hidden">
       
       {/* Main Adaptive Workspace Center Container */}
-      <div className="w-full h-full lg:w-[1008px] lg:h-[590px] lg:max-h-[590px] bg-slate-50 border-0 lg:border border-slate-200/80 rounded-none lg:rounded-[24px] shadow-none lg:shadow-2xl overflow-hidden flex flex-col p-3 lg:p-3 justify-between relative gap-2 lg:gap-1.5">
+      <div className="w-full h-full bg-slate-50 border border-slate-200/80 rounded-[14px] shadow-sm overflow-hidden flex flex-col p-3 justify-between relative gap-1.5">
         
         {/* TOP LEVEL TOOLBAR ROW */}
         <header className="relative bg-white border border-slate-200/80 px-4 py-2 lg:py-1.5 rounded-2xl shadow-sm flex items-center justify-between gap-4 overflow-hidden select-none shrink-0">
@@ -203,16 +252,23 @@ export default function App() {
         <div className="flex-1 min-h-0 lg:overflow-hidden select-none">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 h-full">
             {/* Percent Card */}
-            <PercentGridCard value={value} compact={false} wholeAmount={wholeAmount} />
+            <PercentGridCard value={value} compact={true} wholeAmount={wholeAmount} />
 
             {/* Decimal Card */}
-            <DecimalBlocksCard value={value} compact={false} wholeAmount={wholeAmount} />
+            <DecimalBlocksCard value={value} compact={true} wholeAmount={wholeAmount} />
 
             {/* Fraction Card */}
-            <FractionShapeCard fraction={activeFraction} compact={false} wholeAmount={wholeAmount} />
+            <FractionShapeCard fraction={activeFraction} compact={true} wholeAmount={wholeAmount} />
           </div>
         </div>
 
+      </div>
+          </section>
+
+          <p className="mt-4 text-[11px] font-mono text-blue-200/70">
+            Viewport Resolution: 800 x 500 px (Device Responsive)
+          </p>
+        </main>
       </div>
     </div>
   );
