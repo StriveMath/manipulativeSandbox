@@ -1,13 +1,13 @@
 import AreaOfParallelogram from './area-of-parallelogram.jsx'
 import FactorTree from './factor-tree.jsx'
+import RatiosUnitRate from './RatiosUnitRate.tsx'
 import TwoFactorTrees from './two-factor-trees.jsx'
-import UnitRateSplitterLab from './unit-rate-splitter-lab.jsx'
 
 export const manipulatives = [
   {
     id: 'unit-rate-splitter-lab',
     name: 'Ratios - Unit rates',
-    component: UnitRateSplitterLab,
+    component: RatiosUnitRate,
   },
   {
     id: 'area-of-parallelogram',

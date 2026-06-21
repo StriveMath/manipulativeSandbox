@@ -19,3 +19,11 @@ alwaysApply: true
 - Number inputs should not show browser spinner arrows.
 - Use Tailwind classes for layout and simple styling.
 - After edits, run `npm run build` when practical and check lints on changed files.
+
+## Ratios - Unit Rates
+
+- Current design ports an AI Studio cookie-and-jar unit-rate app into the sandbox.
+- It uses sliders for Total Cookies and Jars, a ratio/unit-rate equation card, Jar 1 as the editable jar, locked inactive jars, and Apply To All/Reset controls.
+- Students click or drag cookies from the Cookie Supply Drawer into Jar 1, then apply the same amount to every jar.
+- The default example is `20 cookies` shared across `4 jars`.
+- Keep the activity inside the 800x500 canvas with no project-wide dependency additions unless explicitly requested.
