@@ -1,0 +1,29 @@
+---
+description: Manipulative Sandbox project conventions
+alwaysApply: true
+---
+
+# Manipulative Sandbox Rules
+
+- The app is a React/Vite sandbox for prototyping math manipulatives.
+- Every manipulative must render inside the shared `ManipulativeCanvas` in `src/App.jsx`.
+- The shared canvas is the developer boundary: `800px` wide by `500px` high, with a visible border.
+- Never introduce scrollbars. Keep `overflow-hidden` at the page, app, canvas, and manipulative levels.
+- Manipulative content must stay inside the canvas. If content can grow, scale or lay it out to fit the `800x500` frame.
+- Add each manipulative as its own file under `src/manipulatives/`.
+- Register new manipulatives in `src/manipulatives/index.js` so they appear in the left navigator.
+- Do not reuse code across different manipulatives unless the user explicitly asks for shared code. Prefer duplicating standalone logic per manipulative for now.
+- Keep the left navigator very simple: it should only list manipulatives and switch the active one.
+- Action buttons inside manipulatives should appear on hover when possible, not permanently clutter the canvas.
+- Inputs should be visually obvious as white boxes with borders.
+- Number inputs should not show browser spinner arrows.
+- Use Tailwind classes for layout and simple styling.
+- After edits, run `npm run build` when practical and check lints on changed files.
+
+## Ratios - Unit Rates
+
+- Current design ports an AI Studio cookie-and-jar unit-rate app into the sandbox.
+- It uses sliders for Total Cookies and Jars, a ratio/unit-rate equation card, Jar 1 as the editable jar, locked inactive jars, and Apply To All/Reset controls.
+- Students click or drag cookies from the Cookie Supply Drawer into Jar 1, then apply the same amount to every jar.
+- The default example is `20 cookies` shared across `4 jars`.
+- Keep the activity inside the 800x500 canvas with no project-wide dependency additions unless explicitly requested.
