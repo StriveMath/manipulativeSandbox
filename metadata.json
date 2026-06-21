@@ -1,0 +1,6 @@
+{
+  "name": "Percent Decimal Fraction Playground",
+  "description": "An interactive playground demonstrating conversion between percents, fractions, and decimals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
