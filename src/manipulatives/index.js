@@ -1,6 +1,7 @@
 import AreaOfParallelogram from './area-of-parallelogram.jsx'
 import FactorTree from './factor-tree.jsx'
 import PercentDecimalFraction from './PercentDecimalFraction.tsx'
+import PercentFraction from './PercentFraction.tsx'
 import RatiosUnitRate from './RatiosUnitRate.tsx'
 import TwoFactorTrees from './two-factor-trees.jsx'
 
@@ -14,6 +15,11 @@ export const manipulatives = [
     id: 'percent-decimal-fraction',
     name: 'Percent Decimal Fraction',
     component: PercentDecimalFraction,
+  },
+  {
+    id: 'percent-fraction',
+    name: 'Percent Fraction',
+    component: PercentFraction,
   },
   {
     id: 'area-of-parallelogram',
