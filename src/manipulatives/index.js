@@ -1,5 +1,6 @@
 import CoordinateTreasureMap from './coordinate-treasure-map.jsx'
 import FactorTree from './factor-tree.jsx'
+import MeanBalancePoint from './mean-balance-point.jsx'
 import NumberLineExplorer from './number-line-explorer.jsx'
 import ParallelogramArea from './parallelogram-area.jsx'
 import TwoFactorTrees from './two-factor-trees.jsx'
@@ -14,6 +15,11 @@ export const manipulatives = [
     id: 'number-line-explorer',
     name: 'Number Line Explorer',
     component: NumberLineExplorer,
+  },
+  {
+    id: 'mean-balance-point',
+    name: 'Mean Balance Point',
+    component: MeanBalancePoint,
   },
   {
     id: 'parallelogram-area',
