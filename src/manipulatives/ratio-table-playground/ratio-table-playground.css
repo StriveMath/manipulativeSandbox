@@ -1,0 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+.ratio-table-playground {
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+.ratio-table-playground .font-display {
+  font-family: "Outfit", sans-serif;
+}
+
+.ratio-table-playground .font-mono {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+.ratio-table-playground svg path {
+  animation: ratio-table-svg-dash 25s linear infinite;
+}
+
+@keyframes ratio-table-svg-dash {
+  to {
+    stroke-dashoffset: -80;
+  }
+}
+
+.ratio-table-playground ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.ratio-table-playground ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.ratio-table-playground ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.ratio-table-playground ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
