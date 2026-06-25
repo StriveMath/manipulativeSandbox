@@ -230,6 +230,7 @@ export default function ParallelogramArea() {
     ctx.fillStyle = '#ea580c'
     ctx.font = '700 17px Inter, system-ui, sans-serif'
     ctx.textAlign = 'right'
+    ctx.textBaseline = 'alphabetic'
     ctx.fillText(`h = ${height}`, heightLineX - 10, top + height / 2 + 6)
 
     const isRectangle = progress >= 1
@@ -239,7 +240,7 @@ export default function ParallelogramArea() {
     const baseLineY = isRectangle ? top - 20 : bottom + 28
     const baseTickTop = isRectangle ? top - 29 : bottom + 19
     const baseTickBottom = isRectangle ? top - 11 : bottom + 37
-    const baseLabelY = isRectangle ? top - 26 : bottom + 54
+    const baseLabelY = isRectangle ? top - 42 : bottom + 54
 
     ctx.setLineDash([7, 6])
     ctx.strokeStyle = '#2563eb'
@@ -260,7 +261,51 @@ export default function ParallelogramArea() {
     ctx.fillStyle = '#1d4ed8'
     ctx.font = '700 17px Inter, system-ui, sans-serif'
     ctx.textAlign = 'center'
+    ctx.textBaseline = 'alphabetic'
     ctx.fillText(`b = ${base}`, baseLineCenter, baseLabelY)
+
+    // Slant dimension along the bottom-right slanted edge (d -> c), styled like
+    // the h and b dimensions. Hidden once the shape has become a rectangle.
+    if (!isRectangle) {
+      const slantColor = '#059669'
+      const edgeX = points.c.x - points.d.x
+      const edgeY = points.c.y - points.d.y
+      const edgeLen = Math.hypot(edgeX, edgeY) || 1
+      const ux = edgeX / edgeLen
+      const uy = edgeY / edgeLen
+      // Outward normal (points to the lower-right, away from the interior)
+      const nX = -edgeY / edgeLen
+      const nY = edgeX / edgeLen
+      const offset = 24
+      const cap = 9
+      const p1 = { x: points.d.x + nX * offset, y: points.d.y + nY * offset }
+      const p2 = { x: points.c.x + nX * offset, y: points.c.y + nY * offset }
+
+      ctx.strokeStyle = slantColor
+      ctx.setLineDash([7, 6])
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(p1.x, p1.y)
+      ctx.lineTo(p2.x, p2.y)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      ctx.lineWidth = 2.5
+      ctx.beginPath()
+      ctx.moveTo(p1.x - nX * cap, p1.y - nY * cap)
+      ctx.lineTo(p1.x + nX * cap, p1.y + nY * cap)
+      ctx.moveTo(p2.x - nX * cap, p2.y - nY * cap)
+      ctx.lineTo(p2.x + nX * cap, p2.y + nY * cap)
+      ctx.stroke()
+
+      const labelX = (p1.x + p2.x) / 2 + nX * 16 + ux * 4
+      const labelY = (p1.y + p2.y) / 2 + nY * 16 + uy * 4
+      ctx.fillStyle = slantColor
+      ctx.font = '700 17px Inter, system-ui, sans-serif'
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(`slant = ${skew}`, labelX, labelY)
+    }
 
     const centerX = (points.a.x + points.c.x) / 2
     const formulaY = canvasHeight - 18
@@ -281,7 +326,7 @@ export default function ParallelogramArea() {
       ctx.fillText(part.text, formulaX, formulaY)
       formulaX += ctx.measureText(part.text).width
     })
-  }, [area, base, geometry, height, phase, progress])
+  }, [area, base, geometry, height, phase, progress, skew])
 
   useEffect(() => {
     return () => {

@@ -5,6 +5,13 @@ const dotColor = '#FF3EA5'
 const meanColor = '#00C2A8'
 const removeColor = '#A32D2D'
 
+const PRESETS = [
+  ['Evenly spread', [2, 4, 6, 8, 10]],
+  ['One outlier', [1, 1, 1, 10]],
+  ['All equal', [3, 3, 3, 3]],
+  ['Symmetric', [2, 8, 2, 8]],
+]
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
@@ -21,36 +28,41 @@ function makeDot(value) {
   }
 }
 
-function getLayout(width, height) {
+function getLayout(width, height, angle = 0, pivotLocalX = 0) {
   const PAD = Math.max(28, Math.min(44, width * 0.08))
-  const BEAM_Y = height * 0.62
+  const BEAM_Y = height * 0.46
   const BEAM_LEFT = PAD
   const BEAM_RIGHT = width - PAD
   const BEAM_LENGTH = BEAM_RIGHT - BEAM_LEFT
   const CENTER_X = width / 2
-  const angle = 0
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
 
   const toLocalX = (value) => -BEAM_LENGTH / 2 + (value / 20) * BEAM_LENGTH
   const toValue = (localX) => clamp(((localX + BEAM_LENGTH / 2) / BEAM_LENGTH) * 20, 0, 20)
   const toIntegerValue = (localX) => Math.round(toValue(localX))
-  const toScreen = (localX, localY = 0) => ({
-    x: CENTER_X + localX * Math.cos(angle) - localY * Math.sin(angle),
-    y: BEAM_Y + localX * Math.sin(angle) + localY * Math.cos(angle),
-  })
+  // The beam rotates about the fulcrum (pivotLocalX), which stays on the ground line.
+  const toScreen = (localX, localY = 0) => {
+    const lx = localX - pivotLocalX
+    return {
+      x: CENTER_X + pivotLocalX + lx * cos - localY * sin,
+      y: BEAM_Y + lx * sin + localY * cos,
+    }
+  }
   const toLocal = (x, y) => {
-    const dx = x - CENTER_X
+    const dx = x - (CENTER_X + pivotLocalX)
     const dy = y - BEAM_Y
     return {
-      x: dx * Math.cos(angle) + dy * Math.sin(angle),
-      y: -dx * Math.sin(angle) + dy * Math.cos(angle),
+      x: pivotLocalX + dx * cos + dy * sin,
+      y: -dx * sin + dy * cos,
     }
   }
 
-  return { PAD, BEAM_Y, BEAM_LENGTH, CENTER_X, angle, toIntegerValue, toLocal, toLocalX, toScreen, toValue }
+  return { PAD, BEAM_Y, BEAM_LENGTH, CENTER_X, angle, pivotLocalX, toIntegerValue, toLocal, toLocalX, toScreen, toValue }
 }
 
-function getDotPositions(dots, width, height) {
-  const layout = getLayout(width, height)
+function getDotPositions(dots, width, height, angle = 0, pivotLocalX = 0) {
+  const layout = getLayout(width, height, angle, pivotLocalX)
   const stackCounts = new Map()
 
   return dots.map((dot) => {
@@ -74,12 +86,22 @@ export default function MeanBalancePoint() {
   const [animatedMean, setAnimatedMean] = useState(8)
   const [drag, setDrag] = useState(null)
   const [statsHidden, setStatsHidden] = useState(false)
+  const [fulcrum, setFulcrum] = useState(10)
+  const [releasedFulcrum, setReleasedFulcrum] = useState(10)
 
-  const canvasHeight = 240
+  const canvasHeight = 280
   const values = useMemo(() => dots.map((dot) => rounded(dot.value, 1)).sort((a, b) => a - b), [dots])
   const sum = values.reduce((total, value) => total + value, 0)
   const mean = dots.length ? sum / dots.length : 0
   const meanDisplay = rounded(mean, 1).toFixed(1)
+
+  // In Hide mode the green marker becomes a draggable fulcrum: once released, if it
+  // isn't at the true mean, the beam tilts slightly (heavier side drops) about it.
+  // While the mouse is pressed (dragging) the beam stays level.
+  const baseLayout = getLayout(canvasWidth, canvasHeight)
+  const tilt = statsHidden && dots.length && !drag ? clamp((mean - fulcrum) * 0.012, -0.12, 0.12) : 0
+  const pivotLocalX = statsHidden ? baseLayout.toLocalX(fulcrum) : 0
+  const balanced = statsHidden && dots.length > 0 && Math.abs(mean - releasedFulcrum) < 0.2
 
   useEffect(() => {
     const node = wrapRef.current
@@ -136,23 +158,13 @@ export default function MeanBalancePoint() {
     setDots((current) => current.map((dot) => dot.id === id ? { ...dot, value } : dot))
   }
 
-  const moveMeanTo = useCallback((targetMean) => {
-    setDots((current) => {
-      if (!current.length) return current
-      const adjustableIndex = current.length - 1
-      const otherSum = current.reduce((total, dot, index) => index === adjustableIndex ? total : total + dot.value, 0)
-      const nextValue = clamp(targetMean * current.length - otherSum, 0, 20)
-      return current.map((dot, index) => index === adjustableIndex ? { ...dot, value: rounded(nextValue, 1) } : dot)
-    })
-  }, [])
-
   const removeDot = (id) => {
     setDots((current) => current.filter((dot) => dot.id !== id))
   }
 
   const handlePointerDown = (event) => {
     const point = getPointer(event)
-    const positions = getDotPositions(dots, canvasWidth, canvasHeight)
+    const positions = getDotPositions(dots, canvasWidth, canvasHeight, tilt, pivotLocalX)
     const hit = positions.findLast((dot) => Math.hypot(dot.screen.x - point.x, dot.screen.y - point.y) <= 19)
 
     if (hit) {
@@ -161,9 +173,11 @@ export default function MeanBalancePoint() {
       return
     }
 
-    const layout = getLayout(canvasWidth, canvasHeight)
-    const meanScreen = layout.toScreen(layout.toLocalX(animatedMean), 0)
-    const meanHit = Math.abs(point.x - meanScreen.x) <= 30 && point.y >= meanScreen.y + 2 && point.y <= meanScreen.y + 66
+    const layout = getLayout(canvasWidth, canvasHeight, tilt, pivotLocalX)
+    const markerValue = statsHidden ? fulcrum : animatedMean
+    const markerScreen = layout.toScreen(layout.toLocalX(markerValue), 0)
+    // The green marker is only draggable in Hide mode (as the balance fulcrum).
+    const meanHit = statsHidden && Math.abs(point.x - markerScreen.x) <= 30 && point.y >= markerScreen.y + 2 && point.y <= markerScreen.y + 66
     if (meanHit) {
       event.currentTarget.setPointerCapture(event.pointerId)
       setDrag({ type: 'mean', startX: point.x, startY: point.y, x: point.x, y: point.y, didMove: false })
@@ -181,14 +195,13 @@ export default function MeanBalancePoint() {
 
     const point = getPointer(event)
     const moved = drag.didMove || Math.hypot(point.x - drag.startX, point.y - drag.startY) > 3
-    const layout = getLayout(canvasWidth, canvasHeight)
+    const layout = getLayout(canvasWidth, canvasHeight, tilt, pivotLocalX)
     const local = layout.toLocal(point.x, point.y)
 
     if (drag.type === 'mean') {
-      const targetMean = rounded(layout.toValue(local.x), 1)
-      animatedMeanRef.current = targetMean
-      setAnimatedMean(targetMean)
-      moveMeanTo(targetMean)
+      // Drag the fulcrum along the ground line (level mapping, ignore tilt).
+      const groundLocalX = point.x - layout.CENTER_X
+      setFulcrum(rounded(baseLayout.toValue(groundLocalX), 1))
       setDrag({ ...drag, x: point.x, y: point.y, didMove: moved })
       return
     }
@@ -201,11 +214,12 @@ export default function MeanBalancePoint() {
     if (!drag) return
 
     if (drag.type === 'mean') {
+      setReleasedFulcrum(fulcrum)
       setDrag(null)
       return
     }
 
-    const layout = getLayout(canvasWidth, canvasHeight)
+    const layout = getLayout(canvasWidth, canvasHeight, tilt, pivotLocalX)
     const removeByDrag = drag.didMove && drag.y < layout.BEAM_Y - 60
     if (!drag.didMove || removeByDrag) removeDot(drag.id)
     setDrag(null)
@@ -218,10 +232,11 @@ export default function MeanBalancePoint() {
 
     const width = canvasWidth
     const height = canvasHeight
-    const layout = getLayout(width, height)
-    const positionedDots = getDotPositions(dots, width, height)
+    const layout = getLayout(width, height, tilt, pivotLocalX)
+    const positionedDots = getDotPositions(dots, width, height, tilt, pivotLocalX)
     const meanLocalX = layout.toLocalX(animatedMean)
-    const meanScreen = layout.toScreen(meanLocalX, 0)
+    const markerValue = statsHidden ? fulcrum : animatedMean
+    const markerScreen = layout.toScreen(layout.toLocalX(markerValue), 0)
     const removing = drag?.type === 'dot' && drag.y < layout.BEAM_Y - 60
 
     ctx.clearRect(0, 0, width, height)
@@ -245,10 +260,12 @@ export default function MeanBalancePoint() {
     }
 
     ctx.save()
-    ctx.translate(layout.CENTER_X, layout.BEAM_Y)
+    // Rotate the whole beam about the fulcrum; local coords are relative to the pivot.
+    ctx.translate(layout.CENTER_X + layout.pivotLocalX, layout.BEAM_Y)
     ctx.rotate(layout.angle)
+    const px = layout.pivotLocalX
 
-    if (dots.length > 1) {
+    if (dots.length > 1 && !statsHidden) {
       positionedDots.forEach((dot) => {
         ctx.save()
         ctx.setLineDash([6, 5])
@@ -256,8 +273,8 @@ export default function MeanBalancePoint() {
         ctx.globalAlpha = 0.75
         ctx.lineWidth = 1.6
         ctx.beginPath()
-        ctx.moveTo(dot.localX, dot.localY + 13)
-        ctx.lineTo(meanLocalX, 0)
+        ctx.moveTo(dot.localX - px, dot.localY + 13)
+        ctx.lineTo(meanLocalX - px, 0)
         ctx.stroke()
         ctx.restore()
       })
@@ -268,8 +285,8 @@ export default function MeanBalancePoint() {
     ctx.lineWidth = 5
     ctx.lineCap = 'round'
     ctx.beginPath()
-    ctx.moveTo(-layout.BEAM_LENGTH / 2, 0)
-    ctx.lineTo(layout.BEAM_LENGTH / 2, 0)
+    ctx.moveTo(-layout.BEAM_LENGTH / 2 - px, 0)
+    ctx.lineTo(layout.BEAM_LENGTH / 2 - px, 0)
     ctx.stroke()
 
     ctx.lineWidth = 2
@@ -277,7 +294,7 @@ export default function MeanBalancePoint() {
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
     for (let value = 0; value <= 20; value += 1) {
-      const x = layout.toLocalX(value)
+      const x = layout.toLocalX(value) - px
       ctx.beginPath()
       ctx.moveTo(x, -9)
       ctx.lineTo(x, value % 5 === 0 ? 16 : 10)
@@ -293,14 +310,14 @@ export default function MeanBalancePoint() {
       ctx.strokeStyle = '#ffffff'
       ctx.lineWidth = 3
       ctx.beginPath()
-      ctx.arc(dot.localX, dot.localY, 13, 0, Math.PI * 2)
+      ctx.arc(dot.localX - px, dot.localY, 13, 0, Math.PI * 2)
       ctx.fill()
       ctx.stroke()
       ctx.fillStyle = '#ffffff'
       ctx.font = '900 13px Inter, system-ui, sans-serif'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillText(String(dot.value), dot.localX, dot.localY + 0.5)
+      ctx.fillText(String(dot.value), dot.localX - px, dot.localY + 0.5)
       ctx.restore()
     })
 
@@ -323,22 +340,27 @@ export default function MeanBalancePoint() {
     ctx.strokeStyle = meanColor
     ctx.lineWidth = 3
     ctx.beginPath()
-    ctx.moveTo(meanScreen.x, meanScreen.y + 5)
-    ctx.lineTo(meanScreen.x - 18, meanScreen.y + 42)
-    ctx.lineTo(meanScreen.x + 18, meanScreen.y + 42)
+    ctx.moveTo(markerScreen.x, markerScreen.y + 5)
+    ctx.lineTo(markerScreen.x - 18, markerScreen.y + 42)
+    ctx.lineTo(markerScreen.x + 18, markerScreen.y + 42)
     ctx.closePath()
     ctx.fill()
     ctx.beginPath()
-    ctx.moveTo(meanScreen.x - 26, meanScreen.y + 42)
-    ctx.lineTo(meanScreen.x + 26, meanScreen.y + 42)
+    ctx.moveTo(markerScreen.x - 26, markerScreen.y + 42)
+    ctx.lineTo(markerScreen.x + 26, markerScreen.y + 42)
     ctx.stroke()
 
-    ctx.fillStyle = beamColor
-    ctx.font = '900 14px Inter, system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
-    ctx.fillText(`mean = ${meanDisplay}`, meanScreen.x, meanScreen.y + 48)
-  }, [animatedMean, canvasWidth, dots, drag, mean, meanDisplay])
+    ctx.font = '900 14px Inter, system-ui, sans-serif'
+    if (statsHidden) {
+      ctx.fillStyle = balanced ? meanColor : removeColor
+      ctx.fillText(balanced ? 'Balanced!' : 'Drag to balance', markerScreen.x, markerScreen.y + 48)
+    } else {
+      ctx.fillStyle = beamColor
+      ctx.fillText(`mean = ${meanDisplay}`, markerScreen.x, markerScreen.y + 48)
+    }
+  }, [animatedMean, balanced, canvasWidth, dots, drag, fulcrum, mean, meanDisplay, pivotLocalX, statsHidden, tilt])
 
   useEffect(() => {
     draw()
@@ -346,14 +368,7 @@ export default function MeanBalancePoint() {
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-auto bg-[#F8F0FF] p-4 font-['Inter'] text-[#3D0099]">
-      <section className="relative grid grid-cols-2 gap-2 pr-24 md:grid-cols-4">
-        <button
-          type="button"
-          onClick={() => setStatsHidden((hidden) => !hidden)}
-          className="absolute right-0 top-0 rounded-full border border-[#3D0099]/20 bg-white px-3 py-1.5 text-xs font-black"
-        >
-          {statsHidden ? 'Show' : 'Hide'}
-        </button>
+      <section className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <div className="rounded-xl bg-white p-3">
           <p className="text-xs text-[#3D0099]/70">Values</p>
           <p className="text-lg font-black text-[#FF3EA5]">{values.length ? values.join(', ') : '-'}</p>
@@ -366,13 +381,27 @@ export default function MeanBalancePoint() {
           <p className="text-xs text-[#3D0099]/70">Count</p>
           <p className="text-lg font-black text-slate-500">{statsHidden ? '-' : dots.length}</p>
         </div>
-        <div className="rounded-xl bg-white p-3">
+        <div className="relative rounded-xl bg-white p-3">
+          <button
+            type="button"
+            onClick={() => setStatsHidden((hidden) => {
+              const next = !hidden
+              if (next) {
+                setFulcrum(10)
+                setReleasedFulcrum(10)
+              }
+              return next
+            })}
+            className="absolute right-2 top-2 rounded-full border border-[#3D0099]/20 bg-white px-2.5 py-1 text-xs font-black"
+          >
+            {statsHidden ? 'Show' : 'Hide'}
+          </button>
           <p className="text-xs text-[#3D0099]/70">Mean</p>
           <p className="text-lg font-black text-[#00C2A8]">{statsHidden ? '-' : meanDisplay}</p>
         </div>
       </section>
 
-      <div ref={wrapRef} className="relative h-[240px] overflow-hidden rounded-xl bg-white">
+      <div ref={wrapRef} className="relative h-[280px] overflow-hidden rounded-xl bg-white">
         <canvas
           ref={canvasRef}
           width={canvasWidth}
@@ -383,35 +412,34 @@ export default function MeanBalancePoint() {
           onPointerUp={handlePointerUp}
           onPointerCancel={() => setDrag(null)}
         />
-      </div>
 
-      <section className="rounded-xl bg-white p-3">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-black">
-          <button
-            type="button"
-            onClick={() => setDots([])}
-            className="text-[#A32D2D] underline-offset-4 hover:underline"
-          >
-            Clear all
-          </button>
-          {[
-            ['Evenly spread', [2, 4, 6, 8, 10]],
-            ['One outlier', [1, 1, 1, 10]],
-            ['All equal', [3, 3, 3, 3]],
-            ['Symmetric', [2, 8, 2, 8]],
-          ].map(([label, preset]) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => setPreset(preset)}
-              className="text-[#3D0099] underline-offset-4 hover:underline"
-            >
-              {label}
-            </button>
+        <div className="absolute bottom-2 left-2 text-xs font-black text-black">
+          <span>Presets: </span>
+          {PRESETS.map(([label, preset], index) => (
+            <span key={label}>
+              {index > 0 && ', '}
+              <button
+                type="button"
+                onClick={() => setPreset(preset)}
+                className="text-black underline underline-offset-2"
+              >
+                {label}
+              </button>
+            </span>
           ))}
         </div>
 
-        <p className="mt-3 text-sm font-semibold text-[#3D0099]/75">
+        <button
+          type="button"
+          onClick={() => setDots([])}
+          className="absolute bottom-2 right-2 rounded-full bg-[#A32D2D] px-3 py-1.5 text-xs font-black text-white shadow-sm"
+        >
+          Clear all
+        </button>
+      </div>
+
+      <section className="rounded-xl bg-white p-3">
+        <p className="text-sm font-semibold text-[#3D0099]/75">
           Click beam to add dot. Click or drag dot up to remove. Drag the teal mean marker to adjust a value.
         </p>
       </section>
