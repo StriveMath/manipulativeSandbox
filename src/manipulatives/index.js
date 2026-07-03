@@ -6,6 +6,7 @@ import MultiplyingFractionsArea from './multiplying-fractions-area.jsx'
 import NumberLineExplorer from './number-line-explorer.jsx'
 import ParallelogramArea from './parallelogram-area.jsx'
 import PizzaRemainder from './pizza-remainder.jsx'
+import RoundingNumberLine from './rounding-number-line.jsx'
 import TwoFactorTrees from './two-factor-trees.jsx'
 
 export const manipulatives = [
@@ -23,6 +24,11 @@ export const manipulatives = [
     id: 'balance-scale-equations',
     name: 'Balance Scale Equations',
     component: BalanceScaleEquations,
+  },
+  {
+    id: 'rounding-number-line',
+    name: 'Rounding on a Number Line',
+    component: RoundingNumberLine,
   },
   {
     id: 'coordinate-treasure-map',
