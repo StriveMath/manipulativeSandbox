@@ -128,9 +128,11 @@ export default function BalanceScaleEquations() {
     const canvas = canvasRef.current
     if (!canvas) return
     const dpr = window.devicePixelRatio || 1
-    if (canvas.width !== canvasWidth * dpr || canvas.height !== canvasHeight * dpr) {
-      canvas.width = canvasWidth * dpr
-      canvas.height = canvasHeight * dpr
+    const cw = Math.round(canvasWidth * dpr)
+    const ch = Math.round(canvasHeight * dpr)
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw
+      canvas.height = ch
     }
     const ctx = canvas.getContext('2d')
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -214,21 +216,29 @@ export default function BalanceScaleEquations() {
     }
   }, [canvasWidth, geo, layout, left, right, drag])
 
-  // Ease the tilt toward its target, then draw.
+  // Redraw on any state change (keeps the dragged tile following the pointer).
+  const drawRef = useRef(draw)
+  useEffect(() => {
+    drawRef.current = draw
+    draw()
+  }, [draw])
+
+  // Ease the tilt toward its target. Depends only on targetAngle, so a drag
+  // (which changes `draw` every frame) never restarts this loop — no shaking.
   useEffect(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
     const tick = () => {
       const cur = angleRef.current
       const next = cur + (targetAngle - cur) * 0.2
       angleRef.current = Math.abs(next - targetAngle) < 0.0006 ? targetAngle : next
-      draw()
+      drawRef.current()
       if (angleRef.current !== targetAngle) rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [targetAngle, draw])
+  }, [targetAngle])
 
   const getPoint = (event) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -312,22 +322,21 @@ export default function BalanceScaleEquations() {
           <span className="inline-block h-4 w-4 rounded" style={{ background: xPurple }} /> = x
           <span className="ml-3 inline-block h-4 w-4 rounded" style={{ background: unitBlue }} /> = 1
         </div>
-        <div className="text-sm font-semibold" style={{ color: muted }}>
-          Problem:{' '}
-          {PROBLEMS.map((p, i) => (
-            <span key={i}>
-              {i > 0 && ', '}
-              <button
-                type="button"
-                onClick={() => loadProblem(i)}
-                className="underline underline-offset-2"
-                style={{ color: i === problemIndex ? xPurple : muted, fontWeight: i === problemIndex ? 800 : 600 }}
-              >
+        <label className="flex items-center gap-2 text-sm font-semibold" style={{ color: muted }}>
+          Problem:
+          <select
+            value={problemIndex}
+            onChange={(event) => loadProblem(Number(event.target.value))}
+            className="rounded-lg border border-[#E0DDD6] bg-white px-3 py-2 text-sm font-black outline-none"
+            style={{ color: xPurple }}
+          >
+            {PROBLEMS.map((p, i) => (
+              <option key={i} value={i}>
                 {sideLabel(p.left.x, p.left.u)} = {sideLabel(p.right.x, p.right.u)}
-              </button>
-            </span>
-          ))}
-        </div>
+              </option>
+            ))}
+          </select>
+        </label>
         <button type="button" onClick={() => loadProblem(problemIndex)} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
           Reset
         </button>

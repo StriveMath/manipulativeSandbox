@@ -72,7 +72,6 @@ export default function PizzaRemainder() {
   const [hideAnswer, setHideAnswer] = useState(false)
 
   const canvasHeight = 360
-  const quotient = Math.floor(pizzas / friends)
 
   const dragRef = useRef(null) // { index, offX, offY }
   const dragPosRef = useRef(null) // { x, y }
@@ -112,12 +111,12 @@ export default function PizzaRemainder() {
     const friendX = (f) => PAD + colW * (f + 0.5)
     const plateBaseY = canvasHeight - 58
 
-    const maxStack = Math.max(quotient, status.maxC, 1)
-    const availV = plateBaseY - 30 - 118
-    const rV = availV / (1.5 * maxStack + 0.5)
-    const rH = colW * 0.34
-    const r = clamp(Math.min(rH, rV, 22), 7, 22)
-    const spacing = 1.5 * r
+    // Fixed pizza size (never shrinks as a stack grows); tall stacks wrap into columns.
+    const r = clamp(Math.min(colW * 0.32, 20), 12, 20)
+    const spacing = 2 * r + 3
+    const availV = plateBaseY - 26 - 122
+    const perCol = Math.max(1, Math.floor(availV / spacing))
+    const colGap = 2 * r + 5
 
     const pileCols = Math.min(pizzas, 6)
     const pileGap = 2 * r + 6
@@ -133,15 +132,26 @@ export default function PizzaRemainder() {
     const trayY2 = trayY1 + Math.max(2 * r + 26, 68)
     const tray = { x1: trayX1, y1: trayY1, x2: trayX2, y2: trayY2, cx: (trayX1 + trayX2) / 2, cy: (trayY1 + trayY2) / 2 + 4 }
 
+    // Count per plate so a wrapped (multi-column) stack can be centered.
+    const plateCounts = Array(friends).fill(0)
+    place.forEach((p) => { if (p.loc === 'plate' && p.f < friends) plateCounts[p.f] += 1 })
+
     // Compute a resting position for every pizza from its placement.
-    const perPlateRow = Array(friends).fill(0)
+    const perPlateIdx = Array(friends).fill(0)
     let pileK = 0
     let trayK = 0
     const positions = place.map((p) => {
       if (p.loc === 'plate' && p.f < friends) {
-        const row = perPlateRow[p.f]
-        perPlateRow[p.f] += 1
-        return { x: friendX(p.f), y: plateBaseY - 26 - row * spacing, loc: 'plate' }
+        const idx = perPlateIdx[p.f]
+        perPlateIdx[p.f] += 1
+        const numCols = Math.ceil(plateCounts[p.f] / perCol)
+        const subCol = Math.floor(idx / perCol)
+        const rowInCol = idx % perCol
+        return {
+          x: friendX(p.f) + (subCol - (numCols - 1) / 2) * colGap,
+          y: plateBaseY - 26 - rowInCol * spacing,
+          loc: 'plate',
+        }
       }
       if (p.loc === 'tray') {
         const k = trayK
@@ -156,7 +166,7 @@ export default function PizzaRemainder() {
     })
 
     return { PAD, width, colW, friendX, plateBaseY, r, spacing, tray, pileX0, pileY0, positions }
-  }, [canvasWidth, pizzas, friends, quotient, place, status.maxC, status.trayCount])
+  }, [canvasWidth, pizzas, friends, place, status.trayCount])
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -207,6 +217,14 @@ export default function PizzaRemainder() {
     ctx.fillStyle = muted
     ctx.textBaseline = 'top'
     ctx.fillText("what's left over", tray.cx, tray.y2 + 4)
+    // Show a bold 0 when nothing is left over.
+    if (status.trayCount === 0) {
+      ctx.fillStyle = remOrange
+      ctx.font = '900 24px Inter, system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('0', tray.cx, tray.cy)
+    }
 
     // Pile label.
     if (status.pileCount > 0) {
@@ -306,10 +324,6 @@ export default function PizzaRemainder() {
       return next
     })
   }
-  const shareForMe = () => {
-    setPlace((prev) => prev.map((_, i) => (i < quotient * friends ? { loc: 'plate', f: i % friends } : { loc: 'tray' })))
-  }
-
   const canDeal = status.pileCount >= friends
   const remainderVal = status.trayCount
   const message = status.solved
@@ -377,9 +391,6 @@ export default function PizzaRemainder() {
         <Stepper label="Friends" value={friends} accent={friendBlue} onDec={() => changeFriends(friends - 1)} onInc={() => changeFriends(friends + 1)} />
         <button type="button" onClick={dealRound} disabled={!canDeal} className="rounded-full px-4 py-2.5 text-sm font-black text-white disabled:opacity-40" style={{ background: friendBlue }}>
           Deal a round
-        </button>
-        <button type="button" onClick={shareForMe} className="rounded-full border px-4 py-2.5 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
-          Share for me
         </button>
         <button type="button" onClick={() => reset()} className="rounded-full border px-4 py-2.5 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
           Reset

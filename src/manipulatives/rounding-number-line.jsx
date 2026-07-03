@@ -8,25 +8,47 @@ const roundGreen = '#1D9E75'
 const midGray = '#9AA0AA'
 const axisColor = '#1A1A2E'
 
+const GHOST_MS = 680
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
+const easeOut = (t) => 1 - Math.pow(1 - t, 3)
+
+// Range and defaults per rounding place.
+const CONFIG = {
+  1: { max: 5, step: 0.1, def: 2.7 },
+  10: { max: 50, step: 1, def: 27 },
+  100: { max: 500, step: 1, def: 270 },
+}
 
 export default function RoundingNumberLine() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
   const [canvasWidth, setCanvasWidth] = useState(720)
-  const [base, setBase] = useState(10) // round to nearest 10 or 100
-  const [n, setN] = useState(47)
+  const [base, setBase] = useState(10)
+  const [n, setN] = useState(27)
   const [hideAnswer, setHideAnswer] = useState(false)
   const draggingRef = useRef(false)
+  const nRef = useRef(27)
+  const ghostRef = useRef(null)
+  const ghostRafRef = useRef(null)
 
   const canvasHeight = 260
   const min = 0
-  const max = base === 10 ? 100 : 1000
+  const max = CONFIG[base].max
+  const step = CONFIG[base].step
+
+  const fmt = (v) => (base === 1 ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : String(v))
+  const roundOf = useCallback(
+    (v) => {
+      const lower = Math.floor(v / base) * base
+      return v - lower >= base / 2 ? lower + base : lower
+    },
+    [base],
+  )
 
   const lower = Math.floor(n / base) * base
   const upper = Math.min(max, lower + base)
   const mid = lower + base / 2
-  const rounded = n - lower >= base / 2 ? lower + base : lower
+  const rounded = roundOf(n)
 
   useEffect(() => {
     const node = wrapRef.current
@@ -43,17 +65,23 @@ export default function RoundingNumberLine() {
     const axisY = canvasHeight * 0.56
     const spanX = canvasWidth - PAD * 2
     const xFor = (v) => PAD + ((v - min) / (max - min)) * spanX
-    const vFor = (x) => clamp(Math.round(((x - PAD) / spanX) * (max - min) + min), min, max)
+    const vFor = (x) => {
+      const raw = ((x - PAD) / spanX) * (max - min) + min
+      const snapped = Math.round(raw / step) * step
+      return clamp(base === 1 ? Math.round(snapped * 10) / 10 : snapped, min, max)
+    }
     return { PAD, axisY, spanX, xFor, vFor }
-  }, [canvasWidth, max])
+  }, [canvasWidth, max, step, base])
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const dpr = window.devicePixelRatio || 1
-    if (canvas.width !== canvasWidth * dpr || canvas.height !== canvasHeight * dpr) {
-      canvas.width = canvasWidth * dpr
-      canvas.height = canvasHeight * dpr
+    const cw = Math.round(canvasWidth * dpr)
+    const ch = Math.round(canvasHeight * dpr)
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw
+      canvas.height = ch
     }
     const ctx = canvas.getContext('2d')
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -62,11 +90,11 @@ export default function RoundingNumberLine() {
     const { PAD, axisY, xFor } = geo
     const minorStep = base / 10
 
-    // Highlight band for the bracketing interval [lower, upper].
+    // Highlight band for the bracketing interval.
     ctx.fillStyle = 'rgba(29, 158, 117, 0.08)'
     ctx.fillRect(xFor(lower), axisY - 54, xFor(upper) - xFor(lower), 108)
 
-    // Axis line + arrowheads.
+    // Axis + arrowheads.
     ctx.strokeStyle = axisColor
     ctx.fillStyle = axisColor
     ctx.lineWidth = 2.5
@@ -87,7 +115,7 @@ export default function RoundingNumberLine() {
     ctx.textAlign = 'center'
     for (let v = min; v <= max + 1e-6; v += minorStep) {
       const x = xFor(v)
-      const isMajor = v % base === 0
+      const isMajor = Math.abs(v / base - Math.round(v / base)) < 1e-6
       ctx.strokeStyle = '#B9BDC6'
       ctx.lineWidth = 1
       ctx.beginPath()
@@ -98,7 +126,7 @@ export default function RoundingNumberLine() {
         ctx.fillStyle = '#8B8F99'
         ctx.font = '600 12px Inter, system-ui, sans-serif'
         ctx.textBaseline = 'top'
-        ctx.fillText(String(v), x, axisY + 14)
+        ctx.fillText(fmt(Math.round(v / base) * base), x, axisY + 14)
       }
     }
 
@@ -114,7 +142,7 @@ export default function RoundingNumberLine() {
     ctx.fillStyle = midGray
     ctx.font = '700 12px Inter, system-ui, sans-serif'
     ctx.textBaseline = 'bottom'
-    ctx.fillText(`halfway ${mid}`, xFor(mid), axisY - 54)
+    ctx.fillText(`halfway ${fmt(mid)}`, xFor(mid), axisY - 54)
 
     // Bracketing benchmarks.
     ;[lower, upper].forEach((v) => {
@@ -127,31 +155,46 @@ export default function RoundingNumberLine() {
       ctx.fillStyle = isTarget ? roundGreen : '#6B7280'
       ctx.font = `${isTarget ? '900' : '700'} 15px Inter, system-ui, sans-serif`
       ctx.textBaseline = 'bottom'
-      ctx.fillText(String(v), x, axisY + 42)
+      ctx.fillText(fmt(v), x, axisY + 42)
     })
 
-    // "rounds to" arrow from the number to the target benchmark.
+    // Straight "rounds to" arrow: a horizontal green line ending in an
+    // arrowhead whose tip sits over the target benchmark.
     if (!hideAnswer && rounded !== n) {
       const x1 = xFor(n)
       const x2 = xFor(rounded)
-      const topY = axisY - 30
+      const y = axisY - 30
+      const dir = x2 >= x1 ? 1 : -1
       ctx.strokeStyle = roundGreen
       ctx.lineWidth = 2.5
       ctx.beginPath()
-      ctx.moveTo(x1, topY)
-      ctx.quadraticCurveTo((x1 + x2) / 2, topY - 22, x2, topY)
+      ctx.moveTo(x1, y)
+      ctx.lineTo(x2 - dir * 8, y)
       ctx.stroke()
-      const dir = x2 >= x1 ? 1 : -1
       ctx.fillStyle = roundGreen
       ctx.beginPath()
-      ctx.moveTo(x2, topY + 1)
-      ctx.lineTo(x2 - dir * 9, topY - 6)
-      ctx.lineTo(x2 - dir * 9, topY + 6)
+      ctx.moveTo(x2, y)
+      ctx.lineTo(x2 - dir * 10, y - 6)
+      ctx.lineTo(x2 - dir * 10, y + 6)
       ctx.closePath()
       ctx.fill()
     }
 
-    // The draggable number marker.
+    // Ghost point floating from the number to its rounded value.
+    if (ghostRef.current) {
+      const g = ghostRef.current
+      const t = clamp((performance.now() - g.start) / GHOST_MS, 0, 1)
+      const gx = g.fromX + (g.toX - g.fromX) * easeOut(t)
+      const gy = axisY - 26 * Math.sin(Math.PI * t)
+      ctx.globalAlpha = 0.6 * (1 - t)
+      ctx.fillStyle = numberPurple
+      ctx.beginPath()
+      ctx.arc(gx, gy, 8, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.globalAlpha = 1
+    }
+
+    // Draggable number marker + pill.
     const nx = xFor(n)
     ctx.strokeStyle = numberPurple
     ctx.lineWidth = 2
@@ -163,14 +206,9 @@ export default function RoundingNumberLine() {
     ctx.beginPath()
     ctx.arc(nx, axisY, 8, 0, Math.PI * 2)
     ctx.fill()
-    ctx.fillStyle = '#ffffff'
-    ctx.font = '900 11px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    // number label in a pill above
-    ctx.fillStyle = numberPurple
-    const label = String(n)
+    const label = fmt(n)
     ctx.font = '900 16px Inter, system-ui, sans-serif'
+    ctx.textAlign = 'center'
     const w = ctx.measureText(label).width + 16
     ctx.beginPath()
     ctx.roundRect(nx - w / 2, axisY - 78, w, 26, 13)
@@ -178,7 +216,6 @@ export default function RoundingNumberLine() {
     ctx.fillStyle = '#ffffff'
     ctx.textBaseline = 'middle'
     ctx.fillText(label, nx, axisY - 64)
-    // little pointer under the pill
     ctx.fillStyle = numberPurple
     ctx.beginPath()
     ctx.moveTo(nx - 5, axisY - 52)
@@ -192,6 +229,38 @@ export default function RoundingNumberLine() {
     draw()
   }, [draw])
 
+  useEffect(() => () => {
+    if (ghostRafRef.current) cancelAnimationFrame(ghostRafRef.current)
+  }, [])
+
+  const runGhost = useCallback(() => {
+    if (ghostRafRef.current) cancelAnimationFrame(ghostRafRef.current)
+    const tick = () => {
+      const g = ghostRef.current
+      if (!g) return
+      if (performance.now() - g.start >= GHOST_MS) {
+        ghostRef.current = null
+        draw()
+        return
+      }
+      draw()
+      ghostRafRef.current = requestAnimationFrame(tick)
+    }
+    ghostRafRef.current = requestAnimationFrame(tick)
+  }, [draw])
+
+  const spawnGhost = (v) => {
+    const rv = roundOf(v)
+    if (rv === v) return
+    ghostRef.current = { fromX: geo.xFor(v), toX: geo.xFor(rv), start: performance.now() }
+    runGhost()
+  }
+
+  const setNumber = (v) => {
+    nRef.current = v
+    setN(v)
+  }
+
   const getVal = (event) => {
     const rect = event.currentTarget.getBoundingClientRect()
     const x = (event.clientX - rect.left) * (canvasWidth / rect.width)
@@ -201,28 +270,36 @@ export default function RoundingNumberLine() {
   const handlePointerDown = (event) => {
     event.currentTarget.setPointerCapture(event.pointerId)
     draggingRef.current = true
-    setN(getVal(event))
+    ghostRef.current = null
+    setNumber(getVal(event))
   }
   const handlePointerMove = (event) => {
     if (!draggingRef.current) return
-    setN(getVal(event))
+    setNumber(getVal(event))
   }
   const handlePointerUp = () => {
+    if (!draggingRef.current) return
     draggingRef.current = false
+    spawnGhost(nRef.current) // ghost floats to the rounded value on release
   }
 
   const switchBase = (b) => {
+    ghostRef.current = null
     setBase(b)
-    setN(b === 10 ? 47 : 472)
+    setNumber(CONFIG[b].def)
+  }
+
+  const stepNumber = (dir) => {
+    const v = clamp(Math.round((n + dir * step) / step) * step, min, max)
+    setNumber(base === 1 ? Math.round(v * 10) / 10 : v)
   }
 
   return (
     <div className="flex h-full flex-col gap-2 overflow-hidden p-4 font-['Inter']" style={{ background: cream, color: ink }}>
-      {/* Result */}
       <div className="flex items-center justify-center gap-3 text-3xl font-black tabular-nums">
-        <span style={{ color: numberPurple }}>{n}</span>
+        <span style={{ color: numberPurple }}>{fmt(n)}</span>
         <span style={{ color: muted }}>rounds to</span>
-        {hideAnswer ? <span style={{ color: muted }}>?</span> : <span style={{ color: roundGreen }}>{rounded}</span>}
+        {hideAnswer ? <span style={{ color: muted }}>?</span> : <span style={{ color: roundGreen }}>{fmt(rounded)}</span>}
         <span className="text-base font-bold" style={{ color: muted }}>(nearest {base})</span>
       </div>
 
@@ -238,12 +315,13 @@ export default function RoundingNumberLine() {
       </div>
 
       <p className="text-center text-sm font-semibold" style={{ color: muted }}>
-        Drag the number. Is it before or after the <b style={{ color: midGray }}>halfway</b> mark? That decides which {base} it’s closer to.
+        Drag the number. Is it before or after the <b style={{ color: midGray }}>halfway</b> mark? That decides
+        {base === 1 ? ' which whole number' : ` which ${base}`} it’s closer to.
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
         <div className="flex overflow-hidden rounded-full border border-[#E0DDD6]">
-          {[10, 100].map((b) => (
+          {[1, 10, 100].map((b) => (
             <button
               key={b}
               type="button"
@@ -257,10 +335,10 @@ export default function RoundingNumberLine() {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold" style={{ color: numberPurple }}>Number</span>
-          <div className="grid grid-cols-[40px_54px_40px] items-center overflow-hidden rounded-full border border-[#E0DDD6] bg-white">
-            <button type="button" onClick={() => setN((v) => clamp(v - 1, min, max))} className="h-10 text-2xl font-black" style={{ color: '#D85A30' }} aria-label="Decrease number">−</button>
-            <span className="border-x border-[#E0DDD6] py-2 text-center text-lg font-black tabular-nums">{n}</span>
-            <button type="button" onClick={() => setN((v) => clamp(v + 1, min, max))} className="h-10 text-2xl font-black" style={{ color: roundGreen }} aria-label="Increase number">+</button>
+          <div className="grid grid-cols-[40px_58px_40px] items-center overflow-hidden rounded-full border border-[#E0DDD6] bg-white">
+            <button type="button" onClick={() => stepNumber(-1)} className="h-10 text-2xl font-black" style={{ color: '#D85A30' }} aria-label="Decrease number">−</button>
+            <span className="border-x border-[#E0DDD6] py-2 text-center text-lg font-black tabular-nums">{fmt(n)}</span>
+            <button type="button" onClick={() => stepNumber(1)} className="h-10 text-2xl font-black" style={{ color: roundGreen }} aria-label="Increase number">+</button>
           </div>
         </div>
         <button type="button" onClick={() => setHideAnswer((h) => !h)} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
