@@ -1,3 +1,4 @@
+import BalanceScaleEquations from './balance-scale-equations.jsx'
 import CoordinateTreasureMap from './coordinate-treasure-map.jsx'
 import FactorTree from './factor-tree.jsx'
 import MeanBalancePoint from './mean-balance-point.jsx'
@@ -17,6 +18,11 @@ export const manipulatives = [
     id: 'multiplying-fractions-area',
     name: 'Multiplying Fractions (Area)',
     component: MultiplyingFractionsArea,
+  },
+  {
+    id: 'balance-scale-equations',
+    name: 'Balance Scale Equations',
+    component: BalanceScaleEquations,
   },
   {
     id: 'coordinate-treasure-map',
