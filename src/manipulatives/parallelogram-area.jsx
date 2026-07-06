@@ -6,8 +6,8 @@ const minBase = 80
 const maxBase = 220
 const minHeight = 40
 const maxHeight = 130
-const minSkew = 10
-const maxSkew = 70
+const minSlantExtra = 5
+const maxSlant = 170
 const animationMs = 1150
 const drawingScale = 1.2
 
@@ -66,7 +66,7 @@ export default function ParallelogramArea() {
   const progressRef = useRef(0)
   const [base, setBase] = useState(150)
   const [height, setHeight] = useState(85)
-  const [skew, setSkew] = useState(40)
+  const [slantLength, setSlantLength] = useState(95)
   const [progress, setProgress] = useState(0)
   const [phase, setPhase] = useState('ready')
 
@@ -92,17 +92,19 @@ export default function ParallelogramArea() {
   const updateHeight = (nextHeight) => {
     resetAnimation()
     setHeight(nextHeight)
+    setSlantLength((current) => Math.max(current, nextHeight + minSlantExtra))
   }
 
-  const updateSkew = (nextSkew) => {
+  const updateSlantLength = (nextSlantLength) => {
     resetAnimation()
-    setSkew(nextSkew)
+    setSlantLength(nextSlantLength)
   }
 
   const geometry = useMemo(() => {
     const visualBase = base * drawingScale
     const visualHeight = height * drawingScale
-    const visualSkew = skew * drawingScale
+    const horizontalSlant = Math.sqrt(Math.max(slantLength * slantLength - height * height, 0))
+    const visualSkew = horizontalSlant * drawingScale
     const left = Math.round((canvasWidth - visualBase - visualSkew) / 2)
     const top = 64
     const bottom = top + visualHeight
@@ -126,7 +128,7 @@ export default function ParallelogramArea() {
         e: { x: left + visualSkew, y: bottom },
       },
     }
-  }, [base, height, skew])
+  }, [base, height, slantLength])
 
   const getCanvasPoint = (event) => {
     const canvas = canvasRef.current
@@ -304,7 +306,7 @@ export default function ParallelogramArea() {
       ctx.font = '700 17px Inter, system-ui, sans-serif'
       ctx.textAlign = 'left'
       ctx.textBaseline = 'middle'
-      ctx.fillText(`slant = ${skew}`, labelX, labelY)
+      ctx.fillText(`slant = ${slantLength}`, labelX, labelY)
     }
 
     const centerX = (points.a.x + points.c.x) / 2
@@ -326,7 +328,7 @@ export default function ParallelogramArea() {
       ctx.fillText(part.text, formulaX, formulaY)
       formulaX += ctx.measureText(part.text).width
     })
-  }, [area, base, geometry, height, phase, progress, skew])
+  }, [area, base, geometry, height, phase, progress, slantLength])
 
   useEffect(() => {
     return () => {
@@ -363,7 +365,7 @@ export default function ParallelogramArea() {
   const resetValues = () => {
     setBase(150)
     setHeight(85)
-    setSkew(40)
+    setSlantLength(95)
     resetAnimation()
   }
 
@@ -457,11 +459,11 @@ export default function ParallelogramArea() {
         />
         <Slider
           label="Slant"
-          value={skew}
-          min={minSkew}
-          max={maxSkew}
+          value={slantLength}
+          min={height + minSlantExtra}
+          max={maxSlant}
           color="emerald"
-          onChange={updateSkew}
+          onChange={updateSlantLength}
         />
         <div className="flex gap-2">
           {phase === 'done' ? (

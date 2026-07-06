@@ -9,11 +9,11 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950">
-      <nav className="w-48 shrink-0 border-r border-slate-800 bg-slate-900 p-3">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+      <nav className="flex w-48 shrink-0 flex-col border-r border-slate-800 bg-slate-900 p-3">
+        <p className="mb-3 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">
           Manipulatives
         </p>
-        <ul className="space-y-1">
+        <ul className="manipulative-list-scroll min-h-0 flex-1 space-y-1 overflow-y-scroll pr-1">
           {manipulatives.map((m) => (
             <li key={m.id}>
               <button
