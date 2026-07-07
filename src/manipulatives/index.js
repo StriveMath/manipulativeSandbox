@@ -1,3 +1,4 @@
+import AngleTargetChallenge from './angle-target-challenge.jsx'
 import CoordinateTreasureMap from './coordinate-treasure-map.jsx'
 import FactorTree from './factor-tree.jsx'
 import MeanBalancePoint from './mean-balance-point.jsx'
@@ -6,6 +7,11 @@ import ParallelogramArea from './parallelogram-area.jsx'
 import TwoFactorTrees from './two-factor-trees.jsx'
 
 export const manipulatives = [
+  {
+    id: 'angle-target-challenge',
+    name: 'Angle Target Challenge',
+    component: AngleTargetChallenge,
+  },
   {
     id: 'coordinate-treasure-map',
     name: 'Coordinate Treasure Map',
