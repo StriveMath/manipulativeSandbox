@@ -1,6 +1,7 @@
 import AngleTargetChallenge from './angle-target-challenge.jsx'
 import CoordinateTreasureMap from './coordinate-treasure-map.jsx'
 import FactorTree from './factor-tree.jsx'
+import LongDivisionLab from './long-division-lab.jsx'
 import MeanBalancePoint from './mean-balance-point.jsx'
 import NumberLineExplorer from './number-line-explorer.jsx'
 import ParallelogramArea from './parallelogram-area.jsx'
@@ -11,6 +12,11 @@ export const manipulatives = [
     id: 'angle-target-challenge',
     name: 'Angle Target Challenge',
     component: AngleTargetChallenge,
+  },
+  {
+    id: 'long-division-lab',
+    name: 'Long Division Lab',
+    component: LongDivisionLab,
   },
   {
     id: 'coordinate-treasure-map',
