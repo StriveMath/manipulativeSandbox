@@ -29,6 +29,20 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
+function drawRoundRect(ctx, x, y, width, height, radius) {
+  ctx.beginPath()
+  ctx.moveTo(x + radius, y)
+  ctx.lineTo(x + width - radius, y)
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
+  ctx.lineTo(x + width, y + height - radius)
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
+  ctx.lineTo(x + radius, y + height)
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
+  ctx.lineTo(x, y + radius)
+  ctx.quadraticCurveTo(x, y, x + radius, y)
+  ctx.closePath()
+}
+
 function easeOutBack(t) {
   const c1 = 1.15
   const c3 = c1 + 1
@@ -118,6 +132,64 @@ function drawCube(ctx, cube, origin, unit, alpha = 1, dashed = false) {
   drawFace(ctx, points.left, colors.cubeLeft, alpha, dashed)
   drawFace(ctx, points.right, colors.cubeRight, alpha, dashed)
   drawFace(ctx, points.top, colors.cubeTop, alpha, dashed)
+}
+
+function drawDimensionGuide(ctx, start, end, color, label, labelOffset = { x: 0, y: 0 }) {
+  const mid = {
+    x: (start.x + end.x) / 2 + labelOffset.x,
+    y: (start.y + end.y) / 2 + labelOffset.y,
+  }
+
+  ctx.save()
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 8
+  ctx.beginPath()
+  ctx.moveTo(start.x, start.y)
+  ctx.lineTo(end.x, end.y)
+  ctx.stroke()
+
+  ctx.strokeStyle = color
+  ctx.lineWidth = 4
+  ctx.beginPath()
+  ctx.moveTo(start.x, start.y)
+  ctx.lineTo(end.x, end.y)
+  ctx.stroke()
+
+  ctx.fillStyle = color
+  ;[start, end].forEach((point) => {
+    ctx.beginPath()
+    ctx.arc(point.x, point.y, 4.5, 0, Math.PI * 2)
+    ctx.fill()
+  })
+
+  ctx.font = '800 12px Inter, system-ui, sans-serif'
+  const metrics = ctx.measureText(label)
+  const pillW = metrics.width + 16
+  const pillH = 22
+  drawRoundRect(ctx, mid.x - pillW / 2, mid.y - pillH / 2, pillW, pillH, 11)
+  ctx.fillStyle = '#ffffffee'
+  ctx.fill()
+  ctx.strokeStyle = color
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+  ctx.fillStyle = color
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(label, mid.x, mid.y + 0.5)
+  ctx.restore()
+}
+
+function drawDimensionGuides(ctx, origin, unit, length, prismWidth, height) {
+  const frontLeftBottom = projectPoint(0, prismWidth, 0, origin.x, origin.y, unit)
+  const frontRightBottom = projectPoint(length, prismWidth, 0, origin.x, origin.y, unit)
+  const backRightBottom = projectPoint(length, 0, 0, origin.x, origin.y, unit)
+  const frontLeftTop = projectPoint(0, prismWidth, height, origin.x, origin.y, unit)
+
+  drawDimensionGuide(ctx, frontLeftBottom, frontRightBottom, colors.lengthAccent, `length ${length}`, { x: 0, y: 18 })
+  drawDimensionGuide(ctx, backRightBottom, frontRightBottom, colors.widthAccent, `width ${prismWidth}`, { x: 18, y: 14 })
+  drawDimensionGuide(ctx, frontLeftBottom, frontLeftTop, colors.heightAccent, `height ${height}`, { x: -42, y: -2 })
 }
 
 function formatCount(layer, baseArea, volume) {
@@ -217,6 +289,10 @@ export default function VolumePrisms() {
         drawCube(ctx, cube, origin, unit, 0.18, true)
       }
     })
+
+    if (filledLayers >= height && currentLayer === null) {
+      drawDimensionGuides(ctx, origin, unit, length, width, height)
+    }
 
     if (filledLayers === 0 && currentLayer === null) {
       ctx.fillStyle = '#6B7280'

@@ -128,12 +128,12 @@ export default function FactorRainbow() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, canvasWidth, canvasHeight)
 
-    const pad = Math.max(24, Math.min(44, canvasWidth * 0.06))
+    const pad = Math.max(30, Math.min(38, canvasWidth * 0.045))
     const baseY = canvasHeight - 45
     const usable = canvasWidth - pad * 2
-    const gap = factors.length > 1 ? usable / (factors.length - 1) : usable
-    const dotRadius = clamp((gap - 5) / 2, 8, 15)
-    const fontSize = clamp(dotRadius * 0.92, 8, 13)
+    const toX = (value) => pad + (value / number) * usable
+    const dotRadius = 13
+    const fontSize = 14
     const labelY = baseY + dotRadius + 10
 
     ctx.fillStyle = '#FFFFFF'
@@ -147,12 +147,44 @@ export default function FactorRainbow() {
     ctx.lineTo(canvasWidth - pad + 10, baseY)
     ctx.stroke()
 
-    const positions = new Map()
-    factors.forEach((factor, index) => {
-      positions.set(factor, {
-        x: factors.length === 1 ? canvasWidth / 2 : pad + index * gap,
-        y: baseY,
+    const positionedFactors = factors.map((factor) => ({
+      factor,
+      x: toX(factor),
+    }))
+    const minSpacing = dotRadius * 2 + 4
+    for (let i = 1; i < positionedFactors.length; i += 1) {
+      const previous = positionedFactors[i - 1]
+      const current = positionedFactors[i]
+      if (current.x - previous.x < minSpacing) {
+        current.x = previous.x + minSpacing
+      }
+    }
+    for (let i = positionedFactors.length - 2; i >= 0; i -= 1) {
+      const next = positionedFactors[i + 1]
+      const current = positionedFactors[i]
+      if (next.x - current.x < minSpacing) {
+        current.x = next.x - minSpacing
+      }
+    }
+    const leftOverflow = pad - (positionedFactors[0]?.x ?? pad)
+    if (leftOverflow > 0) {
+      positionedFactors.forEach((item) => {
+        item.x += leftOverflow
       })
+    }
+    const rightOverflow = (positionedFactors[positionedFactors.length - 1]?.x ?? canvasWidth - pad) - (canvasWidth - pad)
+    if (rightOverflow > 0) {
+      positionedFactors.forEach((item) => {
+        item.x -= rightOverflow
+      })
+    }
+    positionedFactors.forEach((item) => {
+      if (item.factor === number) item.x = canvasWidth - pad
+      if (number % 2 === 0 && item.factor === number / 2) item.x = pad + usable / 2
+    })
+    const positions = new Map()
+    positionedFactors.forEach(({ factor, x }) => {
+      positions.set(factor, { x, y: baseY })
     })
 
     const arcStroke = 6.25
