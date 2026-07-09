@@ -132,8 +132,10 @@ export default function FactorRainbow() {
     const baseY = canvasHeight - 45
     const usable = canvasWidth - pad * 2
     const toX = (value) => pad + (value / number) * usable
-    const dotRadius = 13
-    const fontSize = 14
+    const leftFactorCount = number % 2 === 0 ? factors.filter((factor) => factor <= number / 2).length : factors.length
+    const halfSpacing = number % 2 === 0 && leftFactorCount > 1 ? (usable / 2) / (leftFactorCount - 1) : 30
+    const dotRadius = clamp(halfSpacing / 2 - 1.5, 10.5, 13)
+    const fontSize = clamp(dotRadius + 1, 12, 14)
     const labelY = baseY + dotRadius + 10
 
     ctx.fillStyle = '#FFFFFF'
@@ -147,49 +149,45 @@ export default function FactorRainbow() {
     ctx.lineTo(canvasWidth - pad + 10, baseY)
     ctx.stroke()
 
-    const positionedFactors = factors.map((factor) => ({
-      factor,
-      x: toX(factor),
-    }))
-    const minSpacing = dotRadius * 2 + 4
-    for (let i = 1; i < positionedFactors.length; i += 1) {
-      const previous = positionedFactors[i - 1]
-      const current = positionedFactors[i]
-      if (current.x - previous.x < minSpacing) {
-        current.x = previous.x + minSpacing
-      }
-    }
-    for (let i = positionedFactors.length - 2; i >= 0; i -= 1) {
-      const next = positionedFactors[i + 1]
-      const current = positionedFactors[i]
-      if (next.x - current.x < minSpacing) {
-        current.x = next.x - minSpacing
-      }
-    }
-    const leftOverflow = pad - (positionedFactors[0]?.x ?? pad)
-    if (leftOverflow > 0) {
-      positionedFactors.forEach((item) => {
-        item.x += leftOverflow
-      })
-    }
-    const rightOverflow = (positionedFactors[positionedFactors.length - 1]?.x ?? canvasWidth - pad) - (canvasWidth - pad)
-    if (rightOverflow > 0) {
-      positionedFactors.forEach((item) => {
-        item.x -= rightOverflow
-      })
-    }
-    positionedFactors.forEach((item) => {
-      if (item.factor === number) item.x = canvasWidth - pad
-      if (number % 2 === 0 && item.factor === number / 2) item.x = pad + usable / 2
+    const centerX = pad + usable / 2
+    const rightX = canvasWidth - pad
+    const positionedFactors = factors.map((factor) => {
+      let x = toX(factor)
+      if (factor === 1) x = pad
+      if (factor === number) x = rightX
+      if (number % 2 === 0 && factor === number / 2) x = centerX
+      return { factor, x }
     })
+    const minSpacing = Math.max(20, dotRadius * 2 + 2)
+    const spreadSegment = (items, startX, endX) => {
+      if (items.length <= 1) return
+      items[0].x = startX
+      items[items.length - 1].x = endX
+      const availableSpacing = (endX - startX) / (items.length - 1)
+      const segmentSpacing = Math.min(minSpacing, availableSpacing)
+      for (let i = 1; i < items.length - 1; i += 1) {
+        items[i].x = clamp(items[i].x, startX + i * segmentSpacing, endX - (items.length - 1 - i) * segmentSpacing)
+        if (items[i].x - items[i - 1].x < segmentSpacing) items[i].x = items[i - 1].x + segmentSpacing
+      }
+      for (let i = items.length - 2; i > 0; i -= 1) {
+        if (items[i + 1].x - items[i].x < segmentSpacing) items[i].x = items[i + 1].x - segmentSpacing
+      }
+    }
+    if (number % 2 === 0 && factors.includes(number / 2)) {
+      spreadSegment(positionedFactors.filter((item) => item.factor <= number / 2), pad, centerX)
+      spreadSegment(positionedFactors.filter((item) => item.factor >= number / 2), centerX, rightX)
+    } else {
+      spreadSegment(positionedFactors, pad, rightX)
+    }
     const positions = new Map()
     positionedFactors.forEach(({ factor, x }) => {
       positions.set(factor, { x, y: baseY })
     })
 
     const arcStroke = 6.25
-    const peakGap = arcStroke + 13
     const maxArcHeight = Math.min(205, baseY - 32)
+    const minArcHeight = 34
+    const arcBandStep = pairs.length > 1 ? (maxArcHeight - minArcHeight) / (pairs.length - 1) : 0
 
     pairs.forEach(([left, right], index) => {
       const from = positions.get(left)
@@ -217,10 +215,8 @@ export default function FactorRainbow() {
         ctx.bezierCurveTo(from.x - loopWidth / 2, from.y - loopHeight, from.x + loopWidth / 2, from.y - loopHeight, from.x + loopWidth / 2, from.y)
         ctx.stroke()
       } else {
-        const distance = Math.abs(to.x - from.x)
-        const orderedBandHeight = maxArcHeight - index * peakGap
-        const distanceHeight = 44 + distance * 0.35
-        const arcHeight = clamp(Math.min(orderedBandHeight, distanceHeight), 48, maxArcHeight) * spring
+        const arcLift = number === 120 && index === 0 ? 18 : 0
+        const arcHeight = Math.min(baseY - 14, maxArcHeight + arcLift - index * arcBandStep) * spring
         ctx.beginPath()
         ctx.moveTo(from.x, from.y)
         ctx.bezierCurveTo(from.x, from.y - arcHeight, to.x, from.y - arcHeight, to.x, to.y)
