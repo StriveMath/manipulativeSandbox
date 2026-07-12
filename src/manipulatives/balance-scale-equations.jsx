@@ -65,11 +65,25 @@ export default function BalanceScaleEquations() {
   useEffect(() => {
     const node = wrapRef.current
     if (!node) return undefined
-    const update = () => setCanvasWidth(Math.max(420, Math.round(node.getBoundingClientRect().width)))
-    update()
-    const observer = new ResizeObserver(update)
+    let raf = 0
+    // Only commit a whole-pixel change, and defer via rAF so the observer can
+    // never feed back into itself (the classic ResizeObserver "bounce").
+    const commit = (w) => {
+      const next = Math.max(420, Math.round(w))
+      setCanvasWidth((prev) => (Math.abs(prev - next) >= 1 ? next : prev))
+    }
+    commit(node.getBoundingClientRect().width)
+    const observer = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect?.width // unscaled content box — stable under parent transforms
+      if (!w) return
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => commit(w))
+    })
     observer.observe(node)
-    return () => observer.disconnect()
+    return () => {
+      cancelAnimationFrame(raf)
+      observer.disconnect()
+    }
   }, [])
 
   const loadProblem = (index) => {
