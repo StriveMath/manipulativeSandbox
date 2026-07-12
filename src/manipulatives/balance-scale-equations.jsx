@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 const cream = '#F8F6F0'
 const ink = '#1A1A2E'
@@ -62,12 +62,12 @@ export default function BalanceScaleEquations() {
       (rightX === 1 && rightU === 0 && leftX === 0 && leftU >= 1))
   const answer = solved ? (leftX === 1 ? rightU : leftU) : null
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = wrapRef.current
     if (!node) return undefined
     let raf = 0
-    // Only commit a whole-pixel change, and defer via rAF so the observer can
-    // never feed back into itself (the classic ResizeObserver "bounce").
+    // Measure before first paint; only commit a whole-pixel change, and defer
+    // via rAF so the observer can never feed back into itself (ResizeObserver "bounce").
     const commit = (w) => {
       const next = Math.max(420, Math.round(w))
       setCanvasWidth((prev) => (Math.abs(prev - next) >= 1 ? next : prev))

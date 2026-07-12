@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 const cream = '#F8F6F0'
 const ink = '#1A1A2E'
@@ -75,17 +75,27 @@ export default function MultiplyingFractionsArea() {
   const simpD = prodD / divisor
   const reduces = divisor > 1
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = wrapRef.current
     if (!node) return undefined
-    const update = () => {
-      const rect = node.getBoundingClientRect()
-      setSize({ w: Math.max(300, Math.round(rect.width)), h: Math.max(260, Math.round(rect.height)) })
+    let raf = 0
+    const commit = (box) => {
+      const w = Math.max(300, Math.round(box.width))
+      const h = Math.max(260, Math.round(box.height))
+      setSize((prev) => (Math.abs(prev.w - w) >= 1 || Math.abs(prev.h - h) >= 1 ? { w, h } : prev))
     }
-    update()
-    const observer = new ResizeObserver(update)
+    commit(node.getBoundingClientRect())
+    const observer = new ResizeObserver((entries) => {
+      const cr = entries[0]?.contentRect
+      if (!cr) return
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => commit(cr))
+    })
     observer.observe(node)
-    return () => observer.disconnect()
+    return () => {
+      cancelAnimationFrame(raf)
+      observer.disconnect()
+    }
   }, [])
 
   const geometry = useMemo(() => {

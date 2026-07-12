@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 const cream = '#F8F6F0'
 const ink = '#1A1A2E'
@@ -76,14 +76,28 @@ export default function PizzaRemainder() {
   const dragRef = useRef(null) // { index, offX, offY }
   const dragPosRef = useRef(null) // { x, y }
 
-  useEffect(() => {
+  // Measure before first paint (no initial width jump), then track the stable
+  // unscaled content box via an rAF-deferred observer (no settle bounce).
+  useLayoutEffect(() => {
     const node = wrapRef.current
     if (!node) return undefined
-    const update = () => setCanvasWidth(Math.max(360, Math.round(node.getBoundingClientRect().width)))
-    update()
-    const observer = new ResizeObserver(update)
+    let raf = 0
+    const commit = (w) => {
+      const next = Math.max(360, Math.round(w))
+      setCanvasWidth((prev) => (Math.abs(prev - next) >= 1 ? next : prev))
+    }
+    commit(node.getBoundingClientRect().width)
+    const observer = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect?.width
+      if (!w) return
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => commit(w))
+    })
     observer.observe(node)
-    return () => observer.disconnect()
+    return () => {
+      cancelAnimationFrame(raf)
+      observer.disconnect()
+    }
   }, [])
 
   // Counts / status derived from the current placement.
