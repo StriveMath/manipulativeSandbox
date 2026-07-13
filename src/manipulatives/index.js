@@ -10,6 +10,7 @@ import FactorRainbow from './factor-rainbow.jsx'
 import FactorTree from './factor-tree.jsx'
 import FractionsNumberLine from './fractions-number-line.jsx'
 import IntegerMultiplyDivide from './integer-multiply-divide.jsx'
+import LinearEquationGrapher from './linear-equation-grapher.jsx'
 import MeanBalancePoint from './mean-balance-point.jsx'
 import NetsSurfaceArea from './nets-surface-area.jsx'
 import NumberLineAddSubtract from './number-line-add-subtract.jsx'
@@ -80,6 +81,11 @@ export const manipulatives = [
     id: 'integer-multiply-divide',
     name: 'Integer Multiply/Divide',
     component: IntegerMultiplyDivide,
+  },
+  {
+    id: 'linear-equation-grapher',
+    name: 'Linear Equation Grapher',
+    component: LinearEquationGrapher,
   },
   {
     id: 'number-line-explorer',
