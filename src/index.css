@@ -1434,6 +1434,114 @@ input[type="number"] {
   }
 }
 
+@keyframes place-regroup-single-to-center {
+  0% {
+    opacity: 1;
+    transform: translate(calc(var(--from-x) - 50%), calc(var(--from-y) - 50%)) scale(1);
+  }
+
+  42%,
+  72% {
+    opacity: 1;
+    transform: translate(calc(var(--center-x) - 50%), calc(var(--center-y) - 50%)) scale(1.38);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--center-x) - 50%), calc(var(--center-y) - 50%)) scale(0.2);
+  }
+}
+
+@keyframes place-regroup-split-flash {
+  0%,
+  44% {
+    opacity: 0;
+    transform: translate(calc(var(--center-x) - 50%), calc(var(--center-y) - 50%)) scale(0.4);
+  }
+
+  56% {
+    opacity: 0.7;
+    transform: translate(calc(var(--center-x) - 50%), calc(var(--center-y) - 50%)) scale(1.1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--center-x) - 50%), calc(var(--center-y) - 50%)) scale(1.55);
+  }
+}
+
+@keyframes place-regroup-split-piece {
+  0%,
+  38% {
+    opacity: 0;
+    transform: translate(calc(var(--center-x) - 50%), calc(var(--center-y) - 50%)) scale(0.35);
+  }
+
+  52% {
+    opacity: 1;
+    transform: translate(calc(var(--center-x) + var(--piece-x) - 50%), calc(var(--center-y) + var(--piece-y) - 50%)) scale(1.08);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate(calc(var(--to-x) + var(--piece-x) - 50%), calc(var(--to-y) + var(--piece-y) - 50%)) scale(1);
+  }
+}
+
+@keyframes place-regroup-pieces-to-center {
+  0% {
+    opacity: 1;
+    transform: translate(calc(var(--from-x) + var(--piece-x) - 50%), calc(var(--from-y) + var(--piece-y) - 50%)) scale(1);
+  }
+
+  56% {
+    opacity: 1;
+    transform: translate(calc(var(--center-x) + var(--piece-x) - 50%), calc(var(--center-y) + var(--piece-y) - 50%)) scale(1.08);
+  }
+
+  82%,
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--center-x) - 50%), calc(var(--center-y) - 50%)) scale(0.18);
+  }
+}
+
+@keyframes place-regroup-merge-flash {
+  0%,
+  58% {
+    opacity: 0;
+    transform: translate(calc(var(--center-x) - 50%), calc(var(--center-y) - 50%)) scale(0.45);
+  }
+
+  70% {
+    opacity: 0.74;
+    transform: translate(calc(var(--center-x) - 50%), calc(var(--center-y) - 50%)) scale(1.1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--center-x) - 50%), calc(var(--center-y) - 50%)) scale(1.48);
+  }
+}
+
+@keyframes place-regroup-merge-piece {
+  0%,
+  62% {
+    opacity: 0;
+    transform: translate(calc(var(--center-x) - 50%), calc(var(--center-y) - 50%)) scale(0.28);
+  }
+
+  76% {
+    opacity: 1;
+    transform: translate(calc(var(--center-x) - 50%), calc(var(--center-y) - 50%)) scale(1.42);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate(calc(var(--to-x) - 50%), calc(var(--to-y) - 50%)) scale(1);
+  }
+}
+
 @keyframes place-ready-button {
   0%,
   100% {
@@ -1489,6 +1597,49 @@ input[type="number"] {
 
 .place-regroup-destination {
   animation: place-regroup-destination 700ms ease-in-out both;
+}
+
+.place-regroup-ghost-disk {
+  left: 0;
+  top: 0;
+  will-change: opacity, transform;
+}
+
+.place-regroup-single-to-center {
+  animation: place-regroup-single-to-center 1100ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+}
+
+.place-regroup-split-flash,
+.place-regroup-merge-flash {
+  background: radial-gradient(circle, rgb(251 191 36 / 0.58), rgb(251 191 36 / 0));
+  border-radius: 9999px;
+  height: 108px;
+  left: 0;
+  top: 0;
+  width: 108px;
+  will-change: opacity, transform;
+}
+
+.place-regroup-split-flash {
+  animation: place-regroup-split-flash 980ms ease-out both;
+}
+
+.place-regroup-split-piece {
+  animation: place-regroup-split-piece 1450ms cubic-bezier(0.2, 0.84, 0.2, 1) both;
+  animation-delay: var(--piece-delay, 0ms);
+}
+
+.place-regroup-pieces-to-center {
+  animation: place-regroup-pieces-to-center 1180ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  animation-delay: var(--piece-delay, 0ms);
+}
+
+.place-regroup-merge-flash {
+  animation: place-regroup-merge-flash 1180ms ease-out both;
+}
+
+.place-regroup-merge-piece {
+  animation: place-regroup-merge-piece 1420ms cubic-bezier(0.2, 0.84, 0.2, 1) both;
 }
 
 .place-ready-button {
@@ -1633,6 +1784,12 @@ input[type="number"] {
   .place-disk-highlight,
   .place-regroup-source,
   .place-regroup-destination,
+  .place-regroup-single-to-center,
+  .place-regroup-split-flash,
+  .place-regroup-split-piece,
+  .place-regroup-pieces-to-center,
+  .place-regroup-merge-flash,
+  .place-regroup-merge-piece,
   .place-ready-button,
   .place-value-refresh,
   .hundredth-square-fill,
