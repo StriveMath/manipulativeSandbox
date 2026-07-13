@@ -10,6 +10,7 @@ const places = [
     softColor: 'bg-emerald-50',
     borderColor: 'border-emerald-200',
     textColor: 'text-emerald-900',
+    totalTextColor: 'text-emerald-300',
   },
   {
     id: 'tenths',
@@ -20,6 +21,7 @@ const places = [
     softColor: 'bg-blue-50',
     borderColor: 'border-blue-200',
     textColor: 'text-blue-900',
+    totalTextColor: 'text-blue-300',
   },
   {
     id: 'hundredths',
@@ -30,6 +32,7 @@ const places = [
     softColor: 'bg-amber-50',
     borderColor: 'border-amber-200',
     textColor: 'text-amber-900',
+    totalTextColor: 'text-amber-300',
   },
   {
     id: 'thousandths',
@@ -40,6 +43,7 @@ const places = [
     softColor: 'bg-violet-50',
     borderColor: 'border-violet-200',
     textColor: 'text-violet-900',
+    totalTextColor: 'text-violet-300',
   },
 ]
 
@@ -54,12 +58,48 @@ const clampCount = (value) => Math.max(0, Math.min(18, value))
 
 const formatDecimal = (value) => value.toFixed(3).replace(/\.?0+$/, '')
 
-function Disk({ place, index }) {
+function ExpandedForm({ counts }) {
+  const activePlaces = places.filter((place) => counts[place.id] > 0)
+
+  if (activePlaces.length === 0) return 'No disks selected'
+
+  return activePlaces.map((place, index) => (
+    <span key={place.id}>
+      {index > 0 && <span className="mx-1 text-slate-400">+</span>}
+      <span className={place.textColor}>
+        {counts[place.id]} x {place.shortLabel}
+      </span>
+    </span>
+  ))
+}
+
+function ColorCodedDecimal({ value }) {
+  const [whole, decimalPart = ''] = value.toFixed(3).split('.')
+  const visibleDecimals = decimalPart.replace(/0+$/, '')
+  const decimalPlaces = places.slice(1)
+
+  return (
+    <>
+      <span className={places[0].totalTextColor}>{whole}</span>
+      {visibleDecimals.length > 0 && <span className="text-slate-500">.</span>}
+      {visibleDecimals.split('').map((digit, index) => (
+        <span className={decimalPlaces[index]?.totalTextColor ?? 'text-slate-100'} key={`${digit}-${index}`}>
+          {digit}
+        </span>
+      ))}
+    </>
+  )
+}
+
+function Disk({ place, index, animate, highlight }) {
   return (
     <div
-      className={`flex h-9 w-9 items-center justify-center rounded-full border-2 border-white ${place.color} text-[9px] font-bold text-white shadow-sm`}
+      className={`flex h-9 w-9 items-center justify-center rounded-full border-2 border-white ${place.color} text-[9px] font-bold text-white shadow-sm ${
+        animate ? 'place-disk-pop' : ''
+      } ${highlight ? 'place-disk-highlight' : ''}`}
       style={{
         transform: `translate(${(index % 3) * 4}px, ${Math.floor(index / 3) * -2}px)`,
+        '--place-disk-delay': `${Math.min(index, 9) * 24}ms`,
       }}
     >
       {place.shortLabel}
@@ -69,6 +109,7 @@ function Disk({ place, index }) {
 
 export default function DecimalPlaceValueDisks() {
   const [counts, setCounts] = useState(initialCounts)
+  const [lastChange, setLastChange] = useState(null)
 
   const total = useMemo(
     () =>
@@ -80,9 +121,17 @@ export default function DecimalPlaceValueDisks() {
   )
 
   const setPlaceCount = (placeId, updater) => {
+    const previous = counts[placeId]
+    const next = clampCount(updater(previous))
+    setLastChange({
+      destinationId: next > previous ? placeId : null,
+      placeId,
+      sourceId: next < previous ? placeId : null,
+      type: next > previous ? 'add' : next < previous ? 'remove' : 'same',
+    })
     setCounts((prev) => ({
       ...prev,
-      [placeId]: clampCount(updater(prev[placeId])),
+      [placeId]: next,
     }))
   }
 
@@ -91,6 +140,7 @@ export default function DecimalPlaceValueDisks() {
     const to = places[fromIndex - 1]
     if (!from || !to || counts[from.id] < 10) return
 
+    setLastChange({ destinationId: to.id, sourceId: from.id, type: 'regroup-up' })
     setCounts((prev) => ({
       ...prev,
       [from.id]: prev[from.id] - 10,
@@ -103,6 +153,7 @@ export default function DecimalPlaceValueDisks() {
     const to = places[fromIndex + 1]
     if (!from || !to || counts[from.id] < 1) return
 
+    setLastChange({ destinationId: to.id, sourceId: from.id, type: 'regroup-down' })
     setCounts((prev) => ({
       ...prev,
       [from.id]: prev[from.id] - 1,
@@ -110,9 +161,14 @@ export default function DecimalPlaceValueDisks() {
     }))
   }
 
-  const reset = () => setCounts(initialCounts)
-  const clear = () =>
+  const reset = () => {
+    setLastChange({ type: 'reset' })
+    setCounts(initialCounts)
+  }
+  const clear = () => {
+    setLastChange({ type: 'clear' })
     setCounts(Object.fromEntries(places.map((place) => [place.id, 0])))
+  }
 
   return (
     <div className="box-border flex h-full flex-col bg-slate-50 px-6 py-5 text-slate-700">
@@ -149,11 +205,15 @@ export default function DecimalPlaceValueDisks() {
           const count = counts[place.id]
           const canRegroupUp = index > 0 && count >= 10
           const canRegroupDown = index < places.length - 1 && count > 0
+          const isSource = lastChange?.sourceId === place.id
+          const isDestination = lastChange?.destinationId === place.id
 
           return (
             <section
               key={place.id}
-              className={`flex min-h-0 flex-col rounded border ${place.borderColor} ${place.softColor} p-3`}
+              className={`flex min-h-0 flex-col rounded border ${place.borderColor} ${place.softColor} p-3 ${
+                isSource ? 'place-regroup-source' : ''
+              } ${isDestination ? 'place-regroup-destination' : ''}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -164,7 +224,10 @@ export default function DecimalPlaceValueDisks() {
                     x {place.shortLabel}
                   </div>
                 </div>
-                <div className={`rounded bg-white px-2 py-1 text-sm font-bold tabular-nums ${place.textColor}`}>
+                <div
+                  className={`place-value-refresh rounded bg-white px-2 py-1 text-sm font-bold tabular-nums ${place.textColor}`}
+                  key={`${place.id}-${count}`}
+                >
                   {count}
                 </div>
               </div>
@@ -172,7 +235,13 @@ export default function DecimalPlaceValueDisks() {
               <div className="mt-3 flex min-h-0 flex-1 items-start justify-center overflow-hidden rounded border border-white/80 bg-white/70 p-2">
                 <div className="grid grid-cols-3 gap-1">
                   {Array.from({ length: count }, (_, diskIndex) => (
-                    <Disk key={`${place.id}-${diskIndex}`} place={place} index={diskIndex} />
+                    <Disk
+                      animate={isDestination || lastChange?.placeId === place.id}
+                      highlight={isSource && diskIndex >= Math.max(0, count - 10)}
+                      index={diskIndex}
+                      key={`${place.id}-${diskIndex}`}
+                      place={place}
+                    />
                   ))}
                 </div>
               </div>
@@ -203,7 +272,9 @@ export default function DecimalPlaceValueDisks() {
                   type="button"
                   onClick={() => regroupUp(index)}
                   disabled={!canRegroupUp}
-                  className="h-7 w-full rounded bg-slate-800 px-2 text-[11px] font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  className={`h-7 w-full rounded bg-slate-800 px-2 text-[11px] font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300 ${
+                    canRegroupUp ? 'place-ready-button' : ''
+                  }`}
                 >
                   Regroup 10 up
                 </button>
@@ -227,18 +298,15 @@ export default function DecimalPlaceValueDisks() {
             Expanded form
           </div>
           <div className="mt-1 text-sm font-semibold text-slate-700">
-            {places
-              .filter((place) => counts[place.id] > 0)
-              .map((place) => `${counts[place.id]} x ${place.shortLabel}`)
-              .join(' + ') || 'No disks selected'}
+            <ExpandedForm counts={counts} />
           </div>
         </div>
         <div className="rounded bg-slate-900 px-4 py-2 text-right text-white">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-300">
             Total
           </div>
-          <div className="text-2xl font-bold tabular-nums">
-            {formatDecimal(total)}
+          <div className="place-value-refresh text-2xl font-bold tabular-nums" key={formatDecimal(total)}>
+            <ColorCodedDecimal value={total} />
           </div>
         </div>
       </div>
