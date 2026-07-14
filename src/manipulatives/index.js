@@ -3,8 +3,11 @@ import BalanceScaleEquations from './balance-scale-equations.jsx'
 import CoordinateTreasureMap from './coordinate-treasure-map.jsx'
 import FactorTree from './factor-tree.jsx'
 import InequalitiesNumberLine from './inequalities-number-line.jsx'
+import MeanAbsoluteDeviation from './mean-absolute-deviation.jsx'
 import MeanBalancePoint from './mean-balance-point.jsx'
 import MixedNumbersImproper from './mixed-numbers-improper.jsx'
+import ProbabilityScale from './probability-scale.jsx'
+import SampleSpaceTree from './sample-space-tree.jsx'
 import MultiplyingFractionsArea from './multiplying-fractions-area.jsx'
 import NumberLineExplorer from './number-line-explorer.jsx'
 import ParallelogramArea from './parallelogram-area.jsx'
@@ -47,6 +50,21 @@ export const manipulatives = [
     id: 'algebra-tiles',
     name: 'Algebra Tiles',
     component: AlgebraTiles,
+  },
+  {
+    id: 'probability-scale',
+    name: 'Probability Scale Explorer',
+    component: ProbabilityScale,
+  },
+  {
+    id: 'sample-space-tree',
+    name: 'Sample Space & Tree Diagrams',
+    component: SampleSpaceTree,
+  },
+  {
+    id: 'mean-absolute-deviation',
+    name: 'Mean Absolute Deviation',
+    component: MeanAbsoluteDeviation,
   },
   {
     id: 'coordinate-treasure-map',
