@@ -1,30 +1,24 @@
-import RatioTables from './ratio-table-playground/App.tsx'
-import UnitRateVisualizer from './UnitRateVisualizer.tsx'
-import PercentDecomposer from './PercentDecomposer.tsx'
-import FruitBalanceLab from './FruitBalanceLab.tsx'
+import PercentageBarModel from './PercentageBarModel.tsx'
+import TriangleAreaApp from './TriangleAreaApp.tsx'
+import TrapezoidAreaApp from './TrapezoidAreaApp.tsx'
 import FactorTree from './factor-tree.jsx'
 import TwoFactorTrees from './two-factor-trees.jsx'
 
 export const manipulatives = [
   {
-    id: 'ratio-tables',
-    name: 'Ratio Tables',
-    component: RatioTables,
+    id: 'percentage-bar-model',
+    name: 'Percentage bar model',
+    component: PercentageBarModel,
   },
   {
-    id: 'unit-rate-visualizer',
-    name: 'Unit Rate Visualizer',
-    component: UnitRateVisualizer,
+    id: 'area-of-a-triangle',
+    name: 'Area of a triangle',
+    component: TriangleAreaApp,
   },
   {
-    id: 'percent-decomposer',
-    name: 'Percent of Numbers: Fractions',
-    component: PercentDecomposer,
-  },
-  {
-    id: 'equivalent-ratios',
-    name: 'Equivalent ratios',
-    component: FruitBalanceLab,
+    id: 'area-of-trapezoid',
+    name: 'Area of Trapezoid',
+    component: TrapezoidAreaApp,
   },
   {
     id: 'factor-tree',
