@@ -1,4 +1,7 @@
 import CoordinateTreasureMap from './coordinate-treasure-map.jsx'
+import PercentageBarModel from './PercentageBarModel.tsx'
+import TriangleAreaApp from './TriangleAreaApp.tsx'
+import TrapezoidAreaApp from './TrapezoidAreaApp.tsx'
 import FactorTree from './factor-tree.jsx'
 import MeanBalancePoint from './mean-balance-point.jsx'
 import NumberLineExplorer from './number-line-explorer.jsx'
@@ -25,6 +28,21 @@ export const manipulatives = [
     id: 'parallelogram-area',
     name: 'Parallelogram Area',
     component: ParallelogramArea,
+  },
+  {
+    id: 'percentage-bar-model',
+    name: 'Percentage bar model',
+    component: PercentageBarModel,
+  },
+  {
+    id: 'area-of-a-triangle',
+    name: 'Area of a triangle',
+    component: TriangleAreaApp,
+  },
+  {
+    id: 'area-of-trapezoid',
+    name: 'Area of Trapezoid',
+    component: TrapezoidAreaApp,
   },
   {
     id: 'factor-tree',
