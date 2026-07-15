@@ -36,7 +36,7 @@ export default function ProbabilityScale() {
   const dispRef = useRef({}) // id -> {x,y} current displayed center (for ease)
   const rafRef = useRef(null)
 
-  const canvasHeight = 320
+  const canvasHeight = 268
 
   useLayoutEffect(() => {
     const node = wrapRef.current
@@ -62,8 +62,8 @@ export default function ProbabilityScale() {
 
   const geo = useMemo(() => {
     const PAD = 60
-    const scaleY = 132
-    const trayY = 250
+    const scaleY = 116
+    const trayY = 202
     const spanX = canvasWidth - PAD * 2
     const xFor = (p) => PAD + p * spanX
     const pFor = (x) => clamp((x - PAD) / spanX, 0, 1)
@@ -131,10 +131,23 @@ export default function ProbabilityScale() {
     })
     // Endpoint number labels 0 and 1.
     ctx.fillStyle = ink
-    ctx.font = '900 15px Inter, system-ui, sans-serif'
+    ctx.font = '900 16px Inter, system-ui, sans-serif'
     ctx.textBaseline = 'bottom'
     ctx.fillText('0', xFor(0), scaleY - 34)
+    ctx.fillText('½', xFor(0.5), scaleY - 34)
     ctx.fillText('1', xFor(1), scaleY - 34)
+
+    // On reveal, mark where each event was guessed (hollow) so the gap to the true spot shows.
+    if (revealed) {
+      Object.values(placed).forEach((gp) => {
+        const gx = xFor(gp)
+        ctx.strokeStyle = '#B9A6E8'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.arc(gx, scaleY, 6, 0, Math.PI * 2)
+        ctx.stroke()
+      })
+    }
 
     // Tray label.
     if (Object.keys(placed).length < EVENTS.length && !revealed) {

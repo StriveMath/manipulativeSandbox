@@ -21,7 +21,7 @@ export default function MeanAbsoluteDeviation() {
   const [points, setPoints] = useState(() => [4, 7, 9, 16].map((v) => ({ id: (seq += 1), value: v })))
   const [drag, setDrag] = useState(null) // { id, startX, moved }
 
-  const canvasHeight = 300
+  const canvasHeight = 272
 
   const values = points.map((p) => p.value)
   const mean = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0
@@ -75,6 +75,14 @@ export default function MeanAbsoluteDeviation() {
 
     const { PAD, axisY, xFor } = geo
     const meanX = xFor(mean)
+
+    // Shaded "typical" band: mean ± MAD (most points fall roughly this close).
+    if (points.length && mad > 0.05) {
+      const bx0 = xFor(Math.max(MIN, mean - mad))
+      const bx1 = xFor(Math.min(MAX, mean + mad))
+      ctx.fillStyle = 'rgba(29,158,117,0.12)'
+      ctx.fillRect(bx0, axisY - 74, bx1 - bx0, 80)
+    }
 
     // Axis + ticks.
     ctx.strokeStyle = axisColor
@@ -148,19 +156,37 @@ export default function MeanAbsoluteDeviation() {
       }
     })
 
-    // MAD bar under the axis (average distance, from the mean outward).
-    const madX = xFor(mean + mad)
-    ctx.strokeStyle = meanGreen
-    ctx.lineWidth = 5
-    ctx.beginPath()
-    ctx.moveTo(meanX, axisY + 30)
-    ctx.lineTo(madX, axisY + 30)
-    ctx.stroke()
-    ctx.fillStyle = meanGreen
-    ctx.font = '900 12px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(`MAD = ${round1(mad)}`, madX + 8, axisY + 30)
+    // MAD shown as a two-sided span (mean − MAD .. mean + MAD) below the axis.
+    if (points.length && mad > 0.05) {
+      const y2 = axisY + 34
+      const lx = xFor(Math.max(MIN, mean - mad))
+      const rx = xFor(Math.min(MAX, mean + mad))
+      ctx.strokeStyle = meanGreen
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.moveTo(lx, y2)
+      ctx.lineTo(rx, y2)
+      ctx.stroke()
+      ;[[lx, -1], [rx, 1]].forEach(([x, d]) => {
+        ctx.fillStyle = meanGreen
+        ctx.beginPath()
+        ctx.moveTo(x, y2)
+        ctx.lineTo(x - d * 8, y2 - 5)
+        ctx.lineTo(x - d * 8, y2 + 5)
+        ctx.closePath()
+        ctx.fill()
+      })
+      // tick down from the mean
+      ctx.beginPath()
+      ctx.moveTo(meanX, axisY + 10)
+      ctx.lineTo(meanX, y2)
+      ctx.stroke()
+      ctx.fillStyle = meanGreen
+      ctx.font = '900 12px Inter, system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'top'
+      ctx.fillText(`MAD = ${round1(mad)} on each side of the mean`, meanX, y2 + 7)
+    }
 
     // Data points.
     points.forEach((p) => {
@@ -240,10 +266,16 @@ export default function MeanAbsoluteDeviation() {
   return (
     <div className="flex h-full flex-col gap-2 overflow-hidden p-4 font-['Inter']" style={{ background: cream, color: ink }}>
       <div className="flex items-center justify-center gap-3 text-2xl font-black tabular-nums">
-        <span style={{ color: meanGreen }}>MAD = {round1(mad)}</span>
-        <span className="text-base font-bold" style={{ color: muted }}>
-          = the average distance from the mean ({distances.map((d) => round1(d)).join(' + ')} ÷ {distances.length || 1})
-        </span>
+        {points.length === 0 ? (
+          <span className="text-lg font-bold" style={{ color: muted }}>Click the line to add data points</span>
+        ) : (
+          <>
+            <span style={{ color: meanGreen }}>MAD = {round1(mad)}</span>
+            <span className="text-base font-bold" style={{ color: muted }}>
+              = average distance from the mean ({distances.map((d) => round1(d)).join(' + ')} ÷ {distances.length})
+            </span>
+          </>
+        )}
       </div>
 
       <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">

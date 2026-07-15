@@ -84,9 +84,10 @@ export default function SampleSpaceTree() {
     const rootY = size.h / 2
 
     // Edges root -> stage 1.
-    ctx.strokeStyle = '#C9CDd6'
-    ctx.lineWidth = 1.5
     for (let j = 0; j < a; j += 1) {
+      const anySel = [...selected].some((k) => Math.floor(k / b) === j)
+      ctx.strokeStyle = anySel ? selBlue : '#C9CDd6'
+      ctx.lineWidth = anySel ? 2.5 : 1.5
       ctx.beginPath()
       ctx.moveTo(rootX + 14, rootY)
       ctx.lineTo(s1X - 14, s1Y(j))
@@ -103,6 +104,31 @@ export default function SampleSpaceTree() {
       ctx.stroke()
     }
 
+    // Branch probability labels (each branch is equally likely).
+    ctx.font = '700 10px Inter, system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillStyle = muted
+    for (let j = 0; j < a; j += 1) {
+      const mx = rootX + 14 + (s1X - 14 - (rootX + 14)) * 0.42
+      const my = rootY + (s1Y(j) - rootY) * 0.42
+      ctx.fillText(`1/${a}`, mx, my - 7)
+    }
+    if (b <= 4) {
+      for (let k = 0; k < N; k += 1) {
+        const j = Math.floor(k / b)
+        const mx = s1X + 14 + (leafX - 12 - (s1X + 14)) * 0.45
+        const my = s1Y(j) + (leafY(k) - s1Y(j)) * 0.45
+        ctx.fillText(`1/${b}`, mx, my - 6)
+      }
+    }
+    // Per-outcome probability note.
+    ctx.fillStyle = muted
+    ctx.font = '800 11px Inter, system-ui, sans-serif'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'top'
+    ctx.fillText(`each outcome = 1/${N}`, leafX - 12, 6)
+
     // Root node.
     ctx.fillStyle = ink
     ctx.beginPath()
@@ -117,12 +143,21 @@ export default function SampleSpaceTree() {
     // Stage 1 nodes.
     for (let j = 0; j < a; j += 1) {
       const o = exp.s1[j]
+      if ([...selected].some((k) => Math.floor(k / b) === j)) {
+        ctx.strokeStyle = selBlue
+        ctx.lineWidth = 3
+        ctx.beginPath()
+        ctx.arc(s1X, s1Y(j), 16, 0, Math.PI * 2)
+        ctx.stroke()
+      }
       ctx.fillStyle = colorOf(o)
       ctx.beginPath()
       ctx.arc(s1X, s1Y(j), 13, 0, Math.PI * 2)
       ctx.fill()
       ctx.fillStyle = '#fff'
       ctx.font = '900 13px Inter, system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
       ctx.fillText(o, s1X, s1Y(j))
     }
 
