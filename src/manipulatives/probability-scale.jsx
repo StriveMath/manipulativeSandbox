@@ -76,12 +76,11 @@ export default function ProbabilityScale() {
   const targets = useMemo(() => {
     const t = {}
     EVENTS.forEach((e, i) => {
-      if (revealed) t[e.id] = { x: geo.xFor(e.p), y: geo.scaleY - 42, on: true }
-      else if (placed[e.id] != null) t[e.id] = { x: geo.xFor(placed[e.id]), y: geo.scaleY - 42, on: true }
+      if (placed[e.id] != null) t[e.id] = { x: geo.xFor(placed[e.id]), y: geo.scaleY - 42, on: true }
       else t[e.id] = { x: geo.PAD + geo.chipW / 2 + i * (geo.chipW + 10), y: geo.trayY, on: false }
     })
     return t
-  }, [geo, placed, revealed])
+  }, [geo, placed])
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -137,14 +136,26 @@ export default function ProbabilityScale() {
     ctx.fillText('½', xFor(0.5), scaleY - 34)
     ctx.fillText('1', xFor(1), scaleY - 34)
 
-    // On reveal, mark where each event was guessed (hollow) so the gap to the true spot shows.
+    // On reveal: a green tick marks each true spot; a dashed line links your guess to it.
     if (revealed) {
-      Object.values(placed).forEach((gp) => {
-        const gx = xFor(gp)
-        ctx.strokeStyle = '#B9A6E8'
-        ctx.lineWidth = 2
+      EVENTS.forEach((e) => {
+        const tx = xFor(e.p)
+        if (placed[e.id] != null) {
+          const gx = xFor(placed[e.id])
+          ctx.strokeStyle = '#B9BDC6'
+          ctx.lineWidth = 1.5
+          ctx.setLineDash([4, 4])
+          ctx.beginPath()
+          ctx.moveTo(gx, scaleY - 26)
+          ctx.lineTo(tx, scaleY)
+          ctx.stroke()
+          ctx.setLineDash([])
+        }
+        ctx.strokeStyle = trueGreen
+        ctx.lineWidth = 3
         ctx.beginPath()
-        ctx.arc(gx, scaleY, 6, 0, Math.PI * 2)
+        ctx.moveTo(tx, scaleY - 13)
+        ctx.lineTo(tx, scaleY + 13)
         ctx.stroke()
       })
     }
@@ -167,7 +178,7 @@ export default function ProbabilityScale() {
       ctx.beginPath()
       ctx.roundRect(cx - w / 2 + 2, cy - h / 2 + 3, w, h, 9)
       ctx.fill()
-      ctx.fillStyle = revealed ? trueGreen : chipPurple
+      ctx.fillStyle = chipPurple
       ctx.strokeStyle = '#ffffff'
       ctx.lineWidth = 2
       ctx.beginPath()
@@ -185,7 +196,7 @@ export default function ProbabilityScale() {
       }
       // pointer to the line when on the scale
       if (on) {
-        ctx.fillStyle = revealed ? trueGreen : chipPurple
+        ctx.fillStyle = chipPurple
         ctx.beginPath()
         ctx.moveTo(cx - 6, cy + h / 2)
         ctx.lineTo(cx + 6, cy + h / 2)
@@ -278,6 +289,9 @@ export default function ProbabilityScale() {
     setRevealed(false)
   }
 
+  const placedIds = Object.keys(placed)
+  const closeCount = EVENTS.filter((e) => placed[e.id] != null && Math.abs(placed[e.id] - e.p) <= 0.1).length
+
   return (
     <div className="flex h-full flex-col gap-2 overflow-hidden p-4 font-['Inter']" style={{ background: cream, color: ink }}>
       <div className="text-center text-xl font-black">
@@ -295,8 +309,10 @@ export default function ProbabilityScale() {
         />
       </div>
 
-      <p className="text-center text-sm font-semibold" style={{ color: muted }}>
-        Probability is a number from <b>0 (impossible)</b> to <b>1 (certain)</b>. Drag each event, then reveal the true spot.
+      <p className="text-center text-sm font-semibold" style={{ color: revealed && placedIds.length ? trueGreen : muted }}>
+        {revealed && placedIds.length > 0
+          ? `You placed ${closeCount} of ${placedIds.length} within 10% of the true probability. The hollow marks show your guesses.`
+          : 'Probability is a number from 0 (impossible) to 1 (certain). Drag each event, then reveal the true spot.'}
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
