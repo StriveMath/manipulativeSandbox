@@ -2,6 +2,7 @@ import AngleRelationships from './angle-relationships.jsx'
 import AddingUnlikeFractions from './adding-unlike-fractions.jsx'
 import BoxPlotBuilder from './box-plot-builder.jsx'
 import CoordinateConnectDots from './coordinate-connect-dots.jsx'
+import AngleTargetChallenge from './angle-target-challenge.jsx'
 import CoordinateTreasureMap from './coordinate-treasure-map.jsx'
 import PercentageBarModel from './PercentageBarModel.tsx'
 import TriangleAreaApp from './TriangleAreaApp.tsx'
@@ -64,6 +65,11 @@ export const manipulatives = [
     id: 'coordinate-connect-dots',
     name: 'Coordinate Connect-the-Dots',
     component: CoordinateConnectDots,
+  },
+  {
+    id: 'angle-target-challenge',
+    name: 'Angle Target Challenge',
+    component: AngleTargetChallenge,
   },
   {
     id: 'coordinate-treasure-map',
