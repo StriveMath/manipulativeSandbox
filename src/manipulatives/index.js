@@ -25,6 +25,7 @@ import ExploreRatios from './explore-ratios.jsx'
 import FactorRainbow from './factor-rainbow.jsx'
 import IntegerMultiplyDivide from './integer-multiply-divide.jsx'
 import LinearEquationGrapher from './linear-equation-grapher.jsx'
+import LongDivisionLab from './long-division-lab.jsx'
 import MeanBalancePoint from './mean-balance-point.jsx'
 import NetsSurfaceArea from './nets-surface-area.jsx'
 import NumberLineAddSubtract from './number-line-add-subtract.jsx'
@@ -70,6 +71,11 @@ export const manipulatives = [
     id: 'angle-target-challenge',
     name: 'Angle Target Challenge',
     component: AngleTargetChallenge,
+  },
+  {
+    id: 'long-division-lab',
+    name: 'Long Division Lab',
+    component: LongDivisionLab,
   },
   {
     id: 'coordinate-treasure-map',
