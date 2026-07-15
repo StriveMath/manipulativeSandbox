@@ -3,6 +3,8 @@ import AddingUnlikeFractions from './adding-unlike-fractions.jsx'
 import BoxPlotBuilder from './box-plot-builder.jsx'
 import CoordinateConnectDots from './coordinate-connect-dots.jsx'
 import AngleTargetChallenge from './angle-target-challenge.jsx'
+import AlgebraTiles from './algebra-tiles.jsx'
+import BalanceScaleEquations from './balance-scale-equations.jsx'
 import CoordinateTreasureMap from './coordinate-treasure-map.jsx'
 import PercentageBarModel from './PercentageBarModel.tsx'
 import TriangleAreaApp from './TriangleAreaApp.tsx'
@@ -26,11 +28,17 @@ import FactorRainbow from './factor-rainbow.jsx'
 import IntegerMultiplyDivide from './integer-multiply-divide.jsx'
 import LinearEquationGrapher from './linear-equation-grapher.jsx'
 import LongDivisionLab from './long-division-lab.jsx'
+import InequalitiesNumberLine from './inequalities-number-line.jsx'
+import MeanAbsoluteDeviation from './mean-absolute-deviation.jsx'
 import MeanBalancePoint from './mean-balance-point.jsx'
-import NetsSurfaceArea from './nets-surface-area.jsx'
-import NumberLineAddSubtract from './number-line-add-subtract.jsx'
+import MixedNumbersImproper from './mixed-numbers-improper.jsx'
+import ProbabilityScale from './probability-scale.jsx'
+import SampleSpaceTree from './sample-space-tree.jsx'
+import MultiplyingFractionsArea from './multiplying-fractions-area.jsx'
 import NumberLineExplorer from './number-line-explorer.jsx'
 import ParallelogramArea from './parallelogram-area.jsx'
+import PizzaRemainder from './pizza-remainder.jsx'
+import RoundingNumberLine from './rounding-number-line.jsx'
 import PlaceValueDisks from './place-value-disks.jsx'
 import PowerOf10BlobExplorer from './power-of-10-blob-explorer.jsx'
 import PowersOf10PlaceValueShift from './powers-of-10-place-value-shift.jsx'
@@ -76,6 +84,56 @@ export const manipulatives = [
     id: 'long-division-lab',
     name: 'Long Division Lab',
     component: LongDivisionLab,
+  },
+  {
+    id: 'pizza-remainder',
+    name: 'Pizza Remainder',
+    component: PizzaRemainder,
+  },
+  {
+    id: 'multiplying-fractions-area',
+    name: 'Multiplying Fractions (Area)',
+    component: MultiplyingFractionsArea,
+  },
+  {
+    id: 'balance-scale-equations',
+    name: 'Balance Scale Equations',
+    component: BalanceScaleEquations,
+  },
+  {
+    id: 'rounding-number-line',
+    name: 'Rounding on a Number Line',
+    component: RoundingNumberLine,
+  },
+  {
+    id: 'mixed-numbers-improper',
+    name: 'Mixed Numbers & Improper Fractions',
+    component: MixedNumbersImproper,
+  },
+  {
+    id: 'inequalities-number-line',
+    name: 'Inequalities on a Number Line',
+    component: InequalitiesNumberLine,
+  },
+  {
+    id: 'algebra-tiles',
+    name: 'Algebra Tiles',
+    component: AlgebraTiles,
+  },
+  {
+    id: 'probability-scale',
+    name: 'Probability Scale Explorer',
+    component: ProbabilityScale,
+  },
+  {
+    id: 'sample-space-tree',
+    name: 'Sample Space & Tree Diagrams',
+    component: SampleSpaceTree,
+  },
+  {
+    id: 'mean-absolute-deviation',
+    name: 'Mean Absolute Deviation',
+    component: MeanAbsoluteDeviation,
   },
   {
     id: 'coordinate-treasure-map',
