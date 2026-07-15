@@ -13,6 +13,11 @@ dist-ssr
 *.local
 
 # Editor directories and files
+.agents
+.codex
+.cursor
+repo_meta/
+.git-data/
 .vscode/*
 !.vscode/extensions.json
 .idea
