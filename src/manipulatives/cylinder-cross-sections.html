@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8th Grade Math: Cylinder Cross-Sections</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+        :root {
+            --blue: #3498db; --blue-light: #5dade2;
+            --bg: #f8f9fa; --text: #2c3e50; --border: #dee2e6;
+        }
+
+        * { box-sizing: border-box; user-select: none; }
+        input { user-select: auto; }
+
+        html, body {
+            width: 800px; height: 500px;
+            overflow: hidden;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 500px; background-color: #e9ecef;
+            font-family: 'Inter', sans-serif;
+        }
+
+        #app {
+            width: 800px; height: 500px;
+            background: white; border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            position: relative; overflow: hidden;
+        }
+
+        /* Top Navigation & Controls */
+        #header {
+            position: absolute; top: 0; left: 0; right: 0; height: 70px;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 30px; border-bottom: 2px solid var(--border);
+            background: white; z-index: 10;
+        }
+
+        .title { font-size: 20px; font-weight: 700; color: var(--text); }
+
+        .global-controls {
+            display: flex; gap: 15px; align-items: center; font-size: 16px;
+        }
+
+        button {
+            padding: 10px 18px; border-radius: 6px; border: 1px solid var(--border);
+            background: white; font-family: 'Inter', sans-serif; font-weight: 600;
+            cursor: pointer; transition: 0.2s; color: var(--text); font-size: 15px;
+        }
+        button:hover { background: var(--bg); border-color: #adb5bd; }
+
+        canvas {
+            position: absolute; top: 70px; left: 0; width: 800px; height: 430px;
+        }
+
+        /* Bottom Row Controls */
+        #bottom-row {
+            position: absolute; top: 440px; left: 0; right: 0; height: 40px;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .slider-container {
+            display: flex; align-items: center; gap: 12px;
+            background: white; padding: 10px 20px; border-radius: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid var(--border);
+        }
+        
+        .slider-container label { font-size: 15px; font-weight: 700; color: #2c3e50; }
+        input[type=range] { cursor: pointer; width: 140px; }
+
+        .dimensions-display {
+            font-weight: bold; color: var(--blue); background: #eaf2f8;
+            padding: 8px 12px; border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="header">
+        <div class="title">Volume: Cylinder Cross-Sections</div>
+        <div class="global-controls">
+            <span class="dimensions-display" id="dim-text">r = 3, h = 6</span>
+            <button onclick="randomizeRadius()">New radius</button>
+        </div>
+    </div>
+
+    <canvas id="cvs" width="800" height="430"></canvas>
+
+    <div id="bottom-row">
+        <div class="slider-container">
+            <label for="s1-peel">Peel apart:</label>
+            <input type="range" id="s1-peel" min="0" max="100" value="0" oninput="updateS1Peel(this.value)">
+        </div>
+    </div>
+</div>
+
+<script>
+    const cvs = document.getElementById('cvs');
+    const ctx = cvs.getContext('2d');
+    
+    const SCALE = 18;
+    const C = { cyl: '#2980b9', cylLight: '#5dade2', outline: '#1c2833' };
+
+    const state = { r: 3, h: 6, peel: 0 };
+
+    function randomizeRadius() {
+        state.r = Math.floor(Math.random() * 3) + 2; 
+        state.h = state.r * 2;
+        document.getElementById('dim-text').innerText = `r = ${state.r}, h = ${state.h}`;
+    }
+
+    function updateS1Peel(val) { state.peel = val / 100; }
+
+    function drawCylinderSegment(x, y, rx, ry, segmentH, color, lightColor) {
+        ctx.fillStyle = color; ctx.strokeStyle = C.outline; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI);
+        ctx.lineTo(x - rx, y - segmentH); ctx.ellipse(x, y - segmentH, rx, ry, 0, Math.PI, 0, true);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = lightColor; ctx.beginPath();
+        ctx.ellipse(x, y - segmentH, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+
+        let rx = state.r * SCALE, ry = rx * 0.35, H = state.h * SCALE;
+        let numDiscs = state.h; 
+        let dh = H / numDiscs;
+        
+        let base_y = 260;
+        let maxGapTotal = 80;
+        let gap = state.peel * (maxGapTotal / (numDiscs - 1 || 1));
+
+        const labelColor = '#2c3e50', calcColor = '#154360';
+        let singleX = 190, arrowX = 395, stackX = 595;
+        let textY = base_y + ry + 14;
+
+        // --- Single Disc (Left) ---
+        drawCylinderSegment(singleX, base_y, rx, ry, dh, C.cyl, C.cylLight);
+        
+        ctx.strokeStyle = C.outline; ctx.fillStyle = labelColor;
+        ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
+        ctx.beginPath(); ctx.moveTo(singleX, base_y - dh); ctx.lineTo(singleX + rx, base_y - dh); ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.font = 'bold 16px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        ctx.fillText(`r = ${state.r}`, singleX + rx/2, base_y - dh - 6);
+
+        let singleHx = singleX + rx + 15;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(singleHx - 6, base_y); ctx.lineTo(singleHx, base_y);
+        ctx.moveTo(singleHx, base_y); ctx.lineTo(singleHx, base_y - dh);
+        ctx.moveTo(singleHx - 6, base_y - dh); ctx.lineTo(singleHx, base_y - dh); ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(`height = 1`, singleHx + 8, base_y - dh/2);
+
+        let areaVal = Math.PI * state.r * state.r;
+        ctx.fillStyle = calcColor; ctx.font = 'bold 18px Inter, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText(`Area = \u03c0r\u00b2`, singleX, textY);
+        ctx.font = 'bold 16px Inter, sans-serif';
+        ctx.fillText(`= \u03c0 \u00d7 ${state.r}\u00b2`, singleX, textY + 24);
+        ctx.fillText(`\u2248 ${areaVal.toFixed(1)}`, singleX, textY + 46);
+
+        // --- Arrow (Middle) ---
+        ctx.fillStyle = labelColor; ctx.font = '36px Inter, sans-serif';
+        ctx.textBaseline = 'middle'; ctx.fillText(`\u2192`, arrowX, base_y - H/2);
+
+        // --- Stack (Right) ---
+        for (let i = 0; i < numDiscs; i++) {
+            let y = base_y - i * dh - i * gap;
+            drawCylinderSegment(stackX, y, rx, ry, dh, C.cyl, C.cylLight);
+        }
+
+        ctx.strokeStyle = C.outline; ctx.lineWidth = 1.5;
+        let topY = base_y - (numDiscs - 1) * dh - (numDiscs - 1) * gap - dh;
+        
+        ctx.setLineDash([5, 5]); ctx.beginPath();
+        ctx.moveTo(stackX, topY); ctx.lineTo(stackX + rx, topY); ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = labelColor; ctx.font = 'bold 16px Inter, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        ctx.fillText(`r = ${state.r}`, stackX + rx/2, topY - 6);
+
+        let hX = stackX + rx + 30;
+        let stackTextY = textY;
+
+        if (state.peel > 0.05) {
+            ctx.setLineDash([3, 3]);
+            for (let i = 0; i < numDiscs; i++) {
+                let yBottom = base_y - i * dh - i * gap;
+                let yTop = yBottom - dh;
+                ctx.beginPath(); ctx.moveTo(hX - 6, yBottom); ctx.lineTo(hX, yBottom);
+                ctx.moveTo(hX, yBottom); ctx.lineTo(hX, yTop);
+                ctx.moveTo(hX - 6, yTop); ctx.lineTo(hX, yTop); ctx.stroke();
+                ctx.fillStyle = labelColor; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+                ctx.fillText(`h = 1`, hX + 8, (yBottom + yTop) / 2);
+            }
+            ctx.setLineDash([]);
+            
+            let sumStr = Array(state.h).fill('1').join(' + ') + ` = ${state.h}`;
+            ctx.fillStyle = calcColor; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+            ctx.fillText(`h = ` + sumStr, stackX, stackTextY);
+            stackTextY += 28; 
+        } else {
+            ctx.setLineDash([5, 5]); ctx.beginPath();
+            ctx.moveTo(hX - 10, base_y); ctx.lineTo(hX, base_y);
+            ctx.moveTo(hX, base_y); ctx.lineTo(hX, base_y - H);
+            ctx.moveTo(hX - 10, base_y - H); ctx.lineTo(hX, base_y - H); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = calcColor; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            ctx.font = 'bold 18px Inter, sans-serif';
+            ctx.fillText(`\u00d7 h = ${state.h}`, hX + 10, base_y - H/2);
+        }
+
+        let volVal = areaVal * state.h;
+        ctx.fillStyle = calcColor; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.font = 'bold 18px Inter, sans-serif';
+        ctx.fillText(`Volume = Area \u00d7 h`, stackX, stackTextY);
+        ctx.font = 'bold 16px Inter, sans-serif';
+        ctx.fillText(`\u2248 ${areaVal.toFixed(1)} \u00d7 ${state.h}`, stackX, stackTextY + 24);
+        ctx.fillText(`V \u2248 ${volVal.toFixed(1)}`, stackX, stackTextY + 46);
+
+        requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+</script>
+</body>
+</html>

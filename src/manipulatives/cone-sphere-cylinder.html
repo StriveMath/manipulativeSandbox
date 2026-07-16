@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8th Grade Math: Cone + Sphere</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+        :root {
+            --blue: #3498db; --orange: #e67e22; --green: #2ecc71;
+            --bg: #f8f9fa; --text: #2c3e50; --border: #dee2e6;
+        }
+
+        * { box-sizing: border-box; user-select: none; }
+        html, body {
+            width: 800px; height: 500px; overflow: hidden;
+        }
+        body {
+            margin: 0; padding: 0; display: flex; justify-content: center; align-items: center;
+            min-height: 500px; background-color: #e9ecef; font-family: 'Inter', sans-serif;
+        }
+        #app {
+            width: 800px; height: 500px; background: white; border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1); position: relative; overflow: hidden;
+        }
+
+        #header {
+            position: absolute; top: 0; left: 0; right: 0; height: 70px;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 30px; border-bottom: 2px solid var(--border); background: white; z-index: 10;
+        }
+        .title { font-size: 20px; font-weight: 700; color: var(--text); }
+        .global-controls { display: flex; gap: 15px; align-items: center; font-size: 16px; }
+        
+        button {
+            padding: 10px 18px; border-radius: 6px; border: 1px solid var(--border);
+            background: white; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 15px;
+            cursor: pointer; color: var(--text); transition: 0.2s;
+        }
+        button:hover:not(:disabled) { background: var(--bg); border-color: #adb5bd; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        canvas { position: absolute; top: 70px; left: 0; width: 800px; height: 430px; }
+
+        #result-ui {
+            position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+            width: 620px; display: none; padding: 12px 20px; text-align: center;
+            background: #ffffff; border-radius: 8px; border: 1px solid var(--border);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08); z-index: 10; min-height: 90px;
+        }
+        
+        .nudge {
+            position: absolute; top: 415px; left: 0; right: 0; text-align: center;
+            font-size: 14px; font-style: italic; color: #7f8c8d; pointer-events: none; z-index: 5;
+        }
+
+        .formula { font-family: 'Times New Roman', Times, serif; font-size: 18px; color: #000; font-weight: bold; line-height: 1.5; margin-top: 10px; }
+        .math-symbol { font-style: italic; }
+
+        #bottom-row {
+            position: absolute; top: 440px; left: 0; right: 0; height: 50px;
+            display: flex; justify-content: center; align-items: center; gap: 20px; padding: 0 40px;
+        }
+        .btn-action {
+            background: white; padding: 10px 20px; border-radius: 24px; font-size: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid var(--border);
+        }
+
+        .dimensions-display { font-weight: bold; color: var(--blue); background: #eaf2f8; padding: 8px 12px; border-radius: 6px; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="header">
+        <div class="title">Volume: Cone + Sphere = Cylinder</div>
+        <div class="global-controls">
+            <span class="dimensions-display" id="dim-text">r = 3, h = 6</span>
+            <button onclick="randomizeRadius()">New radius</button>
+        </div>
+    </div>
+
+    <canvas id="cvs" width="800" height="430"></canvas>
+
+    <div class="nudge" id="nudge-text">Guess: will cone + sphere exactly fill it?</div>
+
+    <div id="result-ui">
+        <!-- Stage 1 -->
+        <div id="stage1" style="display: none;">
+            <p style="margin: 0 0 15px 0; font-size: 17px; font-weight: bold; color: #2c3e50;">
+                Cone + sphere exactly fills the cylinder &mdash; same result no matter which order you pour them.
+            </p>
+            <button class="btn-action" onclick="nextReveal(2)">Show the math</button>
+        </div>
+        <!-- Stage 2 -->
+        <div id="stage2" style="display: none;">
+            <p style="margin: 0 0 15px 0; font-size: 16px; color: #34495e;">
+                Since 1 cone filled 1/3 and 1 sphere filled the remaining 2/3, <strong style="color: #2c3e50;">sphere volume = 2/3 &times; cylinder volume</strong>.
+            </p>
+            <button class="btn-action" onclick="nextReveal(3)">Next: Substitute h = 2r</button>
+        </div>
+        <!-- Stage 3 -->
+        <div id="stage3" style="display: none;">
+            <div class="formula" id="formula-content" style="margin-top: 0;"></div>
+        </div>
+    </div>
+
+    <div id="bottom-row">
+        <button class="btn-action" id="btn-cone" style="color: var(--orange); border-color: var(--orange);" onclick="pour('cone')">Pour cone</button>
+        <button class="btn-action" id="btn-sph" style="color: var(--green); border-color: var(--green);" onclick="pour('sphere')">Pour sphere</button>
+        <button class="btn-action" id="btn-reset" onclick="resetApp()" style="display: none;">Try again</button>
+    </div>
+</div>
+
+<script>
+    const cvs = document.getElementById('cvs');
+    const ctx = cvs.getContext('2d');
+    
+    const SCALE = 16;
+    const C = { cyl: '#2980b9', cylLight: '#5dade2', cone: '#d35400', coneLight: '#e67e22', sph: '#27ae60', sphLight: '#58d68d', empty: 'rgba(255,255,255,0.7)', outline: '#1c2833' };
+
+    const state = { r: 3, h: 6, time: 0, pours: [], anim: 0, pouring: null, coneDone: false, sphereDone: false, stage: 0 };
+
+    function getRx() { return state.r * SCALE; }
+    function getRy() { return getRx() * 0.35; }
+    function getH() { return state.h * SCALE; }
+
+    function randomizeRadius() {
+        state.r = Math.floor(Math.random() * 3) + 2; 
+        state.h = state.r * 2;
+        document.getElementById('dim-text').innerText = `r = ${state.r}, h = ${state.h}`;
+        resetApp();
+    }
+
+    function pour(type) {
+        if (state.pouring) return;
+        state.pouring = type; state.anim = 0;
+        document.getElementById(`btn-${type === 'cone' ? 'cone' : 'sph'}`).disabled = true;
+    }
+
+    function resetApp() {
+        state.pours = []; state.anim = 0; state.pouring = null;
+        state.coneDone = false; state.sphereDone = false; state.stage = 0;
+        
+        document.getElementById('result-ui').style.display = 'none';
+        [1,2,3].forEach(i => document.getElementById(`stage${i}`).style.display = 'none');
+        
+        document.getElementById('btn-cone').style.display = 'block';
+        document.getElementById('btn-cone').disabled = false;
+        document.getElementById('btn-sph').style.display = 'block';
+        document.getElementById('btn-sph').disabled = false;
+        document.getElementById('nudge-text').style.display = 'block';
+        document.getElementById('btn-reset').style.display = 'none';
+    }
+
+    function nextReveal(targetStage) {
+        state.stage = targetStage;
+        [1,2,3].forEach(i => document.getElementById(`stage${i}`).style.display = (i === targetStage) ? 'block' : 'none');
+        
+        if (targetStage === 3) {
+            let vSph = (4/3) * Math.PI * Math.pow(state.r, 3);
+            document.getElementById('formula-content').innerHTML = `
+                V<sub>sphere</sub> = <sup style="font-size:0.7em;">2</sup>&frasl;<sub style="font-size:0.7em;">3</sub> &times; &pi;<span class="math-symbol">r</span>&sup2;<span class="math-symbol">h</span><br>
+                Since h = 2r: V<sub>sphere</sub> = <sup style="font-size:0.7em;">2</sup>&frasl;<sub style="font-size:0.7em;">3</sub> &times; &pi;<span class="math-symbol">r</span>&sup2; &times; (2<span class="math-symbol">r</span>) = <sup style="font-size:0.7em;">4</sup>&frasl;<sub style="font-size:0.7em;">3</sub>&pi;<span class="math-symbol">r</span>&sup3;<br>
+                V<sub>sphere</sub> = <sup style="font-size:0.7em;">4</sup>&frasl;<sub style="font-size:0.7em;">3</sub> &times; &pi; &times; ${state.r}&sup3; &approx; ${vSph.toFixed(1)}
+            `;
+        }
+    }
+
+    function drawCylinderSegment(x, y, rx, ry, segmentH, color, lightColor) {
+        ctx.fillStyle = color; ctx.strokeStyle = C.outline; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI); ctx.lineTo(x - rx, y - segmentH);
+        ctx.ellipse(x, y - segmentH, rx, ry, 0, Math.PI, 0, true); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = lightColor; ctx.beginPath(); ctx.ellipse(x, y - segmentH, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    function drawEmptyCylinder(x, y, rx, ry, h) {
+        ctx.fillStyle = C.empty; ctx.strokeStyle = C.outline; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI); ctx.lineTo(x - rx, y - h);
+        ctx.ellipse(x, y - h, rx, ry, 0, Math.PI, 0, true); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(x, y - h, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    function drawConeLiquid(x, y, rx, ry, h, fillRatio, color, lightColor) {
+        if (fillRatio <= 0) return;
+        let emptyRatio = Math.pow(1 - fillRatio, 1/3);
+        let hEmpty = h * emptyRatio, hLiq = h - hEmpty, rLiqX = rx * emptyRatio, rLiqY = ry * emptyRatio;
+        ctx.fillStyle = color; ctx.strokeStyle = C.outline; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI); ctx.lineTo(x - rLiqX, y - hLiq);
+        ctx.ellipse(x, y - hLiq, rLiqX, rLiqY, 0, Math.PI, 0, true); ctx.lineTo(x + rx, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = lightColor; ctx.beginPath(); ctx.ellipse(x, y - hLiq, rLiqX, rLiqY, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    function drawEmptyCone(x, y, rx, ry, h) {
+        ctx.strokeStyle = C.outline; ctx.fillStyle = C.empty; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, y - h); ctx.lineTo(x - rx, y); ctx.moveTo(x, y - h); ctx.lineTo(x + rx, y); ctx.stroke();
+    }
+    function drawSphereLiquid(x, yCenter, r, fillRatio, color, lightColor) {
+        if (fillRatio <= 0) return;
+        let hCap = 2 * r * fillRatio, liquidY = yCenter + r - hCap, dy = Math.abs(liquidY - yCenter);
+        let rCut = Math.sqrt(Math.max(0, r * r - dy * dy)), rCutY = rCut * 0.35;
+        ctx.save(); ctx.beginPath(); ctx.arc(x, yCenter, r, 0, Math.PI * 2); ctx.clip();
+        ctx.fillStyle = color; ctx.fillRect(x - r, liquidY, r * 2, hCap);
+        ctx.strokeStyle = C.outline; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, yCenter, r, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+        if (hCap > 0 && hCap < 2*r) {
+            ctx.fillStyle = lightColor; ctx.strokeStyle = C.outline; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.ellipse(x, liquidY, rCut, rCutY, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
+    }
+    function drawEmptySphere(x, yCenter, r) {
+        ctx.strokeStyle = C.outline; ctx.fillStyle = C.empty; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(x, yCenter, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(x, yCenter, r, r * 0.35, 0, 0, Math.PI); ctx.stroke();
+    }
+    function drawStream(startX, startY, endX, endY, color) {
+        ctx.strokeStyle = color; ctx.lineWidth = 6; ctx.setLineDash([15, 15]); ctx.lineDashOffset = -state.time * 40;
+        ctx.beginPath(); ctx.moveTo(startX, startY);
+        let midX = (startX + endX) / 2, midY = Math.min(startY, endY) - 50;
+        ctx.quadraticCurveTo(midX, midY, endX, endY); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    function loop(timestamp) {
+        state.time = timestamp / 1000;
+        
+        if (state.pouring) {
+            state.anim += 0.02;
+            if (state.anim >= 1) {
+                if (state.pouring === 'cone') {
+                    state.coneDone = true;
+                    state.pours.push({ type: 'cone', ratio: 1/3, color: C.cone, light: C.coneLight });
+                } else {
+                    state.sphereDone = true;
+                    state.pours.push({ type: 'sphere', ratio: 2/3, color: C.sph, light: C.sphLight });
+                }
+                state.anim = 0; state.pouring = null;
+                
+                if (state.coneDone && state.sphereDone) {
+                    document.getElementById('btn-cone').style.display = 'none';
+                    document.getElementById('btn-sph').style.display = 'none';
+                    document.getElementById('nudge-text').style.display = 'none';
+                    document.getElementById('result-ui').style.display = 'block';
+                    document.getElementById('btn-reset').style.display = 'block';
+                    nextReveal(1);
+                }
+            }
+        }
+
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+        
+        let rx = getRx(), ry = getRy(), H = getH();
+        let base_y = 285;
+        
+        const P_CONE_X = 145, P_CYL_X = 390, P_SPH_X = 610;
+        const SPH_Y_CENTER = base_y - rx;
+
+        // 1. SHAPES (Bottom Layer)
+        let currentY = base_y;
+        state.pours.forEach(p => {
+            let segH = H * p.ratio;
+            drawCylinderSegment(P_CYL_X, currentY, rx, ry, segH, p.color, p.light);
+            currentY -= segH;
+        });
+
+        if (state.pouring) {
+            let maxRatio = state.pouring === 'cone' ? 1/3 : 2/3;
+            let cColor = state.pouring === 'cone' ? C.cone : C.sph;
+            let lColor = state.pouring === 'cone' ? C.coneLight : C.sphLight;
+            drawCylinderSegment(P_CYL_X, currentY, rx, ry, H * maxRatio * state.anim, cColor, lColor);
+        }
+        
+        drawEmptyCylinder(P_CYL_X, base_y, rx, ry, H);
+
+        let coneFill = state.coneDone ? 0 : (state.pouring === 'cone' ? 1 - state.anim : 1);
+        if (coneFill > 0) drawConeLiquid(P_CONE_X, base_y, rx, ry, H, coneFill, C.cone, C.coneLight);
+        drawEmptyCone(P_CONE_X, base_y, rx, ry, H);
+
+        let sphFill = state.sphereDone ? 0 : (state.pouring === 'sphere' ? 1 - state.anim : 1);
+        if (sphFill > 0) drawSphereLiquid(P_SPH_X, SPH_Y_CENTER, rx, sphFill, C.sph, C.sphLight);
+        drawEmptySphere(P_SPH_X, SPH_Y_CENTER, rx);
+
+        if (state.pouring) {
+            let srcX = state.pouring === 'cone' ? P_CONE_X + rx*0.5 : P_SPH_X;
+            let srcY = state.pouring === 'cone' ? base_y - H * (1 - Math.pow(1 - coneFill, 1/3)) : SPH_Y_CENTER + rx - (2 * rx * sphFill);
+            let destY = currentY - (H * (state.pouring === 'cone' ? 1/3 : 2/3) * state.anim);
+            let sColor = state.pouring === 'cone' ? C.coneLight : C.sphLight;
+            drawStream(srcX, srcY, P_CYL_X, destY, sColor);
+        }
+
+        // --- Progressive mark lines ---
+        ctx.strokeStyle = '#95a5a6'; ctx.fillStyle = '#2c3e50'; ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 5]); ctx.font = 'bold 16px Inter, sans-serif';
+        ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        
+        let sumRatio = 0;
+        for (let p of state.pours) {
+            sumRatio += p.ratio;
+            if (Math.abs(sumRatio - 1) < 0.01) continue; 
+            let lineY = base_y - (H * sumRatio);
+            ctx.beginPath();
+            ctx.moveTo(P_CYL_X - rx - 10, lineY); ctx.lineTo(P_CYL_X + rx + 10, lineY); ctx.stroke();
+            ctx.fillText(Math.abs(sumRatio - 1/3) < 0.01 ? '1/3' : '2/3', P_CYL_X - rx - 15, lineY);
+        }
+        ctx.setLineDash([]);
+
+        // 2. LABELS & DIMENSIONS (Front Layer)
+        ctx.strokeStyle = C.outline; ctx.fillStyle = '#2c3e50'; ctx.lineWidth = 1.5;
+        let topY = base_y - H;
+
+        // Cone
+        let crX = P_CONE_X + rx + 20;
+        ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(P_CONE_X, base_y); ctx.lineTo(crX, base_y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.font = 'bold 16px Inter, sans-serif'; ctx.textAlign = 'left'; ctx.fillText(`r = ${state.r}`, crX + 8, base_y);
+
+        let chX = P_CONE_X - rx - 25;
+        ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(chX + 10, base_y); ctx.lineTo(chX, base_y);
+        ctx.moveTo(chX, base_y); ctx.lineTo(chX, topY); ctx.moveTo(chX + 10, topY); ctx.lineTo(chX, topY); ctx.stroke(); ctx.setLineDash([]);
+        ctx.textAlign = 'right'; ctx.fillText(`h = ${state.h}`, chX - 8, (base_y + topY) / 2);
+
+        // Cylinder
+        let cyrX = P_CYL_X - rx - 20;
+        ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(P_CYL_X, topY); ctx.lineTo(cyrX, topY); ctx.stroke(); ctx.setLineDash([]);
+        ctx.textAlign = 'right'; ctx.fillText(`r = ${state.r}`, cyrX - 8, topY);
+
+        let cyhX = P_CYL_X + rx + 25;
+        ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(cyhX - 10, base_y); ctx.lineTo(cyhX, base_y);
+        ctx.moveTo(cyhX, base_y); ctx.lineTo(cyhX, topY); ctx.moveTo(cyhX - 10, topY); ctx.lineTo(cyhX, topY); ctx.stroke(); ctx.setLineDash([]);
+        ctx.textAlign = 'left'; ctx.fillText(`h = ${state.h}`, cyhX + 8, (base_y + topY) / 2);
+
+        // Sphere
+        let srX = P_SPH_X - rx - 20;
+        ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(P_SPH_X, SPH_Y_CENTER); ctx.lineTo(srX, SPH_Y_CENTER); ctx.stroke(); ctx.setLineDash([]);
+        ctx.textAlign = 'right'; ctx.fillText(`r = ${state.r}`, srX - 8, SPH_Y_CENTER);
+
+        let shX = P_SPH_X + rx + 25;
+        ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(shX - 10, base_y); ctx.lineTo(shX, base_y);
+        ctx.moveTo(shX, base_y); ctx.lineTo(shX, topY); ctx.moveTo(shX - 10, topY); ctx.lineTo(shX, topY); ctx.stroke(); ctx.setLineDash([]);
+        ctx.textAlign = 'left'; ctx.fillText(`diameter = ${state.h}`, shX + 8, (base_y + topY) / 2);
+
+        if (state.pours.length > 0 || state.pouring) {
+            ctx.fillStyle = '#154360'; ctx.font = 'bold 16px Inter, sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+            let pourNames = state.pours.map(p => p.type);
+            if (state.pouring) pourNames.push(state.pouring);
+            ctx.fillText(`Poured: ${pourNames.join(', ')}`, P_CYL_X, topY - 20);
+        }
+
+        requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+</script>
+</body>
+</html>
