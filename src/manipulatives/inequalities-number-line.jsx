@@ -27,6 +27,7 @@ export default function InequalitiesNumberLine() {
   const [opKey, setOpKey] = useState('gt')
   const [bound, setBound] = useState(3)
   const [test, setTest] = useState(6)
+  const [hideAnswer, setHideAnswer] = useState(false)
   const dragRef = useRef(null) // 'bound' | 'test'
 
   const canvasHeight = 260
@@ -174,11 +175,13 @@ export default function InequalitiesNumberLine() {
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(String(test), tx, ty)
-    // verdict badge
-    ctx.fillStyle = testOk ? solGreen : noRed
-    ctx.font = '900 18px Inter, system-ui, sans-serif'
-    ctx.fillText(testOk ? '✓' : '✗', tx + 22, ty)
-  }, [canvasWidth, geo, op, bound, test, testOk])
+    // verdict badge (hideable, so the teacher can ask "is this a solution?")
+    if (!hideAnswer) {
+      ctx.fillStyle = testOk ? solGreen : noRed
+      ctx.font = '900 18px Inter, system-ui, sans-serif'
+      ctx.fillText(testOk ? '✓' : '✗', tx + 22, ty)
+    }
+  }, [canvasWidth, geo, op, bound, test, testOk, hideAnswer])
 
   useEffect(() => {
     draw()
@@ -254,6 +257,9 @@ export default function InequalitiesNumberLine() {
         </div>
         <Stepper label="Boundary" color={boundPurple} value={bound} onDec={() => setBound((v) => clamp(v - 1, MIN, MAX))} onInc={() => setBound((v) => clamp(v + 1, MIN, MAX))} />
         <Stepper label="Test" color={testBlue} value={test} onDec={() => setTest((v) => clamp(v - 1, MIN, MAX))} onInc={() => setTest((v) => clamp(v + 1, MIN, MAX))} />
+        <button type="button" onClick={() => setHideAnswer((h) => !h)} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+          {hideAnswer ? 'Show answer' : 'Hide answer'}
+        </button>
       </div>
     </div>
   )

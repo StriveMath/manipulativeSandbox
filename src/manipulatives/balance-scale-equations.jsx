@@ -25,8 +25,6 @@ const buildTiles = ({ x, u }) => [
   ...Array.from({ length: u }, () => ({ id: (tileSeq += 1), type: 'unit' })),
 ]
 
-const solveX = (p) => (p.right.u - p.left.u) / (p.left.x - p.right.x)
-
 const countType = (tiles, type) => tiles.filter((t) => t.type === type).length
 
 function sideLabel(xc, uc) {
@@ -47,12 +45,17 @@ export default function BalanceScaleEquations() {
   const [drag, setDrag] = useState(null) // { side, id, x, y, offX, offY }
 
   const canvasHeight = 360
-  const solution = useMemo(() => solveX(PROBLEMS[problemIndex]), [problemIndex])
 
   const leftX = countType(left, 'x')
   const leftU = countType(left, 'unit')
   const rightX = countType(right, 'x')
   const rightU = countType(right, 'unit')
+  // x is whatever value makes the equation currently on the pans true, so any
+  // equation the teacher builds works — nothing is hardcoded to a preset.
+  // If both sides hold the same number of x's there is no unique x; a nominal 1
+  // then correctly shows an identity as level and a no-solution as permanently tipped.
+  const denom = leftX - rightX
+  const solution = denom !== 0 ? (rightU - leftU) / denom : 1
   const leftW = leftX * solution + leftU
   const rightW = rightX * solution + rightU
   const balanced = leftW === rightW
@@ -85,6 +88,18 @@ export default function BalanceScaleEquations() {
       observer.disconnect()
     }
   }, [])
+
+  const addTile = (side, type) => {
+    const tile = { id: (tileSeq += 1), type }
+    if (side === 'left') setLeft((prev) => [...prev, tile])
+    else setRight((prev) => [...prev, tile])
+  }
+
+  const clearAll = () => {
+    setLeft([])
+    setRight([])
+    setDrag(null)
+  }
 
   const loadProblem = (index) => {
     setProblemIndex(index)
@@ -298,11 +313,19 @@ export default function BalanceScaleEquations() {
     setDrag(null)
   }
 
-  const message = solved
-    ? `Solved!  x = ${answer}`
-    : !balanced
-      ? 'Unbalanced! Take the same tile off the OTHER side to level it again.'
-      : 'Balanced ✓  Drag matching tiles off both sides until one x sits alone.'
+  const isEmpty = left.length === 0 && right.length === 0
+  const noUniqueX = denom === 0 && !isEmpty
+  const message = isEmpty
+    ? 'Add x and 1 tiles to either pan to build an equation.'
+    : solved
+      ? `Solved!  x = ${answer}`
+      : noUniqueX
+        ? leftU === rightU
+          ? 'Both sides are identical — this is true for every value of x.'
+          : 'These sides can never balance — no value of x makes this true.'
+        : !balanced
+          ? 'Unbalanced! Take the same tile off the OTHER side to level it again.'
+          : 'Balanced ✓  Drag matching tiles off both sides until one x sits alone.'
 
   const leftEq = sideLabel(leftX, leftU)
   const rightEq = sideLabel(rightX, rightU)
@@ -331,17 +354,21 @@ export default function BalanceScaleEquations() {
         {message}
       </p>
 
-      <div className="flex flex-wrap items-center justify-center gap-4">
-        <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: muted }}>
-          <span className="inline-block h-4 w-4 rounded" style={{ background: xPurple }} /> = x
-          <span className="ml-3 inline-block h-4 w-4 rounded" style={{ background: unitBlue }} /> = 1
-        </div>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        {/* Build any equation: add tiles to either pan. */}
+        {['left', 'right'].map((side) => (
+          <div key={side} className="flex items-center gap-1.5">
+            <span className="text-xs font-black uppercase" style={{ color: muted }}>{side}</span>
+            <button type="button" onClick={() => addTile(side, 'x')} className="rounded-lg px-3 py-1.5 text-sm font-black text-white" style={{ background: xPurple }}>+ x</button>
+            <button type="button" onClick={() => addTile(side, 'unit')} className="rounded-lg px-3 py-1.5 text-sm font-black text-white" style={{ background: unitBlue }}>+ 1</button>
+          </div>
+        ))}
         <label className="flex items-center gap-2 text-sm font-semibold" style={{ color: muted }}>
-          Problem:
+          Starter:
           <select
             value={problemIndex}
             onChange={(event) => loadProblem(Number(event.target.value))}
-            className="rounded-lg border border-[#E0DDD6] bg-white px-3 py-2 text-sm font-black outline-none"
+            className="rounded-lg border border-[#E0DDD6] bg-white px-2 py-1.5 text-sm font-black outline-none"
             style={{ color: xPurple }}
           >
             {PROBLEMS.map((p, i) => (
@@ -351,8 +378,11 @@ export default function BalanceScaleEquations() {
             ))}
           </select>
         </label>
-        <button type="button" onClick={() => loadProblem(problemIndex)} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+        <button type="button" onClick={() => loadProblem(problemIndex)} className="rounded-full border px-3 py-1.5 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
           Reset
+        </button>
+        <button type="button" onClick={clearAll} className="rounded-full border px-3 py-1.5 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+          Empty pans
         </button>
       </div>
     </div>

@@ -20,6 +20,7 @@ export default function MeanAbsoluteDeviation() {
   const [canvasWidth, setCanvasWidth] = useState(720)
   const [points, setPoints] = useState(() => [4, 7, 9, 16].map((v) => ({ id: (seq += 1), value: v })))
   const [drag, setDrag] = useState(null) // { id, startX, moved }
+  const [hideAnswer, setHideAnswer] = useState(false)
 
   const canvasHeight = 272
 
@@ -148,11 +149,13 @@ export default function MeanAbsoluteDeviation() {
         ctx.lineTo(px, axisY)
         ctx.stroke()
         ctx.setLineDash([])
-        ctx.fillStyle = distOrange
-        ctx.font = '800 11px Inter, system-ui, sans-serif'
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'bottom'
-        ctx.fillText(round1(dist).toString(), (px + meanX) / 2, y - 2)
+        if (!hideAnswer) {
+          ctx.fillStyle = distOrange
+          ctx.font = '800 11px Inter, system-ui, sans-serif'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'bottom'
+          ctx.fillText(round1(dist).toString(), (px + meanX) / 2, y - 2)
+        }
       }
     })
 
@@ -185,7 +188,7 @@ export default function MeanAbsoluteDeviation() {
       ctx.font = '900 12px Inter, system-ui, sans-serif'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
-      ctx.fillText(`MAD = ${round1(mad)} on each side of the mean`, meanX, y2 + 7)
+      ctx.fillText(hideAnswer ? 'MAD = ? on each side of the mean' : `MAD = ${round1(mad)} on each side of the mean`, meanX, y2 + 7)
     }
 
     // Data points.
@@ -223,7 +226,7 @@ export default function MeanAbsoluteDeviation() {
         ctx.globalAlpha = 1
       }
     }
-  }, [canvasWidth, geo, points, mean, mad, drag])
+  }, [canvasWidth, geo, points, mean, mad, drag, hideAnswer])
 
   useEffect(() => {
     draw()
@@ -270,10 +273,12 @@ export default function MeanAbsoluteDeviation() {
           <span className="text-lg font-bold" style={{ color: muted }}>Click the line to add data points</span>
         ) : (
           <>
-            <span style={{ color: meanGreen }}>MAD = {round1(mad)}</span>
-            <span className="text-base font-bold" style={{ color: muted }}>
-              = average distance from the mean ({distances.map((d) => round1(d)).join(' + ')} ÷ {distances.length})
-            </span>
+            <span style={{ color: meanGreen }}>MAD = {hideAnswer ? '?' : round1(mad)}</span>
+            {!hideAnswer && (
+              <span className="text-base font-bold" style={{ color: muted }}>
+                = average distance from the mean ({distances.map((d) => round1(d)).join(' + ')} ÷ {distances.length})
+              </span>
+            )}
           </>
         )}
       </div>
@@ -302,6 +307,9 @@ export default function MeanAbsoluteDeviation() {
         </button>
         <button type="button" onClick={() => setPoints([])} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
           Clear
+        </button>
+        <button type="button" onClick={() => setHideAnswer((h) => !h)} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+          {hideAnswer ? 'Show answer' : 'Hide answer'}
         </button>
       </div>
     </div>

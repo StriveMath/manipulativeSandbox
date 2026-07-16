@@ -49,20 +49,26 @@ export default function AlgebraTiles() {
     }
   }, [])
 
-  const xC = tiles.filter((t) => t.type === 'x').length - tiles.filter((t) => t.type === 'nx').length
-  const c = tiles.filter((t) => t.type === 'u').length - tiles.filter((t) => t.type === 'nu').length
-
-  let expr = ''
-  if (xC !== 0) expr += (xC < 0 ? '−' : '') + (Math.abs(xC) === 1 ? 'x' : `${Math.abs(xC)}x`)
-  if (c !== 0) expr += (expr ? (c < 0 ? ' − ' : ' + ') : c < 0 ? '−' : '') + Math.abs(c)
-  if (expr === '') expr = '0'
+  // Tiles left of the divider form one side of the equation, right the other.
+  const midX = size.w / 2
+  const fmt = (ts) => {
+    const xC = ts.filter((t) => t.type === 'x').length - ts.filter((t) => t.type === 'nx').length
+    const c = ts.filter((t) => t.type === 'u').length - ts.filter((t) => t.type === 'nu').length
+    let e = ''
+    if (xC !== 0) e += (xC < 0 ? '−' : '') + (Math.abs(xC) === 1 ? 'x' : `${Math.abs(xC)}x`)
+    if (c !== 0) e += (e ? (c < 0 ? ' − ' : ' + ') : c < 0 ? '−' : '') + Math.abs(c)
+    return e || '0'
+  }
+  const leftExpr = fmt(tiles.filter((t) => t.x < midX))
+  const rightExpr = fmt(tiles.filter((t) => t.x >= midX))
 
   const addTile = (type) => {
-    const t = TYPES[type]
     const n = tiles.length
+    // Spawn on the left of the equals; drag across to build the other side.
+    const span = Math.max(110, size.w / 2 - 70)
     setTiles((prev) => [
       ...prev,
-      { id: (seq += 1), type, x: 46 + ((n * 46) % Math.max(120, size.w - 90)), y: 44 + Math.floor((n * 46) / Math.max(120, size.w - 90)) * 76 },
+      { id: (seq += 1), type, x: 40 + ((n * 46) % span), y: 56 + Math.floor((n * 46) / span) * 74 },
     ])
   }
 
@@ -80,12 +86,34 @@ export default function AlgebraTiles() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, size.w, size.h)
 
+    // Equals divider: tiles either side form the two sides of an equation.
+    const mid = size.w / 2
+    ctx.save()
+    ctx.strokeStyle = '#C9CDD6'
+    ctx.setLineDash([7, 6])
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(mid, 14)
+    ctx.lineTo(mid, size.h - 14)
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    ctx.arc(mid, size.h / 2, 17, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = '#8B8F99'
+    ctx.font = '900 22px Inter, system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('=', mid, size.h / 2)
+    ctx.restore()
+
     if (tiles.length === 0) {
       ctx.fillStyle = '#B9BDC6'
-      ctx.font = '600 15px Inter, system-ui, sans-serif'
+      ctx.font = '600 14px Inter, system-ui, sans-serif'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillText('Add tiles below, then drag an x onto a −x (or 1 onto −1) to make a zero pair.', size.w / 2, size.h / 2)
+      ctx.fillText('Add tiles, drag them either side of the =, and drop an x onto a −x to zero-pair.', size.w / 2, 30)
     }
 
     const drawTile = (t, lifted) => {
@@ -186,8 +214,13 @@ export default function AlgebraTiles() {
       return
     }
     const opp = TYPES[dragged.type].opp
+    // Zero pairs only cancel on the SAME side of the equals.
     const hit = tiles.find(
-      (t) => t.id !== dragged.id && t.type === opp && Math.hypot(t.x - drag.x, t.y - drag.y) <= 34,
+      (t) =>
+        t.id !== dragged.id &&
+        t.type === opp &&
+        Math.hypot(t.x - drag.x, t.y - drag.y) <= 34 &&
+        (t.x < midX) === (drag.x < midX),
     )
     if (hit) {
       setTiles((prev) => prev.filter((t) => t.id !== dragged.id && t.id !== hit.id))
@@ -215,8 +248,9 @@ export default function AlgebraTiles() {
   return (
     <div className="flex h-full flex-col gap-2 overflow-hidden p-4 font-['Inter']" style={{ background: cream, color: ink }}>
       <div className="flex items-center justify-center gap-3 text-3xl font-black">
-        <span style={{ color: muted }}>Expression =</span>
-        <span style={{ color: xC || c ? ink : muted }}>{expr}</span>
+        <span style={{ color: ink }}>{leftExpr}</span>
+        <span style={{ color: muted }}>=</span>
+        <span style={{ color: ink }}>{rightExpr}</span>
       </div>
 
       <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">

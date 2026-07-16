@@ -19,17 +19,30 @@ const EXPERIMENTS = {
   spinners: { name: 'Two spinners (R/B/G)', s1: ['R', 'B', 'G'], s2: ['R', 'B', 'G'] },
 }
 
+// Comma-separated options -> labels (max 6 a stage so the tree stays readable).
+const parseOpts = (text) => {
+  const o = text.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 6)
+  return o.length ? o : ['?']
+}
+
 export default function SampleSpaceTree() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
   const [size, setSize] = useState({ w: 720, h: 380 })
-  const [expKey, setExpKey] = useState('coins')
+  const [s1Text, setS1Text] = useState('H,T')
+  const [s2Text, setS2Text] = useState('H,T')
   const [selected, setSelected] = useState(() => new Set())
+  const [hideAnswer, setHideAnswer] = useState(false)
 
-  const exp = EXPERIMENTS[expKey]
-  const a = exp.s1.length
-  const b = exp.s2.length
+  // Stages are free text, so a teacher (or the worksheet AI) can define any
+  // experiment; the presets below just load a starting pair.
+  const s1 = useMemo(() => parseOpts(s1Text), [s1Text])
+  const s2 = useMemo(() => parseOpts(s2Text), [s2Text])
+  const a = s1.length
+  const b = s2.length
   const N = a * b
+  const matchKey =
+    Object.entries(EXPERIMENTS).find(([, v]) => v.s1.join(',') === s1.join(',') && v.s2.join(',') === s2.join(','))?.[0] || 'custom'
 
   useLayoutEffect(() => {
     const node = wrapRef.current
@@ -127,7 +140,7 @@ export default function SampleSpaceTree() {
     ctx.font = '800 11px Inter, system-ui, sans-serif'
     ctx.textAlign = 'left'
     ctx.textBaseline = 'top'
-    ctx.fillText(`each outcome = 1/${N}`, leafX - 12, 6)
+    ctx.fillText(hideAnswer ? 'each outcome = 1/?' : `each outcome = 1/${N}`, leafX - 12, 6)
 
     // Root node.
     ctx.fillStyle = ink
@@ -142,7 +155,7 @@ export default function SampleSpaceTree() {
 
     // Stage 1 nodes.
     for (let j = 0; j < a; j += 1) {
-      const o = exp.s1[j]
+      const o = s1[j]
       if ([...selected].some((k) => Math.floor(k / b) === j)) {
         ctx.strokeStyle = selBlue
         ctx.lineWidth = 3
@@ -166,8 +179,8 @@ export default function SampleSpaceTree() {
     for (let k = 0; k < N; k += 1) {
       const j = Math.floor(k / b)
       const i = k % b
-      const o1 = exp.s1[j]
-      const o2 = exp.s2[i]
+      const o1 = s1[j]
+      const o2 = s2[i]
       const y = leafY(k)
       const on = selected.has(k)
       ctx.fillStyle = colorOf(o2)
@@ -192,7 +205,7 @@ export default function SampleSpaceTree() {
       ctx.textAlign = 'left'
       ctx.fillText(`${o1}${o2}`, leafX + r + 8, y)
     }
-  }, [size, geo, exp, a, b, N, selected])
+  }, [size, geo, s1, s2, a, b, N, selected, hideAnswer])
 
   useEffect(() => {
     draw()
@@ -216,17 +229,20 @@ export default function SampleSpaceTree() {
     }
   }
 
-  const changeExp = (key) => {
-    setExpKey(key)
+  const loadStarter = (key) => {
+    const p = EXPERIMENTS[key]
+    if (!p) return
+    setS1Text(p.s1.join(','))
+    setS2Text(p.s2.join(','))
     setSelected(new Set())
   }
 
   return (
     <div className="flex h-full flex-col gap-2 overflow-hidden p-4 font-['Inter']" style={{ background: cream, color: ink }}>
       <div className="flex items-center justify-center gap-3 text-2xl font-black tabular-nums">
-        <span style={{ color: totalPurple }}>{N} outcomes</span>
-        <span className="text-base font-bold" style={{ color: muted }}>= {a} × {b}</span>
-        {selected.size > 0 && (
+        <span style={{ color: totalPurple }}>{hideAnswer ? '?' : N} outcomes</span>
+        {!hideAnswer && <span className="text-base font-bold" style={{ color: muted }}>= {a} × {b}</span>}
+        {!hideAnswer && selected.size > 0 && (
           <span className="text-base font-black" style={{ color: selBlue }}>· P(selected) = {selected.size}/{N}</span>
         )}
       </div>
@@ -240,21 +256,44 @@ export default function SampleSpaceTree() {
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <label className="flex items-center gap-2 text-sm font-semibold" style={{ color: muted }}>
-          Experiment:
+        <label className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: muted }}>
+          Starter:
           <select
-            value={expKey}
-            onChange={(e) => changeExp(e.target.value)}
-            className="rounded-lg border border-[#E0DDD6] bg-white px-3 py-2 text-sm font-black outline-none"
+            value={matchKey}
+            onChange={(e) => loadStarter(e.target.value)}
+            className="rounded-lg border border-[#E0DDD6] bg-white px-2 py-1.5 text-sm font-black outline-none"
             style={{ color: totalPurple }}
           >
             {Object.entries(EXPERIMENTS).map(([k, v]) => (
               <option key={k} value={k}>{v.name}</option>
             ))}
+            <option value="custom">Custom</option>
           </select>
         </label>
-        <button type="button" onClick={() => setSelected(new Set())} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+        {/* Any experiment: type the outcomes for each stage. */}
+        <label className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: muted }}>
+          Stage 1:
+          <input
+            value={s1Text}
+            onChange={(e) => { setS1Text(e.target.value); setSelected(new Set()) }}
+            className="w-28 rounded-lg border border-[#E0DDD6] bg-white px-2 py-1.5 text-sm font-black outline-none"
+            style={{ color: ink }}
+          />
+        </label>
+        <label className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: muted }}>
+          Stage 2:
+          <input
+            value={s2Text}
+            onChange={(e) => { setS2Text(e.target.value); setSelected(new Set()) }}
+            className="w-28 rounded-lg border border-[#E0DDD6] bg-white px-2 py-1.5 text-sm font-black outline-none"
+            style={{ color: ink }}
+          />
+        </label>
+        <button type="button" onClick={() => setSelected(new Set())} className="rounded-full border px-3 py-1.5 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
           Clear selection
+        </button>
+        <button type="button" onClick={() => setHideAnswer((h) => !h)} className="rounded-full border px-3 py-1.5 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+          {hideAnswer ? 'Show answer' : 'Hide answer'}
         </button>
       </div>
     </div>
