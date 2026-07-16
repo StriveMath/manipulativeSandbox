@@ -27,7 +27,9 @@ export default function InequalitiesNumberLine() {
   const [opKey, setOpKey] = useState('gt')
   const [bound, setBound] = useState(3)
   const [test, setTest] = useState(6)
-  const [hideAnswer, setHideAnswer] = useState(false)
+  // Layered reveals: the teacher peels back one idea at a time.
+  const [show, setShow] = useState({ ray: true, check: true })
+  const toggle = (k) => setShow((s) => ({ ...s, [k]: !s[k] }))
   const dragRef = useRef(null) // 'bound' | 'test'
 
   const canvasHeight = 260
@@ -119,22 +121,24 @@ export default function InequalitiesNumberLine() {
     }
 
     // Solution ray (shaded direction) + arrowhead.
-    const endX = op.right ? canvasWidth - PAD + 8 : PAD - 8
-    ctx.strokeStyle = solGreen
-    ctx.lineWidth = 6
-    ctx.lineCap = 'round'
-    ctx.beginPath()
-    ctx.moveTo(bx, axisY)
-    ctx.lineTo(endX, axisY)
-    ctx.stroke()
-    const dir = op.right ? 1 : -1
-    ctx.fillStyle = solGreen
-    ctx.beginPath()
-    ctx.moveTo(endX + dir * 8, axisY)
-    ctx.lineTo(endX - dir * 6, axisY - 8)
-    ctx.lineTo(endX - dir * 6, axisY + 8)
-    ctx.closePath()
-    ctx.fill()
+    if (show.ray) {
+      const endX = op.right ? canvasWidth - PAD + 8 : PAD - 8
+      ctx.strokeStyle = solGreen
+      ctx.lineWidth = 6
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(bx, axisY)
+      ctx.lineTo(endX, axisY)
+      ctx.stroke()
+      const dir = op.right ? 1 : -1
+      ctx.fillStyle = solGreen
+      ctx.beginPath()
+      ctx.moveTo(endX + dir * 8, axisY)
+      ctx.lineTo(endX - dir * 6, axisY - 8)
+      ctx.lineTo(endX - dir * 6, axisY + 8)
+      ctx.closePath()
+      ctx.fill()
+    }
 
     // Boundary dot: open (strict) or closed (inclusive).
     ctx.lineWidth = 3.5
@@ -176,12 +180,12 @@ export default function InequalitiesNumberLine() {
     ctx.textBaseline = 'middle'
     ctx.fillText(String(test), tx, ty)
     // verdict badge (hideable, so the teacher can ask "is this a solution?")
-    if (!hideAnswer) {
+    if (show.check) {
       ctx.fillStyle = testOk ? solGreen : noRed
       ctx.font = '900 18px Inter, system-ui, sans-serif'
       ctx.fillText(testOk ? '✓' : '✗', tx + 22, ty)
     }
-  }, [canvasWidth, geo, op, bound, test, testOk, hideAnswer])
+  }, [canvasWidth, geo, op, bound, test, testOk, show])
 
   useEffect(() => {
     draw()
@@ -257,11 +261,27 @@ export default function InequalitiesNumberLine() {
         </div>
         <Stepper label="Boundary" color={boundPurple} value={bound} onDec={() => setBound((v) => clamp(v - 1, MIN, MAX))} onInc={() => setBound((v) => clamp(v + 1, MIN, MAX))} />
         <Stepper label="Test" color={testBlue} value={test} onDec={() => setTest((v) => clamp(v - 1, MIN, MAX))} onInc={() => setTest((v) => clamp(v + 1, MIN, MAX))} />
-        <button type="button" onClick={() => setHideAnswer((h) => !h)} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
-          {hideAnswer ? 'Show answer' : 'Hide answer'}
-        </button>
+        <ToggleChip label="Show solution ray" color={solGreen} on={show.ray} onClick={() => toggle('ray')} />
+        <ToggleChip label="Show check" color={testBlue} on={show.check} onClick={() => toggle('check')} />
       </div>
     </div>
+  )
+}
+
+// One reveal layer. The dot carries the layer's colour so the chip and the
+// thing it reveals read as the same idea.
+function ToggleChip({ label, color, on, onClick }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onClick}
+      className="flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-bold"
+      style={{ borderColor: on ? color : '#E0DDD6', color: on ? color : muted }}
+    >
+      <span className="h-2.5 w-2.5 rounded-full" style={{ background: on ? color : '#C9CDD6' }} />
+      {label}
+    </button>
   )
 }
 

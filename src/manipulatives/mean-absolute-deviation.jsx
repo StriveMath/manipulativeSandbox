@@ -20,7 +20,9 @@ export default function MeanAbsoluteDeviation() {
   const [canvasWidth, setCanvasWidth] = useState(720)
   const [points, setPoints] = useState(() => [4, 7, 9, 16].map((v) => ({ id: (seq += 1), value: v })))
   const [drag, setDrag] = useState(null) // { id, startX, moved }
-  const [hideAnswer, setHideAnswer] = useState(false)
+  // Layered reveals: the teacher peels back one idea at a time.
+  const [show, setShow] = useState({ distances: true, mad: true })
+  const toggle = (k) => setShow((s) => ({ ...s, [k]: !s[k] }))
 
   const canvasHeight = 272
 
@@ -78,7 +80,7 @@ export default function MeanAbsoluteDeviation() {
     const meanX = xFor(mean)
 
     // Shaded "typical" band: mean ± MAD (most points fall roughly this close).
-    if (points.length && mad > 0.05) {
+    if (show.mad && points.length && mad > 0.05) {
       const bx0 = xFor(Math.max(MIN, mean - mad))
       const bx1 = xFor(Math.min(MAX, mean + mad))
       ctx.fillStyle = 'rgba(29,158,117,0.12)'
@@ -130,6 +132,7 @@ export default function MeanAbsoluteDeviation() {
       .map((p, i) => ({ ...p, i }))
       .sort((a, b) => Math.abs(b.value - mean) - Math.abs(a.value - mean))
     ordered.forEach((p, row) => {
+      if (!show.distances) return
       if (drag && drag.id === p.id) return
       const px = xFor(p.value)
       const y = axisY - 22 - row * 20
@@ -149,18 +152,16 @@ export default function MeanAbsoluteDeviation() {
         ctx.lineTo(px, axisY)
         ctx.stroke()
         ctx.setLineDash([])
-        if (!hideAnswer) {
-          ctx.fillStyle = distOrange
-          ctx.font = '800 11px Inter, system-ui, sans-serif'
-          ctx.textAlign = 'center'
-          ctx.textBaseline = 'bottom'
-          ctx.fillText(round1(dist).toString(), (px + meanX) / 2, y - 2)
-        }
+        ctx.fillStyle = distOrange
+        ctx.font = '800 11px Inter, system-ui, sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'bottom'
+        ctx.fillText(round1(dist).toString(), (px + meanX) / 2, y - 2)
       }
     })
 
     // MAD shown as a two-sided span (mean − MAD .. mean + MAD) below the axis.
-    if (points.length && mad > 0.05) {
+    if (show.mad && points.length && mad > 0.05) {
       const y2 = axisY + 34
       const lx = xFor(Math.max(MIN, mean - mad))
       const rx = xFor(Math.min(MAX, mean + mad))
@@ -188,7 +189,7 @@ export default function MeanAbsoluteDeviation() {
       ctx.font = '900 12px Inter, system-ui, sans-serif'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
-      ctx.fillText(hideAnswer ? 'MAD = ? on each side of the mean' : `MAD = ${round1(mad)} on each side of the mean`, meanX, y2 + 7)
+      ctx.fillText(`MAD = ${round1(mad)} on each side of the mean`, meanX, y2 + 7)
     }
 
     // Data points.
@@ -226,7 +227,7 @@ export default function MeanAbsoluteDeviation() {
         ctx.globalAlpha = 1
       }
     }
-  }, [canvasWidth, geo, points, mean, mad, drag, hideAnswer])
+  }, [canvasWidth, geo, points, mean, mad, drag, show])
 
   useEffect(() => {
     draw()
@@ -273,8 +274,8 @@ export default function MeanAbsoluteDeviation() {
           <span className="text-lg font-bold" style={{ color: muted }}>Click the line to add data points</span>
         ) : (
           <>
-            <span style={{ color: meanGreen }}>MAD = {hideAnswer ? '?' : round1(mad)}</span>
-            {!hideAnswer && (
+            <span style={{ color: meanGreen }}>MAD = {show.mad ? round1(mad) : '?'}</span>
+            {show.distances && (
               <span className="text-base font-bold" style={{ color: muted }}>
                 = average distance from the mean ({distances.map((d) => round1(d)).join(' + ')} ÷ {distances.length})
               </span>
@@ -308,10 +309,26 @@ export default function MeanAbsoluteDeviation() {
         <button type="button" onClick={() => setPoints([])} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
           Clear
         </button>
-        <button type="button" onClick={() => setHideAnswer((h) => !h)} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
-          {hideAnswer ? 'Show answer' : 'Hide answer'}
-        </button>
+        <ToggleChip label="Show distances" color={distOrange} on={show.distances} onClick={() => toggle('distances')} />
+        <ToggleChip label="Show MAD" color={meanGreen} on={show.mad} onClick={() => toggle('mad')} />
       </div>
     </div>
+  )
+}
+
+// One reveal layer. The dot carries the layer's colour so the chip and the
+// thing it reveals read as the same idea.
+function ToggleChip({ label, color, on, onClick }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onClick}
+      className="flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-bold"
+      style={{ borderColor: on ? color : '#E0DDD6', color: on ? color : muted }}
+    >
+      <span className="h-2.5 w-2.5 rounded-full" style={{ background: on ? color : '#C9CDD6' }} />
+      {label}
+    </button>
   )
 }

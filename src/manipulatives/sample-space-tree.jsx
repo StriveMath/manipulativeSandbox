@@ -32,7 +32,9 @@ export default function SampleSpaceTree() {
   const [s1Text, setS1Text] = useState('H,T')
   const [s2Text, setS2Text] = useState('H,T')
   const [selected, setSelected] = useState(() => new Set())
-  const [hideAnswer, setHideAnswer] = useState(false)
+  // Layered reveals: the teacher peels back one idea at a time.
+  const [show, setShow] = useState({ count: true, prob: true })
+  const toggle = (k) => setShow((s) => ({ ...s, [k]: !s[k] }))
 
   // Stages are free text, so a teacher (or the worksheet AI) can define any
   // experiment; the presets below just load a starting pair.
@@ -118,29 +120,31 @@ export default function SampleSpaceTree() {
     }
 
     // Branch probability labels (each branch is equally likely).
-    ctx.font = '700 10px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillStyle = muted
-    for (let j = 0; j < a; j += 1) {
-      const mx = rootX + 14 + (s1X - 14 - (rootX + 14)) * 0.42
-      const my = rootY + (s1Y(j) - rootY) * 0.42
-      ctx.fillText(`1/${a}`, mx, my - 7)
-    }
-    if (b <= 4) {
-      for (let k = 0; k < N; k += 1) {
-        const j = Math.floor(k / b)
-        const mx = s1X + 14 + (leafX - 12 - (s1X + 14)) * 0.45
-        const my = s1Y(j) + (leafY(k) - s1Y(j)) * 0.45
-        ctx.fillText(`1/${b}`, mx, my - 6)
+    if (show.prob) {
+      ctx.font = '700 10px Inter, system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = selBlue
+      for (let j = 0; j < a; j += 1) {
+        const mx = rootX + 14 + (s1X - 14 - (rootX + 14)) * 0.42
+        const my = rootY + (s1Y(j) - rootY) * 0.42
+        ctx.fillText(`1/${a}`, mx, my - 7)
       }
+      if (b <= 4) {
+        for (let k = 0; k < N; k += 1) {
+          const j = Math.floor(k / b)
+          const mx = s1X + 14 + (leafX - 12 - (s1X + 14)) * 0.45
+          const my = s1Y(j) + (leafY(k) - s1Y(j)) * 0.45
+          ctx.fillText(`1/${b}`, mx, my - 6)
+        }
+      }
+      // Per-outcome probability note.
+      ctx.fillStyle = selBlue
+      ctx.font = '800 11px Inter, system-ui, sans-serif'
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'top'
+      ctx.fillText(`each outcome = 1/${N}`, leafX - 12, 6)
     }
-    // Per-outcome probability note.
-    ctx.fillStyle = muted
-    ctx.font = '800 11px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'top'
-    ctx.fillText(hideAnswer ? 'each outcome = 1/?' : `each outcome = 1/${N}`, leafX - 12, 6)
 
     // Root node.
     ctx.fillStyle = ink
@@ -205,7 +209,7 @@ export default function SampleSpaceTree() {
       ctx.textAlign = 'left'
       ctx.fillText(`${o1}${o2}`, leafX + r + 8, y)
     }
-  }, [size, geo, s1, s2, a, b, N, selected, hideAnswer])
+  }, [size, geo, s1, s2, a, b, N, selected, show])
 
   useEffect(() => {
     draw()
@@ -240,9 +244,9 @@ export default function SampleSpaceTree() {
   return (
     <div className="flex h-full flex-col gap-2 overflow-hidden p-4 font-['Inter']" style={{ background: cream, color: ink }}>
       <div className="flex items-center justify-center gap-3 text-2xl font-black tabular-nums">
-        <span style={{ color: totalPurple }}>{hideAnswer ? '?' : N} outcomes</span>
-        {!hideAnswer && <span className="text-base font-bold" style={{ color: muted }}>= {a} × {b}</span>}
-        {!hideAnswer && selected.size > 0 && (
+        <span style={{ color: totalPurple }}>{show.count ? N : '?'} outcomes</span>
+        {show.count && <span className="text-base font-bold" style={{ color: muted }}>= {a} × {b}</span>}
+        {show.prob && selected.size > 0 && (
           <span className="text-base font-black" style={{ color: selBlue }}>· P(selected) = {selected.size}/{N}</span>
         )}
       </div>
@@ -292,10 +296,26 @@ export default function SampleSpaceTree() {
         <button type="button" onClick={() => setSelected(new Set())} className="rounded-full border px-3 py-1.5 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
           Clear selection
         </button>
-        <button type="button" onClick={() => setHideAnswer((h) => !h)} className="rounded-full border px-3 py-1.5 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
-          {hideAnswer ? 'Show answer' : 'Hide answer'}
-        </button>
+        <ToggleChip label="Show count" color={totalPurple} on={show.count} onClick={() => toggle('count')} />
+        <ToggleChip label="Show probabilities" color={selBlue} on={show.prob} onClick={() => toggle('prob')} />
       </div>
     </div>
+  )
+}
+
+// One reveal layer. The dot carries the layer's colour so the chip and the
+// thing it reveals read as the same idea.
+function ToggleChip({ label, color, on, onClick }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onClick}
+      className="flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-sm font-bold"
+      style={{ borderColor: on ? color : '#E0DDD6', color: on ? color : muted }}
+    >
+      <span className="h-2.5 w-2.5 rounded-full" style={{ background: on ? color : '#C9CDD6' }} />
+      {label}
+    </button>
   )
 }
