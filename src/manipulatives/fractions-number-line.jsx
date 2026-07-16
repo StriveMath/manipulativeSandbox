@@ -18,7 +18,7 @@ const colors = {
 const compareColors = ['#2A7DE1', '#D64550', '#3B9E4E']
 const modes = ['Place it', 'Compare']
 const maxDenominator = 12
-const canvasHeight = 278
+const canvasHeight = 248
 
 function gcd(a, b) {
   let x = Math.abs(a)

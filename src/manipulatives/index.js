@@ -4,11 +4,13 @@ import BoxPlotBuilder from './box-plot-builder.jsx'
 import CoordinateConnectDots from './coordinate-connect-dots.jsx'
 import CoordinateTreasureMap from './coordinate-treasure-map.jsx'
 import DistributiveAreaModel from './distributive-area-model.jsx'
+import DistanceCoordinatePlane from './distance-coordinate-plane.jsx'
 import ElapsedTimeClock from './elapsed-time-clock.jsx'
 import ExploreRatios from './explore-ratios.jsx'
 import FactorRainbow from './factor-rainbow.jsx'
 import FactorTree from './factor-tree.jsx'
 import FractionsNumberLine from './fractions-number-line.jsx'
+import FunctionMachineDetective from './function-machine-detective.jsx'
 import IntegerMultiplyDivide from './integer-multiply-divide.jsx'
 import LinearEquationGrapher from './linear-equation-grapher.jsx'
 import MeanBalancePoint from './mean-balance-point.jsx'
@@ -22,6 +24,8 @@ import RatioBalanceScale from './ratio-balance-scale.jsx'
 import ScatterLineFit from './scatter-line-fit.jsx'
 import SlopeExplorer from './slope-explorer.jsx'
 import SubstitutionMachine from './substitution-machine.jsx'
+import SystemsOfEquations from './systems-of-equations.jsx'
+import TwoWayTables from './two-way-tables.jsx'
 import TwoFactorTrees from './two-factor-trees.jsx'
 import UnitRateExplorer from './unit-rate-better-buy.jsx'
 import VolumePrisms from './volume-prisms.jsx'
@@ -58,6 +62,11 @@ export const manipulatives = [
     component: DistributiveAreaModel,
   },
   {
+    id: 'distance-coordinate-plane',
+    name: 'Distance on a Coordinate Plane',
+    component: DistanceCoordinatePlane,
+  },
+  {
     id: 'elapsed-time-clock',
     name: 'Elapsed Time Clock',
     component: ElapsedTimeClock,
@@ -76,6 +85,11 @@ export const manipulatives = [
     id: 'fractions-number-line',
     name: 'Fractions on a Number Line',
     component: FractionsNumberLine,
+  },
+  {
+    id: 'function-machine-detective',
+    name: 'Function Machine Detective',
+    component: FunctionMachineDetective,
   },
   {
     id: 'integer-multiply-divide',
@@ -131,6 +145,16 @@ export const manipulatives = [
     id: 'substitution-machine',
     name: 'Substitution Machine',
     component: SubstitutionMachine,
+  },
+  {
+    id: 'systems-of-equations',
+    name: 'Systems of Equations',
+    component: SystemsOfEquations,
+  },
+  {
+    id: 'two-way-tables',
+    name: 'Two-Way Tables',
+    component: TwoWayTables,
   },
   {
     id: 'slope-explorer',

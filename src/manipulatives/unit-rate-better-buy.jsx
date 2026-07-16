@@ -1,382 +1,299 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 const colors = {
-  page: '#EAF4F8',
+  page: '#F8F6F0',
   ink: '#1A1A2E',
+  muted: '#5F5E5A',
   border: '#E0DDD6',
-  scale: '#2E3440',
-  display: '#3BE08A',
-  dollars: '#1E7A5E',
-  quantity: '#185FA5',
+  packA: '#2660C4',
+  packATint: '#EAF0FB',
+  packABorder: '#8AA8DD',
+  packB: '#1E7A5E',
+  packBTint: '#E9F5EF',
+  packBBorder: '#7FCBAC',
   rate: '#7B3F9E',
-  better: '#3B9E4E',
-  apple: '#D63A3A',
-  orange: '#E88A2E',
+  rateTint: '#F3EEFA',
+  rateBorder: '#C99BE0',
+  wrong: '#B23050',
+  win: '#27500A',
+  winTint: '#EAF3DE',
 }
 
-const productBases = [
-  { id: 'apple', name: 'Apple', plural: 'apples', color: colors.apple, light: '#FBEAEA' },
-  { id: 'orange', name: 'Orange', plural: 'oranges', color: colors.orange, light: '#FFF0DF' },
+const rounds = [
+  { item: 'Granola bar', icon: '🍫', a: { qty: 6, total: 3 }, b: { qty: 10, total: 4.5 } },
+  { item: 'Juice box', icon: '🧃', a: { qty: 4, total: 3 }, b: { qty: 8, total: 6.4 } },
+  { item: 'Pencil', icon: '✏️', a: { qty: 5, total: 2.5 }, b: { qty: 12, total: 5.4 } },
+  { item: 'Notebook', icon: '📓', a: { qty: 3, total: 3.3 }, b: { qty: 7, total: 7 } },
+  { item: 'Snack pack', icon: '🥨', a: { qty: 8, total: 4.8 }, b: { qty: 12, total: 7.8 } },
+  { item: 'Water bottle', icon: '💧', a: { qty: 6, total: 4.2 }, b: { qty: 9, total: 6.75 } },
 ]
 
 function money(value) {
   return `$${value.toFixed(2)}`
 }
 
-function randomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min
+function unitRate(pack) {
+  return pack.total / pack.qty
 }
 
-function makeRoundProducts() {
-  const appleCents = randomInt(50, 90)
-  let orangeCents = randomInt(50, 90)
-  while (Math.abs(orangeCents - appleCents) < 8) {
-    orangeCents = randomInt(50, 90)
-  }
-
-  const appleQty = randomInt(5, 8)
-  let orangeQty = randomInt(5, 8)
-  if (orangeQty === appleQty) orangeQty = orangeQty === 8 ? 5 : orangeQty + 1
-
-  return [
-    { ...productBases[0], qty: appleQty, unitCents: appleCents, total: (appleQty * appleCents) / 100 },
-    { ...productBases[1], qty: orangeQty, unitCents: orangeCents, total: (orangeQty * orangeCents) / 100 },
-  ]
+function cleanInput(raw) {
+  return raw.replace(/[$,\s]/g, '')
 }
 
-function unitRate(product) {
-  return product.unitCents / 100
-}
-
-function drawRoundRect(ctx, x, y, width, height, radius) {
-  ctx.beginPath()
-  ctx.moveTo(x + radius, y)
-  ctx.lineTo(x + width - radius, y)
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
-  ctx.lineTo(x + width, y + height - radius)
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
-  ctx.lineTo(x + radius, y + height)
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
-  ctx.lineTo(x, y + radius)
-  ctx.quadraticCurveTo(x, y, x + radius, y)
-  ctx.closePath()
-}
-
-function MiniNumberLine({ product, revealed }) {
-  const canvasRef = useRef(null)
-  const wrapRef = useRef(null)
-  const [width, setWidth] = useState(320)
-
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    const dpr = window.devicePixelRatio || 1
-    const height = 60
-    canvas.width = width * dpr
-    canvas.height = height * dpr
-    canvas.style.width = `${width}px`
-    canvas.style.height = `${height}px`
-    const ctx = canvas.getContext('2d')
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, width, height)
-
-    ctx.fillStyle = '#ffffff'
-    drawRoundRect(ctx, 0, 0, width, height, 12)
-    ctx.fill()
-
-    const pad = 34
-    const lineW = width - pad * 2
-    const toX = (value) => pad + (value / product.qty) * lineW
-    const dollarY = 20
-    const qtyY = 42
-
-    ctx.strokeStyle = '#DBD7CE'
-    ctx.lineWidth = 1
-    for (let tick = 0; tick <= product.qty; tick += 1) {
-      const x = toX(tick)
-      ctx.beginPath()
-      ctx.moveTo(x, dollarY - 5)
-      ctx.lineTo(x, qtyY + 5)
-      ctx.stroke()
-    }
-
-    ;[
-      { y: dollarY, color: colors.dollars, label: '$' },
-      { y: qtyY, color: colors.quantity, label: 'qty' },
-    ].forEach((line) => {
-      ctx.strokeStyle = line.color
-      ctx.lineWidth = 2.5
-      ctx.beginPath()
-      ctx.moveTo(pad, line.y)
-      ctx.lineTo(width - pad, line.y)
-      ctx.stroke()
-      ctx.fillStyle = line.color
-      ctx.font = '900 11px Inter, system-ui, sans-serif'
-      ctx.textAlign = 'left'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(line.label, 8, line.y)
-    })
-
-    const endpointX = toX(product.qty)
-    ctx.strokeStyle = product.color
-    ctx.lineWidth = 4
-    ctx.beginPath()
-    ctx.moveTo(endpointX, dollarY - 8)
-    ctx.lineTo(endpointX, qtyY + 8)
-    ctx.stroke()
-
-    ctx.fillStyle = product.color
-    ctx.beginPath()
-    ctx.arc(endpointX, dollarY, 6, 0, Math.PI * 2)
-    ctx.arc(endpointX, qtyY, 6, 0, Math.PI * 2)
-    ctx.fill()
-
-    ctx.font = '900 12px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillStyle = colors.dollars
-    ctx.fillText(money(product.total), endpointX, dollarY - 13)
-    ctx.fillStyle = colors.quantity
-    ctx.fillText(String(product.qty), endpointX, qtyY + 13)
-
-    if (revealed) {
-      const oneX = toX(1)
-      ctx.strokeStyle = colors.rate
-      ctx.lineWidth = 3
-      ctx.setLineDash([5, 4])
-      ctx.beginPath()
-      ctx.moveTo(oneX, dollarY - 10)
-      ctx.lineTo(oneX, qtyY + 10)
-      ctx.stroke()
-      ctx.setLineDash([])
-      ctx.fillStyle = colors.rate
-      ctx.font = '900 12px Inter, system-ui, sans-serif'
-      ctx.fillText(money(unitRate(product)), oneX, dollarY - 13)
-      ctx.fillText('1', oneX, qtyY + 13)
-    }
-  }, [product, revealed, width])
-
-  useEffect(() => {
-    draw()
-  }, [draw])
-
-  useEffect(() => {
-    const node = wrapRef.current
-    if (!node) return undefined
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(250, Math.floor(entry.contentRect.width))))
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [])
-
+function PackIcons({ count, icon, color, lifted }) {
   return (
-    <div ref={wrapRef} className="overflow-hidden rounded-xl border bg-white" style={{ borderColor: colors.border }}>
-      <canvas ref={canvasRef} className="block" aria-label={`${product.name} quantity and price number line`} />
+    <div className="flex min-h-[62px] flex-wrap items-center justify-center gap-1.5 rounded-[14px] bg-white/70 p-2">
+      {Array.from({ length: count }).map((_, index) => (
+        <span
+          key={index}
+          className={`flex h-8 w-8 items-center justify-center rounded-xl border-2 bg-white text-xl font-black shadow-sm transition-transform ${
+            lifted && index === 0 ? 'animate-[unitItemLift_680ms_ease-out_both]' : ''
+          }`}
+          style={{ color, borderColor: color }}
+        >
+          {icon}
+        </span>
+      ))}
     </div>
   )
 }
 
-function FruitDot({ product, small = false }) {
+function RateInput({ packKey, color, value, onChange, onCheck }) {
   return (
-    <span
-      className={`relative inline-block rounded-full ${small ? 'h-5 w-5' : 'h-7 w-7'} shadow-sm`}
-      style={{ background: product.color }}
+    <form
+      className="grid grid-cols-[auto_1fr_auto] items-center gap-2"
+      onSubmit={(event) => {
+        event.preventDefault()
+        onCheck()
+      }}
     >
-      <span className="absolute left-1/2 top-0 h-1.5 w-2 -translate-x-1/2 -translate-y-1 rounded-full bg-[#5D8E35]" />
-      {product.id === 'apple' && <span className="absolute left-1/2 top-0 h-2 w-1 -translate-x-1/2 -translate-y-1 rounded bg-[#7C4A22]" />}
-      <span className="absolute left-1.5 top-1.5 h-2 w-2 rounded-full bg-white/45" />
-    </span>
+      <span className="text-xl font-black" style={{ color }}>$</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        inputMode="decimal"
+        placeholder="0.00"
+        aria-label={`One costs for ${packKey}`}
+        className="min-w-0 rounded-xl border px-3 py-2 text-center font-mono text-xl font-black outline-none"
+        style={{ borderColor: colors.rateBorder, color: colors.rate }}
+      />
+      <button type="submit" className="rounded-xl px-4 py-2 text-sm font-black text-white" style={{ background: colors.rate }}>
+        Check
+      </button>
+    </form>
   )
 }
 
-function FruitCrate({ product }) {
-  return (
-    <div className="rounded-2xl border bg-white p-2 shadow-sm" style={{ borderColor: product.color }}>
-      <div className="grid grid-cols-4 gap-1 rounded-xl p-2" style={{ background: product.light }}>
-        {Array.from({ length: product.qty }).map((_, index) => (
-          <FruitDot key={`${product.id}-crate-${index}`} product={product} />
-        ))}
-      </div>
-      <div className="mt-1 text-center text-xs font-black uppercase tracking-wide" style={{ color: product.color }}>
-        {product.qty} {product.plural}
-      </div>
-    </div>
-  )
-}
-
-function ScaleGraphic({ product, revealed }) {
-  return (
-    <div className="relative mx-auto flex h-[88px] max-w-[320px] flex-col items-center justify-end">
-      <div className="h-4 w-40 rounded-t-[28px]" style={{ background: '#59606E' }} />
-      <div className="w-[17.5rem] rounded-3xl px-4 py-3 shadow-xl" style={{ background: colors.scale }}>
-        <div className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl bg-[#06130C] px-3 py-1.5 font-mono font-black">
-          <div className="min-w-0 text-right">
-            <div className="text-[10px] uppercase tracking-wide text-white/45">{product.qty} total</div>
-            <div className="text-2xl leading-none" style={{ color: colors.display }}>
-              {money(product.total)}
-            </div>
-          </div>
-          {revealed && (
-            <div className="animate-[unitPop_420ms_ease-out_both] rounded-lg bg-white px-2 py-1 text-xs shadow-sm" style={{ color: colors.rate }}>
-              <div className="flex items-center gap-1.5">
-                <FruitDot product={product} small />
-                <span className="whitespace-nowrap">{money(unitRate(product))}</span>
-              </div>
-              <div className="text-center text-[9px] font-black uppercase leading-none tracking-wide">for 1</div>
-            </div>
-          )}
-        </div>
-        <div className="mt-1 text-center text-[10px] font-black uppercase tracking-wide text-white/70">total price given</div>
-      </div>
-    </div>
-  )
-}
-
-function ProductPanel({ product, input, revealed, status, chosen, winner, onInput, onCheck }) {
-  const isBetter = winner && chosen
-  const isChosenWrong = chosen && !winner
+function PackCard({ label, pack, item, icon, color, tint, border, input, revealed, status, chosen, winner, onInput, onCheck }) {
+  const rate = unitRate(pack)
+  const isWinner = chosen && winner
+  const isWrongChoice = chosen && !winner
 
   return (
     <section
-      className="flex min-h-0 flex-col gap-2 rounded-2xl border bg-white p-2 transition-all"
+      className="flex min-h-0 flex-col gap-2 rounded-[14px] border bg-white p-3 transition-all"
       style={{
-        borderColor: isBetter ? colors.better : product.color,
-        boxShadow: isBetter ? '0 0 0 3px rgba(59, 158, 78, 0.14)' : 'none',
+        borderColor: isWinner ? colors.win : border,
+        boxShadow: isWinner ? '0 0 0 4px rgba(39,80,10,0.12)' : 'none',
       }}
     >
-      <div className="flex items-center justify-between gap-2 rounded-2xl px-3 py-2" style={{ background: product.light }}>
-        <div>
-          <div className="text-xl font-black" style={{ color: product.color }}>{product.name}s</div>
-          <div className="text-sm font-black text-neutral-700">{product.qty} {product.plural} for {money(product.total)}</div>
+      <div className="rounded-[14px] p-3" style={{ background: tint }}>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[13px] font-black uppercase tracking-wide" style={{ color }}>{label}</p>
+            <h2 className="text-2xl font-black leading-none" style={{ color }}>{item}s</h2>
+          </div>
+          <p className="rounded-full bg-white px-3 py-1 font-mono text-lg font-black" style={{ color }}>
+            {pack.qty} for {money(pack.total)}
+          </p>
         </div>
-        <FruitCrate product={product} />
+        <PackIcons count={pack.qty} icon={icon} color={color} lifted={revealed} />
       </div>
 
-      <ScaleGraphic product={product} revealed={revealed} />
-      <MiniNumberLine product={product} revealed={revealed} />
-
-      <div className="mx-auto w-full max-w-[360px] rounded-2xl border bg-white p-2" style={{ borderColor: colors.rate }}>
-        <label className="text-xs font-black uppercase tracking-wide text-neutral-500" htmlFor={`${product.id}-rate`}>
-          Price for one {product.name.toLowerCase()}
-        </label>
-        <div className="mt-1 grid grid-cols-[auto_1fr_auto] items-center gap-2">
-          <span className="text-lg font-black">$</span>
-          <input
-            id={`${product.id}-rate`}
-            value={input}
-            onChange={(event) => onInput(event.target.value)}
-            inputMode="decimal"
-            className="min-w-0 rounded-xl border px-3 py-1.5 text-center font-mono text-lg font-black outline-none"
-            style={{ borderColor: colors.rate }}
-            placeholder="0.00"
-          />
-          <button type="button" onClick={onCheck} className="rounded-xl px-4 py-1.5 text-sm font-black text-white" style={{ background: colors.rate }}>
-            Check
-          </button>
-        </div>
-        <div className="mt-1 min-h-[18px] text-center text-sm font-black">
-          {status === 'wrong' && <span className="text-[#D64550]">Try again. Divide total price by quantity.</span>}
-          {revealed && status !== 'wrong' && <span style={{ color: colors.rate }}>Correct. See the unit price on the scale.</span>}
-        </div>
-        {isChosenWrong && <div className="mt-2 text-sm font-black text-[#D64550]">This costs more per one.</div>}
+      <div className="rounded-[14px] border bg-white p-3" style={{ borderColor: colors.rateBorder }}>
+        {!revealed ? (
+          <>
+            <label className="mb-2 block text-sm font-black" style={{ color: colors.rate }}>
+              One costs
+            </label>
+            <RateInput packKey={label} color={color} value={input} onChange={onInput} onCheck={onCheck} />
+            <div className="mt-2 min-h-[36px] text-sm font-bold">
+              {status === 'wrong' ? (
+                <span style={{ color: colors.wrong }}>
+                  {money(pack.total)} shared by {pack.qty} — try {money(pack.total)} ÷ {pack.qty}.
+                </span>
+              ) : (
+                <span className="text-[#77736B]">Divide total price by quantity.</span>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="flex min-h-[86px] flex-col items-center justify-center gap-2 text-center">
+            <div className="animate-[unitRatePop_460ms_ease-out_both] rounded-full px-4 py-2 font-mono text-2xl font-black" style={{ color: colors.rate, background: colors.rateTint, border: `1.5px solid ${colors.rateBorder}` }}>
+              {money(rate)} each
+            </div>
+            <p className="text-sm font-bold text-[#5F5E5A]">
+              {money(pack.total)} ÷ {pack.qty} = {money(rate)}
+            </p>
+          </div>
+        )}
       </div>
+
+      {isWrongChoice && (
+        <p className="rounded-xl px-3 py-2 text-center text-sm font-black" style={{ color: colors.wrong, background: '#FBEAEE' }}>
+          This pack costs more per item.
+        </p>
+      )}
     </section>
   )
 }
 
 export default function UnitRateExplorer() {
-  const [roundProducts, setRoundProducts] = useState(() => makeRoundProducts())
-  const [rateInputs, setRateInputs] = useState(['', ''])
+  const [roundIndex, setRoundIndex] = useState(0)
+  const [inputs, setInputs] = useState(['', ''])
   const [revealed, setRevealed] = useState([false, false])
-  const [rateStatus, setRateStatus] = useState([null, null])
+  const [statuses, setStatuses] = useState([null, null])
   const [choice, setChoice] = useState(null)
 
-  const betterIndex = unitRate(roundProducts[0]) <= unitRate(roundProducts[1]) ? 0 : 1
+  const round = rounds[roundIndex]
+  const packs = useMemo(() => [round.a, round.b], [round])
+  const betterIndex = unitRate(packs[0]) <= unitRate(packs[1]) ? 0 : 1
   const bothRevealed = revealed.every(Boolean)
+  const hasChoice = choice !== null
 
-  const reset = () => {
-    setRoundProducts(makeRoundProducts())
-    setRateInputs(['', ''])
+  const resetForRound = (nextIndex) => {
+    setRoundIndex(nextIndex)
+    setInputs(['', ''])
     setRevealed([false, false])
-    setRateStatus([null, null])
+    setStatuses([null, null])
     setChoice(null)
   }
 
+  const nextRound = () => {
+    resetForRound((roundIndex + 1) % rounds.length)
+  }
+
   const checkRate = (index) => {
-    const guess = Number(rateInputs[index])
-    if (Math.abs(guess - unitRate(roundProducts[index])) <= 0.01) {
-      setRevealed((current) => current.map((value, itemIndex) => itemIndex === index ? true : value))
-      setRateStatus((current) => current.map((value, itemIndex) => itemIndex === index ? 'correct' : value))
+    const guess = Number(cleanInput(inputs[index]))
+    const correct = unitRate(packs[index])
+    if (Number.isFinite(guess) && Math.abs(guess - correct) <= 0.005) {
+      setRevealed((current) => current.map((value, itemIndex) => (itemIndex === index ? true : value)))
+      setStatuses((current) => current.map((value, itemIndex) => (itemIndex === index ? 'correct' : value)))
     } else {
-      setRateStatus((current) => current.map((value, itemIndex) => itemIndex === index ? 'wrong' : value))
+      setStatuses((current) => current.map((value, itemIndex) => (itemIndex === index ? 'wrong' : value)))
     }
   }
 
+  const choosePack = (index) => {
+    if (!bothRevealed) return
+    setChoice(index)
+  }
+
+  const hint = (() => {
+    const aRate = unitRate(packs[0])
+    const bRate = unitRate(packs[1])
+    const winner = betterIndex === 0 ? 'Pack A' : 'Pack B'
+    if (hasChoice) {
+      return `${money(packs[0].total)} ÷ ${packs[0].qty} = ${money(aRate)} and ${money(packs[1].total)} ÷ ${packs[1].qty} = ${money(bRate)}. ${winner} is cheaper per one.`
+    }
+    if (bothRevealed) return 'Both packs are now priced per one. Lower per-one wins.'
+    return `You can't compare ${packs[0].qty} for ${money(packs[0].total)} against ${packs[1].qty} for ${money(packs[1].total)} directly. Divide each total by its quantity.`
+  })()
+
   return (
-    <div className="flex h-[500px] flex-col gap-2 overflow-hidden p-2.5" style={{ background: colors.page, color: colors.ink }}>
+    <div className="flex h-[500px] flex-col gap-2 overflow-hidden p-2 font-['Inter']" style={{ background: colors.page, color: colors.ink }}>
       <style>
         {`
-          @keyframes unitLift {
-            0% { opacity: 0; transform: translate(-50%, 58px) scale(0.82); }
-            35% { opacity: 1; transform: translate(-50%, 12px) scale(1.08); }
-            100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+          @keyframes unitItemLift {
+            0% { transform: translateY(0) scale(1); }
+            58% { transform: translateY(-16px) scale(1.22); }
+            100% { transform: translateY(-10px) scale(1.14); }
           }
-          @keyframes unitPop {
-            0% { opacity: 0; transform: scale(0.76); }
-            65% { opacity: 1; transform: scale(1.08); }
-            100% { opacity: 1; transform: scale(1); }
+          @keyframes unitRatePop {
+            0% { transform: scale(0.72); opacity: 0; }
+            68% { transform: scale(1.08); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
           }
         `}
       </style>
 
-      <section className="shrink-0 rounded-2xl border bg-white px-4 py-2 text-center shadow-sm" style={{ borderColor: colors.border }}>
-        <div className="text-xs font-black uppercase tracking-wide" style={{ color: colors.rate }}>Objective</div>
-        <div className="mt-0.5 text-sm font-bold text-neutral-700">
-          Different amounts are hard to compare. Find the price for ONE of each, then choose the better buy.
-        </div>
+      <section className="shrink-0 rounded-[14px] border bg-white px-4 py-2 text-center" style={{ borderColor: colors.border }}>
+        <p className="text-[12px] font-black uppercase tracking-wide" style={{ color: colors.rate }}>Unit Rate — Better Buy</p>
+        <p className="text-sm font-bold text-[#5F5E5A]">Find the price for one item in each pack, then choose the lower price per item.</p>
       </section>
 
-      <div className="grid min-h-0 flex-1 grid-cols-2 gap-2 max-[700px]:grid-cols-1 max-[700px]:overflow-y-auto">
-        {roundProducts.map((product, index) => (
-          <ProductPanel
-            key={product.id}
-            product={product}
-            input={rateInputs[index]}
-            revealed={revealed[index]}
-            status={rateStatus[index]}
-            chosen={choice === index}
-            winner={index === betterIndex}
-            onInput={(value) => setRateInputs((current) => current.map((item, itemIndex) => itemIndex === index ? value : item))}
-            onCheck={() => checkRate(index)}
-          />
-        ))}
+      <div className="grid min-h-0 flex-1 grid-cols-2 gap-2 max-[620px]:grid-cols-1 max-[620px]:overflow-y-auto">
+        <PackCard
+          label="Pack A"
+          pack={packs[0]}
+          item={round.item}
+          icon={round.icon}
+          color={colors.packA}
+          tint={colors.packATint}
+          border={colors.packABorder}
+          input={inputs[0]}
+          revealed={revealed[0]}
+          status={statuses[0]}
+          chosen={choice === 0}
+          winner={betterIndex === 0}
+          onInput={(value) => setInputs((current) => current.map((item, index) => (index === 0 ? value : item)))}
+          onCheck={() => checkRate(0)}
+        />
+        <PackCard
+          label="Pack B"
+          pack={packs[1]}
+          item={round.item}
+          icon={round.icon}
+          color={colors.packB}
+          tint={colors.packBTint}
+          border={colors.packBBorder}
+          input={inputs[1]}
+          revealed={revealed[1]}
+          status={statuses[1]}
+          chosen={choice === 1}
+          winner={betterIndex === 1}
+          onInput={(value) => setInputs((current) => current.map((item, index) => (index === 1 ? value : item)))}
+          onCheck={() => checkRate(1)}
+        />
       </div>
 
-      <section className={`${bothRevealed && choice === null ? 'grid-cols-[1fr_1fr_auto]' : 'grid-cols-[1fr_auto]'} grid shrink-0 items-center gap-2 max-[560px]:grid-cols-1`}>
-        {bothRevealed && choice === null && roundProducts.map((product, index) => (
-          <button
-            key={product.id}
-            type="button"
-            onClick={() => setChoice(index)}
-            className="rounded-xl border bg-white px-3 py-2 text-sm font-black transition"
-            style={{
-              borderColor: choice === index ? colors.better : colors.border,
-              background: choice === index ? '#E9F5EF' : '#ffffff',
-              color: choice === index ? colors.better : colors.ink,
-            }}
-          >
-            {product.name}s are cheaper
-          </button>
-        ))}
-        {choice !== null && (
-          <div className="rounded-xl border px-3 py-2 text-center text-base font-black" style={{ borderColor: colors.better, background: '#E9F5EF', color: colors.better }}>
-            Better buy: lower price for one.
+      <section className="shrink-0 rounded-[14px] border bg-white p-2" style={{ borderColor: colors.border }}>
+        {!bothRevealed && (
+          <div className="text-center text-sm font-black text-[#5F5E5A]">Find both unit prices to unlock the better-buy choice.</div>
+        )}
+
+        {bothRevealed && !hasChoice && (
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => choosePack(0)} className="rounded-xl px-3 py-2 text-base font-black text-white" style={{ background: colors.packA }}>
+              Pack A is cheaper
+            </button>
+            <button type="button" onClick={() => choosePack(1)} className="rounded-xl px-3 py-2 text-base font-black text-white" style={{ background: colors.packB }}>
+              Pack B is cheaper
+            </button>
           </div>
         )}
-        {!bothRevealed && <div />}
-        <button type="button" onClick={reset} className="rounded-xl border bg-white px-4 py-2 text-sm font-black" style={{ borderColor: colors.border }}>
-          New round
-        </button>
+
+        {hasChoice && (
+          <div
+            className="rounded-xl px-3 py-2 text-center text-base font-black"
+            style={{
+              color: choice === betterIndex ? colors.win : colors.wrong,
+              background: choice === betterIndex ? colors.winTint : '#FBEAEE',
+            }}
+          >
+            {choice === betterIndex
+              ? `${betterIndex === 0 ? 'Pack A' : 'Pack B'} wins: fewer dollars per item.`
+              : `${betterIndex === 0 ? 'Pack A' : 'Pack B'} is actually cheaper per item.`}
+          </div>
+        )}
       </section>
+
+      <div className="grid shrink-0 grid-cols-[1fr_auto] items-center gap-2">
+        <p className="rounded-[14px] bg-white px-3 py-2 text-center text-sm font-semibold text-[#5F5E5A]">{hint}</p>
+        <button type="button" onClick={nextRound} className="rounded-xl border bg-white px-4 py-2 text-sm font-black" style={{ borderColor: colors.border }}>
+          New packs
+        </button>
+      </div>
     </div>
   )
 }
