@@ -1,13 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cream, ink, muted, border, purple as xPurple, blue as unitBlue, green as balancedGreen, orange as offRed } from './shared/palette'
+import { useCanvasBox } from './shared/useCanvasBox'
+import GhostButton from './shared/GhostButton'
 
-const cream = '#F8F6F0'
-const ink = '#1A1A2E'
-const muted = '#5F5E5A'
-const xPurple = '#7C3AED'
-const unitBlue = '#2563EB'
 const beamWood = '#B07A3C'
-const balancedGreen = '#1D9E75'
-const offRed = '#D85A30'
 
 // ax + b = cx + d, solvable by removing equal tiles (|a - c| = 1).
 const PROBLEMS = [
@@ -38,7 +34,7 @@ function sideLabel(xc, uc) {
 export default function BalanceScaleEquations() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const [canvasWidth, setCanvasWidth] = useState(720)
+  const { w: canvasWidth } = useCanvasBox(wrapRef, { minW: 420 })
   const [problemIndex, setProblemIndex] = useState(0)
   const [left, setLeft] = useState(() => buildTiles(PROBLEMS[0].left))
   const [right, setRight] = useState(() => buildTiles(PROBLEMS[0].right))
@@ -64,30 +60,6 @@ export default function BalanceScaleEquations() {
     ((leftX === 1 && leftU === 0 && rightX === 0 && rightU >= 1) ||
       (rightX === 1 && rightU === 0 && leftX === 0 && leftU >= 1))
   const answer = solved ? (leftX === 1 ? rightU : leftU) : null
-
-  useLayoutEffect(() => {
-    const node = wrapRef.current
-    if (!node) return undefined
-    let raf = 0
-    // Measure before first paint; only commit a whole-pixel change, and defer
-    // via rAF so the observer can never feed back into itself (ResizeObserver "bounce").
-    const commit = (w) => {
-      const next = Math.max(420, Math.round(w))
-      setCanvasWidth((prev) => (Math.abs(prev - next) >= 1 ? next : prev))
-    }
-    commit(node.getBoundingClientRect().width)
-    const observer = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect?.width // unscaled content box — stable under parent transforms
-      if (!w) return
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => commit(w))
-    })
-    observer.observe(node)
-    return () => {
-      cancelAnimationFrame(raf)
-      observer.disconnect()
-    }
-  }, [])
 
   const addTile = (side, type) => {
     const tile = { id: (tileSeq += 1), type }
@@ -330,6 +302,22 @@ export default function BalanceScaleEquations() {
   const leftEq = sideLabel(leftX, leftU)
   const rightEq = sideLabel(rightX, rightU)
 
+  // The canvas is the whole point of this manipulative, so it needs a text
+  // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
+  const summary = isEmpty
+    ? 'Empty balance scale. No tiles on either pan.'
+    : `Balance scale: left pan holds ${leftEq}, right pan holds ${rightEq}. ${
+        solved
+          ? `Solved — x equals ${answer}.`
+          : noUniqueX
+            ? leftU === rightU
+              ? 'Both sides are identical, true for every value of x.'
+              : 'These sides can never balance, no value of x works.'
+            : balanced
+              ? 'The scale is balanced.'
+              : 'The scale is tipped — the two sides are not equal.'
+      }`
+
   return (
     <div className="flex h-full flex-col gap-2 overflow-hidden p-4 font-['Inter']" style={{ background: cream, color: ink }}>
       {/* Live equation */}
@@ -339,9 +327,11 @@ export default function BalanceScaleEquations() {
         <span style={{ color: solved ? balancedGreen : rightX ? xPurple : ink }}>{rightEq}</span>
       </div>
 
-      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
+      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
         <canvas
           ref={canvasRef}
+          role="img"
+          aria-label={summary}
           className="h-full w-full touch-none cursor-grab active:cursor-grabbing"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -359,8 +349,24 @@ export default function BalanceScaleEquations() {
         {['left', 'right'].map((side) => (
           <div key={side} className="flex items-center gap-1.5">
             <span className="text-xs font-black uppercase" style={{ color: muted }}>{side}</span>
-            <button type="button" onClick={() => addTile(side, 'x')} className="rounded-lg px-3 py-1.5 text-sm font-black text-white" style={{ background: xPurple }}>+ x</button>
-            <button type="button" onClick={() => addTile(side, 'unit')} className="rounded-lg px-3 py-1.5 text-sm font-black text-white" style={{ background: unitBlue }}>+ 1</button>
+            <button
+              type="button"
+              onClick={() => addTile(side, 'x')}
+              className="rounded-lg px-3 py-1.5 text-sm font-black text-white"
+              style={{ background: xPurple }}
+              aria-label={`Add an x tile to the ${side} pan`}
+            >
+              + x
+            </button>
+            <button
+              type="button"
+              onClick={() => addTile(side, 'unit')}
+              className="rounded-lg px-3 py-1.5 text-sm font-black text-white"
+              style={{ background: unitBlue }}
+              aria-label={`Add a unit tile to the ${side} pan`}
+            >
+              + 1
+            </button>
           </div>
         ))}
         <label className="flex items-center gap-2 text-sm font-semibold" style={{ color: muted }}>
@@ -378,12 +384,12 @@ export default function BalanceScaleEquations() {
             ))}
           </select>
         </label>
-        <button type="button" onClick={() => loadProblem(problemIndex)} className="rounded-full border px-3 py-1.5 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+        <GhostButton compact onClick={() => loadProblem(problemIndex)} ariaLabel="Reset to the current problem's starting tiles">
           Reset
-        </button>
-        <button type="button" onClick={clearAll} className="rounded-full border px-3 py-1.5 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+        </GhostButton>
+        <GhostButton compact onClick={clearAll}>
           Empty pans
-        </button>
+        </GhostButton>
       </div>
     </div>
   )

@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cream, ink, muted, border, purple as pointPurple, green as meanGreen, orange as distOrange } from './shared/palette'
+import { useCanvasBox } from './shared/useCanvasBox'
+import ToggleChip from './shared/ToggleChip'
+import GhostButton from './shared/GhostButton'
 
-const cream = '#F8F6F0'
-const ink = '#1A1A2E'
-const muted = '#5F5E5A'
-const pointPurple = '#7C3AED'
-const meanGreen = '#1D9E75'
-const distOrange = '#D85A30'
-const axisColor = '#1A1A2E'
+const axisColor = ink
 
 const MIN = 0
 const MAX = 20
@@ -17,7 +15,7 @@ let seq = 0
 export default function MeanAbsoluteDeviation() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const [canvasWidth, setCanvasWidth] = useState(720)
+  const { w: canvasWidth } = useCanvasBox(wrapRef, { minW: 420 })
   const [points, setPoints] = useState(() => [4, 7, 9, 16].map((v) => ({ id: (seq += 1), value: v })))
   const [drag, setDrag] = useState(null) // { id, startX, moved }
   // Layered reveals: the teacher peels back one idea at a time.
@@ -31,27 +29,12 @@ export default function MeanAbsoluteDeviation() {
   const distances = values.map((v) => Math.abs(v - mean))
   const mad = distances.length ? distances.reduce((a, b) => a + b, 0) / distances.length : 0
 
-  useLayoutEffect(() => {
-    const node = wrapRef.current
-    if (!node) return undefined
-    let raf = 0
-    const commit = (w) => {
-      const next = Math.max(420, Math.round(w))
-      setCanvasWidth((prev) => (Math.abs(prev - next) >= 1 ? next : prev))
-    }
-    commit(node.getBoundingClientRect().width)
-    const observer = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect?.width
-      if (!w) return
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => commit(w))
-    })
-    observer.observe(node)
-    return () => {
-      cancelAnimationFrame(raf)
-      observer.disconnect()
-    }
-  }, [])
+  // The canvas is the whole point of this manipulative, so it needs a text
+  // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
+  const summary = points.length
+    ? `Dot plot from ${MIN} to ${MAX}. ${points.length} points at ${values.join(', ')}. ` +
+      `Mean ${round1(mean)}.${show.mad ? ` Mean absolute deviation ${round1(mad)}.` : ''}`
+    : `Empty dot plot from ${MIN} to ${MAX}. Click the number line to add a data point.`
 
   const geo = useMemo(() => {
     const PAD = 46
@@ -284,9 +267,11 @@ export default function MeanAbsoluteDeviation() {
         )}
       </div>
 
-      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
+      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
         <canvas
           ref={canvasRef}
+          role="img"
+          aria-label={summary}
           className="h-full w-full touch-none cursor-grab active:cursor-grabbing"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -300,35 +285,16 @@ export default function MeanAbsoluteDeviation() {
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <button type="button" onClick={() => setPoints([8, 10, 12].map((v) => ({ id: (seq += 1), value: v })))} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+        <GhostButton onClick={() => setPoints([8, 10, 12].map((v) => ({ id: (seq += 1), value: v })))} ariaLabel="Starter: bunched data">
           Bunched
-        </button>
-        <button type="button" onClick={() => setPoints([1, 6, 14, 19].map((v) => ({ id: (seq += 1), value: v })))} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+        </GhostButton>
+        <GhostButton onClick={() => setPoints([1, 6, 14, 19].map((v) => ({ id: (seq += 1), value: v })))} ariaLabel="Starter: spread out data">
           Spread out
-        </button>
-        <button type="button" onClick={() => setPoints([])} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
-          Clear
-        </button>
+        </GhostButton>
+        <GhostButton onClick={() => setPoints([])} ariaLabel="Clear all data points">Clear</GhostButton>
         <ToggleChip label="Show distances" color={distOrange} on={show.distances} onClick={() => toggle('distances')} />
         <ToggleChip label="Show MAD" color={meanGreen} on={show.mad} onClick={() => toggle('mad')} />
       </div>
     </div>
-  )
-}
-
-// One reveal layer. The dot carries the layer's colour so the chip and the
-// thing it reveals read as the same idea.
-function ToggleChip({ label, color, on, onClick }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className="flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-bold"
-      style={{ borderColor: on ? color : '#E0DDD6', color: on ? color : muted }}
-    >
-      <span className="h-2.5 w-2.5 rounded-full" style={{ background: on ? color : '#C9CDD6' }} />
-      {label}
-    </button>
   )
 }

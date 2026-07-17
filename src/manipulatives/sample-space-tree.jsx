@@ -1,16 +1,14 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-
-const cream = '#F8F6F0'
-const ink = '#1A1A2E'
-const muted = '#5F5E5A'
-const selBlue = '#2563EB'
-const totalPurple = '#7C3AED'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cream, ink, muted, border, blue as selBlue, purple as totalPurple } from './shared/palette'
+import { useCanvasBox } from './shared/useCanvasBox'
+import GhostButton from './shared/GhostButton'
+import ToggleChip from './shared/ToggleChip'
 
 const OPT_COLORS = {
   H: '#2563EB', T: '#D85A30',
   R: '#D8402F', B: '#2563EB', G: '#1D9E75',
 }
-const numColor = '#7C3AED'
+const numColor = totalPurple
 const colorOf = (o) => OPT_COLORS[o] || numColor
 
 const EXPERIMENTS = {
@@ -28,7 +26,7 @@ const parseOpts = (text) => {
 export default function SampleSpaceTree() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const [size, setSize] = useState({ w: 720, h: 380 })
+  const size = useCanvasBox(wrapRef, { minW: 420, minH: 240 })
   const [s1Text, setS1Text] = useState('H,T')
   const [s2Text, setS2Text] = useState('H,T')
   const [selected, setSelected] = useState(() => new Set())
@@ -46,28 +44,12 @@ export default function SampleSpaceTree() {
   const matchKey =
     Object.entries(EXPERIMENTS).find(([, v]) => v.s1.join(',') === s1.join(',') && v.s2.join(',') === s2.join(','))?.[0] || 'custom'
 
-  useLayoutEffect(() => {
-    const node = wrapRef.current
-    if (!node) return undefined
-    let raf = 0
-    const commit = (box) => {
-      const w = Math.max(420, Math.round(box.width))
-      const h = Math.max(240, Math.round(box.height))
-      setSize((prev) => (Math.abs(prev.w - w) >= 1 || Math.abs(prev.h - h) >= 1 ? { w, h } : prev))
-    }
-    commit(node.getBoundingClientRect())
-    const observer = new ResizeObserver((entries) => {
-      const cr = entries[0]?.contentRect
-      if (!cr) return
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => commit(cr))
-    })
-    observer.observe(node)
-    return () => {
-      cancelAnimationFrame(raf)
-      observer.disconnect()
-    }
-  }, [])
+  // The canvas is the whole point of this manipulative, so it needs a text
+  // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
+  const summary =
+    `Sample space tree. Stage 1: ${s1.join(', ')} (${a} option${a === 1 ? '' : 's'}). ` +
+    `Stage 2: ${s2.join(', ')} (${b} option${b === 1 ? '' : 's'}). ${N} total outcome${N === 1 ? '' : 's'}, ${a} × ${b}. ` +
+    (selected.size > 0 ? `${selected.size} outcome${selected.size === 1 ? '' : 's'} selected.` : 'No outcomes selected.')
 
   const geo = useMemo(() => {
     const { w, h } = size
@@ -251,8 +233,14 @@ export default function SampleSpaceTree() {
         )}
       </div>
 
-      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
-        <canvas ref={canvasRef} className="h-full w-full cursor-pointer" onClick={handleClick} />
+      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
+        <canvas
+          ref={canvasRef}
+          role="img"
+          aria-label={summary}
+          className="h-full w-full cursor-pointer"
+          onClick={handleClick}
+        />
       </div>
 
       <p className="text-center text-sm font-semibold" style={{ color: muted }}>
@@ -293,29 +281,12 @@ export default function SampleSpaceTree() {
             style={{ color: ink }}
           />
         </label>
-        <button type="button" onClick={() => setSelected(new Set())} className="rounded-full border px-3 py-1.5 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+        <GhostButton compact onClick={() => setSelected(new Set())}>
           Clear selection
-        </button>
-        <ToggleChip label="Show count" color={totalPurple} on={show.count} onClick={() => toggle('count')} />
-        <ToggleChip label="Show probabilities" color={selBlue} on={show.prob} onClick={() => toggle('prob')} />
+        </GhostButton>
+        <ToggleChip compact label="Show count" color={totalPurple} on={show.count} onClick={() => toggle('count')} />
+        <ToggleChip compact label="Show probabilities" color={selBlue} on={show.prob} onClick={() => toggle('prob')} />
       </div>
     </div>
-  )
-}
-
-// One reveal layer. The dot carries the layer's colour so the chip and the
-// thing it reveals read as the same idea.
-function ToggleChip({ label, color, on, onClick }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className="flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-sm font-bold"
-      style={{ borderColor: on ? color : '#E0DDD6', color: on ? color : muted }}
-    >
-      <span className="h-2.5 w-2.5 rounded-full" style={{ background: on ? color : '#C9CDD6' }} />
-      {label}
-    </button>
   )
 }

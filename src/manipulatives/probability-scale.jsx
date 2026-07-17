@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cream, ink, muted, border, purple as chipPurple, green as trueGreen } from './shared/palette'
+import { useCanvasBox } from './shared/useCanvasBox'
+import GhostButton from './shared/GhostButton'
 
-const cream = '#F8F6F0'
-const ink = '#1A1A2E'
-const muted = '#5F5E5A'
-const chipPurple = '#7C3AED'
-const trueGreen = '#1D9E75'
-const axisColor = '#1A1A2E'
+const axisColor = ink
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
 
@@ -45,7 +43,7 @@ let evSeq = 0
 export default function ProbabilityScale() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const [canvasWidth, setCanvasWidth] = useState(720)
+  const { w: canvasWidth } = useCanvasBox(wrapRef, { minW: 420 })
   const [events, setEvents] = useState(DEFAULT_EVENTS)
   const [placed, setPlaced] = useState({}) // id -> guess prob (0..1), else in tray
   const [showAnswers, setShowAnswers] = useState(false)
@@ -58,27 +56,18 @@ export default function ProbabilityScale() {
 
   const EV = useMemo(() => events.map((e) => ({ ...e, p: parseProb(e.disp) })), [events])
 
-  useLayoutEffect(() => {
-    const node = wrapRef.current
-    if (!node) return undefined
-    let raf = 0
-    const commit = (w) => {
-      const next = Math.max(420, Math.round(w))
-      setCanvasWidth((prev) => (Math.abs(prev - next) >= 1 ? next : prev))
-    }
-    commit(node.getBoundingClientRect().width)
-    const observer = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect?.width
-      if (!w) return
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => commit(w))
-    })
-    observer.observe(node)
-    return () => {
-      cancelAnimationFrame(raf)
-      observer.disconnect()
-    }
-  }, [])
+  // The canvas is the whole point of this manipulative, so it needs a text
+  // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
+  const placedCount = Object.keys(placed).length
+  const summary = EV.length
+    ? `Probability scale from 0, impossible, to 1, certain. ${EV.length} event${EV.length === 1 ? '' : 's'}, ${placedCount} placed: ` +
+      EV.map((e) => {
+        const g = placed[e.id]
+        const guess = g != null ? `guessed at ${Math.round(g * 100)}%` : 'not yet placed'
+        return `${e.label} (${guess}${showAnswers ? `, actual probability ${e.disp}` : ''})`
+      }).join('; ') +
+      '.'
+    : 'Empty probability scale from 0, impossible, to 1, certain. No events defined yet.'
 
   const geo = useMemo(() => {
     const PAD = 60
@@ -318,9 +307,11 @@ export default function ProbabilityScale() {
         Place each event: <span style={{ color: '#D85A30' }}>0 = impossible</span>, <span style={{ color: trueGreen }}>1 = certain</span>
       </div>
 
-      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
+      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
         <canvas
           ref={canvasRef}
+          role="img"
+          aria-label={summary}
           className="h-full w-full touch-none cursor-grab active:cursor-grabbing"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -339,6 +330,7 @@ export default function ProbabilityScale() {
                   onChange={(ev) => updateEvent(e.id, 'label', ev.target.value)}
                   className="min-w-0 flex-1 rounded-lg border border-[#E0DDD6] px-2 py-1.5 text-sm font-bold outline-none"
                   placeholder="Event name"
+                  aria-label="Event name"
                 />
                 <input
                   value={e.disp}
@@ -346,6 +338,7 @@ export default function ProbabilityScale() {
                   className="w-20 rounded-lg border border-[#E0DDD6] px-2 py-1.5 text-center text-sm font-black outline-none"
                   style={{ color: trueGreen }}
                   placeholder="1/6"
+                  aria-label={`Probability for ${e.label || 'this event'}`}
                 />
                 <button
                   type="button"
@@ -376,9 +369,9 @@ export default function ProbabilityScale() {
         <button type="button" onClick={() => setEditing((e) => !e)} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: editing ? chipPurple : muted }}>
           {editing ? 'Done editing' : 'Edit events'}
         </button>
-        <button type="button" onClick={() => { setPlaced({}); setShowAnswers(false) }} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+        <GhostButton onClick={() => { setPlaced({}); setShowAnswers(false) }} ariaLabel="Reset the probability scale">
           Reset
-        </button>
+        </GhostButton>
       </div>
     </div>
   )

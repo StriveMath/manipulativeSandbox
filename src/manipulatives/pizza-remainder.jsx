@@ -1,15 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cream, ink, muted, border, blue as friendBlue, green as quotientGreen, orange as remOrange } from './shared/palette'
+import { useCanvasBox } from './shared/useCanvasBox'
+import GhostButton from './shared/GhostButton'
+import Stepper from './shared/Stepper'
 
-const cream = '#F8F6F0'
-const ink = '#1A1A2E'
-const muted = '#5F5E5A'
 const crust = '#E0A458'
 const cheese = '#FBD45B'
 const sauce = '#E8893B'
 const pepperoni = '#C23B22'
-const friendBlue = '#2563EB'
-const quotientGreen = '#1D9E75'
-const remOrange = '#D85A30'
 const plateFill = '#EDEAE2'
 
 const MIN_PIZZAS = 1
@@ -65,7 +63,7 @@ function drawPizza(ctx, x, y, r, leftover, lifted) {
 export default function PizzaRemainder() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const [canvasWidth, setCanvasWidth] = useState(720)
+  const { w: canvasWidth } = useCanvasBox(wrapRef, { minW: 360 })
   const [pizzas, setPizzas] = useState(7)
   const [friends, setFriends] = useState(3)
   const [place, setPlace] = useState(() => pileArray(7))
@@ -75,30 +73,6 @@ export default function PizzaRemainder() {
 
   const dragRef = useRef(null) // { index, offX, offY }
   const dragPosRef = useRef(null) // { x, y }
-
-  // Measure before first paint (no initial width jump), then track the stable
-  // unscaled content box via an rAF-deferred observer (no settle bounce).
-  useLayoutEffect(() => {
-    const node = wrapRef.current
-    if (!node) return undefined
-    let raf = 0
-    const commit = (w) => {
-      const next = Math.max(360, Math.round(w))
-      setCanvasWidth((prev) => (Math.abs(prev - next) >= 1 ? next : prev))
-    }
-    commit(node.getBoundingClientRect().width)
-    const observer = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect?.width
-      if (!w) return
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => commit(w))
-    })
-    observer.observe(node)
-    return () => {
-      cancelAnimationFrame(raf)
-      observer.disconnect()
-    }
-  }, [])
 
   // Counts / status derived from the current placement.
   const status = useMemo(() => {
@@ -116,6 +90,17 @@ export default function PizzaRemainder() {
     const solved = pileCount === 0 && allEqual && trayCount < friends
     return { counts, pileCount, trayCount, maxC, allEqual, solved }
   }, [place, friends])
+
+  // The canvas is the whole point of this manipulative, so it needs a text
+  // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
+  const summary = (() => {
+    const plateDesc = status.counts.map((c, i) => `friend ${i + 1} has ${c}`).join(', ')
+    const pileDesc = status.pileCount > 0 ? `, ${status.pileCount} pizza${status.pileCount === 1 ? '' : 's'} still in the pile` : ''
+    const trayDesc = status.trayCount > 0 ? `, ${status.trayCount} in the remainder tray` : ''
+    return `${pizzas} pizzas divided among ${friends} friends: ${plateDesc}${pileDesc}${trayDesc}. ${
+      status.solved ? `Solved — ${status.counts[0]} each, remainder ${status.trayCount}.` : 'Not yet solved.'
+    }`
+  })()
 
   const layout = useMemo(() => {
     const PAD = 28
@@ -385,9 +370,11 @@ export default function PizzaRemainder() {
       </div>
 
       {/* Canvas */}
-      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
+      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
         <canvas
           ref={canvasRef}
+          role="img"
+          aria-label={summary}
           className="h-full w-full touch-none cursor-grab active:cursor-grabbing"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -401,27 +388,12 @@ export default function PizzaRemainder() {
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <Stepper label="Pizzas" value={pizzas} accent={ink} onDec={() => changePizzas(pizzas - 1)} onInc={() => changePizzas(pizzas + 1)} />
-        <Stepper label="Friends" value={friends} accent={friendBlue} onDec={() => changeFriends(friends - 1)} onInc={() => changeFriends(friends + 1)} />
+        <Stepper label="Pizzas" value={pizzas} color={ink} onDec={() => changePizzas(pizzas - 1)} onInc={() => changePizzas(pizzas + 1)} decLabel="Fewer Pizzas" incLabel="More Pizzas" />
+        <Stepper label="Friends" value={friends} color={friendBlue} onDec={() => changeFriends(friends - 1)} onInc={() => changeFriends(friends + 1)} decLabel="Fewer Friends" incLabel="More Friends" />
         <button type="button" onClick={dealRound} disabled={!canDeal} className="rounded-full px-4 py-2.5 text-sm font-black text-white disabled:opacity-40" style={{ background: friendBlue }}>
           Deal a round
         </button>
-        <button type="button" onClick={() => reset()} className="rounded-full border px-4 py-2.5 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
-          Reset
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function Stepper({ label, value, accent, onDec, onInc }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm font-bold" style={{ color: accent }}>{label}</span>
-      <div className="grid grid-cols-[38px_42px_38px] items-center overflow-hidden rounded-full border border-[#E0DDD6] bg-white">
-        <button type="button" onClick={onDec} className="h-10 text-2xl font-black" style={{ color: remOrange }} aria-label={`Fewer ${label}`}>−</button>
-        <span className="border-x border-[#E0DDD6] py-2 text-center text-xl font-black tabular-nums">{value}</span>
-        <button type="button" onClick={onInc} className="h-10 text-2xl font-black" style={{ color: quotientGreen }} aria-label={`More ${label}`}>+</button>
+        <GhostButton onClick={() => reset()} ariaLabel="Reset pizza placement">Reset</GhostButton>
       </div>
     </div>
   )

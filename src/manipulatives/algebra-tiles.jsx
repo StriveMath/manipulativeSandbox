@@ -1,12 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-
-const cream = '#F8F6F0'
-const ink = '#1A1A2E'
-const muted = '#5F5E5A'
-const posX = '#1D9E75'
-const negX = '#D8402F'
-const pos1 = '#2563EB'
-const neg1 = '#D97706'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { cream, ink, muted, border, green as posX, red as negX, blue as pos1, amber as neg1 } from './shared/palette'
+import { useCanvasBox } from './shared/useCanvasBox'
+import GhostButton from './shared/GhostButton'
 
 const TYPES = {
   x: { color: posX, label: 'x', w: 30, h: 64, opp: 'nx' },
@@ -15,39 +10,23 @@ const TYPES = {
   nu: { color: neg1, label: '−1', w: 32, h: 32, opp: 'u' },
 }
 
+const ADD_LABELS = {
+  x: 'Add an x tile',
+  nx: 'Add a negative x tile',
+  u: 'Add a 1 tile',
+  nu: 'Add a negative 1 tile',
+}
+
 let seq = 0
 
 export default function AlgebraTiles() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const [size, setSize] = useState({ w: 720, h: 300 })
+  const size = useCanvasBox(wrapRef, { minW: 420, minH: 220 })
   const [tiles, setTiles] = useState([])
   const [drag, setDrag] = useState(null) // { id, offX, offY, x, y }
   const [flash, setFlash] = useState(null) // { x, y, t } zero-pair spot
   const flashRafRef = useRef(null)
-
-  useLayoutEffect(() => {
-    const node = wrapRef.current
-    if (!node) return undefined
-    let raf = 0
-    const commit = (box) => {
-      const w = Math.max(420, Math.round(box.width))
-      const h = Math.max(220, Math.round(box.height))
-      setSize((prev) => (Math.abs(prev.w - w) >= 1 || Math.abs(prev.h - h) >= 1 ? { w, h } : prev))
-    }
-    commit(node.getBoundingClientRect())
-    const observer = new ResizeObserver((entries) => {
-      const cr = entries[0]?.contentRect
-      if (!cr) return
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => commit(cr))
-    })
-    observer.observe(node)
-    return () => {
-      cancelAnimationFrame(raf)
-      observer.disconnect()
-    }
-  }, [])
 
   // Tiles left of the divider form one side of the equation, right the other.
   const midX = size.w / 2
@@ -61,6 +40,12 @@ export default function AlgebraTiles() {
   }
   const leftExpr = fmt(tiles.filter((t) => t.x < midX))
   const rightExpr = fmt(tiles.filter((t) => t.x >= midX))
+
+  // The canvas is the whole point of this manipulative, so it needs a text
+  // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
+  const summary = tiles.length
+    ? `Algebra tile mat. Left side of the equation: ${leftExpr}. Right side: ${rightExpr}.`
+    : 'Empty algebra tile mat. Add x, negative x, 1, or negative 1 tiles and drag them either side of the equals sign to build both sides of an equation.'
 
   const addTile = (type) => {
     const n = tiles.length
@@ -239,6 +224,7 @@ export default function AlgebraTiles() {
         onClick={() => addTile(type)}
         className="rounded-lg px-4 py-2 text-sm font-black text-white"
         style={{ background: info.color }}
+        aria-label={ADD_LABELS[type]}
       >
         + {info.label}
       </button>
@@ -253,9 +239,11 @@ export default function AlgebraTiles() {
         <span style={{ color: ink }}>{rightExpr}</span>
       </div>
 
-      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
+      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
         <canvas
           ref={canvasRef}
+          role="img"
+          aria-label={summary}
           className="h-full w-full touch-none cursor-grab active:cursor-grabbing"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -273,9 +261,9 @@ export default function AlgebraTiles() {
         <AddBtn type="nx" />
         <AddBtn type="u" />
         <AddBtn type="nu" />
-        <button type="button" onClick={() => setTiles([])} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+        <GhostButton onClick={() => setTiles([])} ariaLabel="Clear all tiles">
           Clear
-        </button>
+        </GhostButton>
       </div>
     </div>
   )
