@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { cream, ink, muted, border, green as posX, red as negX, blue as pos1, amber as neg1 } from './shared/palette'
+import { cream, ink, muted, border, hairline, green as posX, red as negX, blue as pos1, amber as neg1 } from './shared/palette'
 import { useCanvasBox } from './shared/useCanvasBox'
+import { skipMotion } from './shared/motion'
 import GhostButton from './shared/GhostButton'
 
 const TYPES = {
-  x: { color: posX, label: 'x', w: 30, h: 64, opp: 'nx' },
-  nx: { color: negX, label: '−x', w: 30, h: 64, opp: 'x' },
-  u: { color: pos1, label: '1', w: 32, h: 32, opp: 'nu' },
-  nu: { color: neg1, label: '−1', w: 32, h: 32, opp: 'u' },
+  x: { color: posX, label: 'x', w: 30, h: 64, opp: 'nx', kind: 'x' },
+  nx: { color: negX, label: '−x', w: 30, h: 64, opp: 'x', kind: 'x' },
+  u: { color: pos1, label: '1', w: 32, h: 32, opp: 'nu', kind: 'u' },
+  nu: { color: neg1, label: '−1', w: 32, h: 32, opp: 'u', kind: 'u' },
 }
 
 const ADD_LABELS = {
@@ -19,17 +20,80 @@ const ADD_LABELS = {
 
 let seq = 0
 
+// At module scope, not inside the component: a component declared during
+// render is a new type on every render, so React unmounts and remounts it
+// each time instead of updating it.
+function AddBtn({ type, onAdd }) {
+  const info = TYPES[type]
+  return (
+    <button
+      type="button"
+      onClick={() => onAdd(type)}
+      className="rounded-lg px-4 py-2 text-sm font-black text-white"
+      style={{ background: info.color }}
+      aria-label={ADD_LABELS[type]}
+    >
+      + {info.label}
+    </button>
+  )
+}
+
+// Where a tile belongs, given what is on its side of the equals. Tiles are
+// laid in two lanes — x tiles above, units below — and ordered by `ord`,
+// which is just the x the tile was last dropped at. Dropping a tile between
+// two others therefore slots it in between them.
+//
+// An expression you can't read is an expression you can't reason about, so
+// the mat tidies itself: dropped tiles snap into their lane rather than
+// staying wherever the hand let go. Spacing tightens instead of wrapping, so
+// a side stays one readable row however many tiles are on it.
+function packTargets(tiles, size) {
+  const targets = new Map()
+  const mid = size.w / 2
+  const laneY = { x: size.h * 0.36, u: size.h * 0.72 }
+  const pad = 26
+
+  ;['L', 'R'].forEach((side) => {
+    const x0 = side === 'L' ? pad : mid + pad
+    const x1 = side === 'L' ? mid - pad : size.w - pad
+    ;['x', 'u'].forEach((kind) => {
+      const row = tiles
+        .filter((t) => t.side === side && TYPES[t.type].kind === kind)
+        .sort((a, b) => a.ord - b.ord)
+      if (!row.length) return
+      const tileW = TYPES[row[0].type].w
+      const ideal = tileW + 8
+      const room = x1 - x0
+      // Tighten rather than wrap or overflow the side.
+      const step = row.length > 1 ? Math.min(ideal, (room - tileW) / (row.length - 1)) : 0
+      const used = step * (row.length - 1) + tileW
+      const startX = x0 + (room - used) / 2 + tileW / 2
+      row.forEach((t, i) => {
+        targets.set(t.id, { x: startX + i * step, y: laneY[kind] })
+      })
+    })
+  })
+  return targets
+}
+
 export default function AlgebraTiles() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
   const size = useCanvasBox(wrapRef, { minW: 420, minH: 220 })
-  const [tiles, setTiles] = useState([])
-  const [drag, setDrag] = useState(null) // { id, offX, offY, x, y }
+  const [tiles, setTiles] = useState([]) // { id, type, side, ord } — position is derived
   const [flash, setFlash] = useState(null) // { x, y, t } zero-pair spot
-  const flashRafRef = useRef(null)
 
-  // Tiles left of the divider form one side of the equation, right the other.
+  // Rendered positions live in a ref, not state: they change every frame while
+  // tiles ease into their snapped slots, and re-rendering React 60 times a
+  // second to move a rectangle would be silly.
+  const posRef = useRef(new Map())
+  const dragRef = useRef(null) // { id, offX, offY, x, y }
+  const rafRef = useRef(0)
+  const drawRef = useRef(() => {})
+  const [, forceDraw] = useState(0) // nudges the effect that owns the canvas
+
   const midX = size.w / 2
+
   const fmt = (ts) => {
     const xC = ts.filter((t) => t.type === 'x').length - ts.filter((t) => t.type === 'nx').length
     const c = ts.filter((t) => t.type === 'u').length - ts.filter((t) => t.type === 'nu').length
@@ -38,8 +102,8 @@ export default function AlgebraTiles() {
     if (c !== 0) e += (e ? (c < 0 ? ' − ' : ' + ') : c < 0 ? '−' : '') + Math.abs(c)
     return e || '0'
   }
-  const leftExpr = fmt(tiles.filter((t) => t.x < midX))
-  const rightExpr = fmt(tiles.filter((t) => t.x >= midX))
+  const leftExpr = fmt(tiles.filter((t) => t.side === 'L'))
+  const rightExpr = fmt(tiles.filter((t) => t.side === 'R'))
 
   // The canvas is the whole point of this manipulative, so it needs a text
   // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
@@ -47,14 +111,11 @@ export default function AlgebraTiles() {
     ? `Algebra tile mat. Left side of the equation: ${leftExpr}. Right side: ${rightExpr}.`
     : 'Empty algebra tile mat. Add x, negative x, 1, or negative 1 tiles and drag them either side of the equals sign to build both sides of an equation.'
 
+  // `ord` is normally the x a tile was dropped at, so a fresh tile takes an ord
+  // above any possible x to land at the end of its lane. New tiles start on the
+  // left; drag across the equals to build the other side.
   const addTile = (type) => {
-    const n = tiles.length
-    // Spawn on the left of the equals; drag across to build the other side.
-    const span = Math.max(110, size.w / 2 - 70)
-    setTiles((prev) => [
-      ...prev,
-      { id: (seq += 1), type, x: 40 + ((n * 46) % span), y: 56 + Math.floor((n * 46) / span) * 74 },
-    ])
+    setTiles((prev) => [...prev, { id: (seq += 1), type, side: 'L', ord: 1e6 + seq }])
   }
 
   const draw = useCallback(() => {
@@ -74,7 +135,7 @@ export default function AlgebraTiles() {
     // Equals divider: tiles either side form the two sides of an equation.
     const mid = size.w / 2
     ctx.save()
-    ctx.strokeStyle = '#C9CDD6'
+    ctx.strokeStyle = hairline
     ctx.setLineDash([7, 6])
     ctx.lineWidth = 2
     ctx.beginPath()
@@ -101,35 +162,37 @@ export default function AlgebraTiles() {
       ctx.fillText('Add tiles, drag them either side of the =, and drop an x onto a −x to zero-pair.', size.w / 2, 30)
     }
 
-    const drawTile = (t, lifted) => {
+    const drag = dragRef.current
+    const drawTile = (t, px, py, lifted) => {
       const info = TYPES[t.type]
       ctx.save()
       ctx.fillStyle = lifted ? 'rgba(26,26,46,0.20)' : 'rgba(26,26,46,0.10)'
       ctx.beginPath()
-      ctx.roundRect(t.x - info.w / 2 + 2, t.y - info.h / 2 + 4, info.w, info.h, 7)
+      ctx.roundRect(px - info.w / 2 + 2, py - info.h / 2 + (lifted ? 6 : 4), info.w, info.h, 7)
       ctx.fill()
       ctx.fillStyle = info.color
       ctx.strokeStyle = '#ffffff'
       ctx.lineWidth = 2
       ctx.beginPath()
-      ctx.roundRect(t.x - info.w / 2, t.y - info.h / 2, info.w, info.h, 7)
+      ctx.roundRect(px - info.w / 2, py - info.h / 2, info.w, info.h, 7)
       ctx.fill()
       ctx.stroke()
       ctx.fillStyle = '#ffffff'
-      ctx.font = `900 ${t.type === 'x' || t.type === 'nx' ? 16 : 13}px Inter, system-ui, sans-serif`
+      ctx.font = `900 ${info.kind === 'x' ? 16 : 13}px Inter, system-ui, sans-serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillText(info.label, t.x, t.y)
+      ctx.fillText(info.label, px, py)
       ctx.restore()
     }
 
     tiles.forEach((t) => {
       if (drag && t.id === drag.id) return
-      drawTile(t, false)
+      const p = posRef.current.get(t.id)
+      if (p) drawTile(t, p.x, p.y, false)
     })
     if (drag) {
       const t = tiles.find((x) => x.id === drag.id)
-      if (t) drawTile({ ...t, x: drag.x, y: drag.y }, true)
+      if (t) drawTile(t, drag.x, drag.y, true)
     }
 
     // Zero-pair flash.
@@ -144,27 +207,87 @@ export default function AlgebraTiles() {
       ctx.fillText('= 0', flash.x, flash.y - 30 * flash.t)
       ctx.restore()
     }
-  }, [size, tiles, drag, flash])
+  }, [size, tiles, flash])
+
+  // Assigned in an effect, not during render: the animation loop below calls
+  // whatever draw() was current at its last commit, and writing a ref while
+  // rendering is a React-rules violation the linter (rightly) rejects.
+  useEffect(() => {
+    drawRef.current = draw
+  })
+
+  // Ease every tile toward its snapped slot. New tiles enter from above the
+  // mat so it reads as the tile arriving, not blinking into existence.
+  useEffect(() => {
+    const targets = packTargets(tiles, size)
+    const pos = posRef.current
+    const still = skipMotion()
+    tiles.forEach((t) => {
+      if (!pos.has(t.id)) {
+        const tgt = targets.get(t.id)
+        // Enter from above the mat, unless we are not animating at all.
+        pos.set(t.id, { x: tgt ? tgt.x : size.w / 4, y: still && tgt ? tgt.y : -40 })
+      }
+    })
+    // Drop entries for tiles that no longer exist (zero-paired or cleared).
+    pos.forEach((_, id) => {
+      if (!tiles.some((t) => t.id === id)) pos.delete(id)
+    })
+
+    if (still) {
+      targets.forEach((tgt, id) => {
+        if (dragRef.current && dragRef.current.id === id) return
+        const p = pos.get(id)
+        if (p) {
+          p.x = tgt.x
+          p.y = tgt.y
+        }
+      })
+      drawRef.current()
+      return undefined
+    }
+
+    const step = () => {
+      let moving = false
+      targets.forEach((tgt, id) => {
+        if (dragRef.current && dragRef.current.id === id) return
+        const p = pos.get(id)
+        if (!p) return
+        const dx = tgt.x - p.x
+        const dy = tgt.y - p.y
+        if (Math.abs(dx) < 0.4 && Math.abs(dy) < 0.4) {
+          p.x = tgt.x
+          p.y = tgt.y
+          return
+        }
+        p.x += dx * 0.22
+        p.y += dy * 0.22
+        moving = true
+      })
+      drawRef.current()
+      rafRef.current = moving ? requestAnimationFrame(step) : 0
+    }
+    cancelAnimationFrame(rafRef.current)
+    rafRef.current = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [tiles, size])
 
   useEffect(() => {
     draw()
   }, [draw])
 
+  useEffect(() => () => cancelAnimationFrame(rafRef.current), [])
+
   const runFlash = (x, y) => {
-    if (flashRafRef.current) cancelAnimationFrame(flashRafRef.current)
     const start = performance.now()
     const tick = (now) => {
       const t = Math.min(1, (now - start) / 500)
       setFlash({ x, y, t })
-      if (t < 1) flashRafRef.current = requestAnimationFrame(tick)
+      if (t < 1) requestAnimationFrame(tick)
       else setFlash(null)
     }
-    flashRafRef.current = requestAnimationFrame(tick)
+    requestAnimationFrame(tick)
   }
-
-  useEffect(() => () => {
-    if (flashRafRef.current) cancelAnimationFrame(flashRafRef.current)
-  }, [])
 
   const getPoint = (event) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -179,56 +302,56 @@ export default function AlgebraTiles() {
     for (let i = tiles.length - 1; i >= 0; i -= 1) {
       const t = tiles[i]
       const info = TYPES[t.type]
-      if (Math.abs(pt.x - t.x) <= info.w / 2 + 2 && Math.abs(pt.y - t.y) <= info.h / 2 + 2) {
+      const p = posRef.current.get(t.id)
+      if (!p) continue
+      if (Math.abs(pt.x - p.x) <= info.w / 2 + 2 && Math.abs(pt.y - p.y) <= info.h / 2 + 2) {
         event.currentTarget.setPointerCapture(event.pointerId)
-        setDrag({ id: t.id, offX: pt.x - t.x, offY: pt.y - t.y, x: t.x, y: t.y })
+        dragRef.current = { id: t.id, offX: pt.x - p.x, offY: pt.y - p.y, x: p.x, y: p.y }
+        forceDraw((n) => n + 1)
         return
       }
     }
   }
+
   const handlePointerMove = (event) => {
+    const drag = dragRef.current
     if (!drag) return
     const pt = getPoint(event)
-    setDrag((d) => (d ? { ...d, x: pt.x - d.offX, y: pt.y - d.offY } : d))
+    drag.x = pt.x - drag.offX
+    drag.y = pt.y - drag.offY
+    const p = posRef.current.get(drag.id)
+    if (p) {
+      p.x = drag.x
+      p.y = drag.y
+    }
+    drawRef.current()
   }
+
   const handlePointerUp = () => {
+    const drag = dragRef.current
     if (!drag) return
     const dragged = tiles.find((t) => t.id === drag.id)
     if (!dragged) {
-      setDrag(null)
+      dragRef.current = null
       return
     }
+    const side = drag.x < midX ? 'L' : 'R'
     const opp = TYPES[dragged.type].opp
     // Zero pairs only cancel on the SAME side of the equals.
-    const hit = tiles.find(
-      (t) =>
-        t.id !== dragged.id &&
-        t.type === opp &&
-        Math.hypot(t.x - drag.x, t.y - drag.y) <= 34 &&
-        (t.x < midX) === (drag.x < midX),
-    )
+    const hit = tiles.find((t) => {
+      if (t.id === dragged.id || t.type !== opp || t.side !== side) return false
+      const p = posRef.current.get(t.id)
+      return p && Math.hypot(p.x - drag.x, p.y - drag.y) <= 34
+    })
+    dragRef.current = null
     if (hit) {
+      const p = posRef.current.get(hit.id)
+      runFlash((drag.x + p.x) / 2, (drag.y + p.y) / 2)
       setTiles((prev) => prev.filter((t) => t.id !== dragged.id && t.id !== hit.id))
-      runFlash((drag.x + hit.x) / 2, (drag.y + hit.y) / 2)
     } else {
-      setTiles((prev) => prev.map((t) => (t.id === dragged.id ? { ...t, x: drag.x, y: drag.y } : t)))
+      // ord is the drop x, so a tile dropped between two others lands between them.
+      setTiles((prev) => prev.map((t) => (t.id === dragged.id ? { ...t, side, ord: drag.x } : t)))
     }
-    setDrag(null)
-  }
-
-  const AddBtn = ({ type }) => {
-    const info = TYPES[type]
-    return (
-      <button
-        type="button"
-        onClick={() => addTile(type)}
-        className="rounded-lg px-4 py-2 text-sm font-black text-white"
-        style={{ background: info.color }}
-        aria-label={ADD_LABELS[type]}
-      >
-        + {info.label}
-      </button>
-    )
   }
 
   return (
@@ -257,10 +380,10 @@ export default function AlgebraTiles() {
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-2">
-        <AddBtn type="x" />
-        <AddBtn type="nx" />
-        <AddBtn type="u" />
-        <AddBtn type="nu" />
+        <AddBtn type="x" onAdd={addTile} />
+        <AddBtn type="nx" onAdd={addTile} />
+        <AddBtn type="u" onAdd={addTile} />
+        <AddBtn type="nu" onAdd={addTile} />
         <GhostButton onClick={() => setTiles([])} ariaLabel="Clear all tiles">
           Clear
         </GhostButton>

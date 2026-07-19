@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cream, ink, muted, border, purple as xPurple, blue as unitBlue, green as balancedGreen, orange as offRed } from './shared/palette'
 import { useCanvasBox } from './shared/useCanvasBox'
+import { skipMotion } from './shared/motion'
 import GhostButton from './shared/GhostButton'
 
 const beamWood = '#B07A3C'
@@ -139,7 +140,7 @@ export default function BalanceScaleEquations() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, canvasWidth, canvasHeight)
 
-    const { cx, pivotY, L, baseY } = geo
+    const { cx, pivotY, baseY } = geo
     const angle = angleRef.current
 
     // Fulcrum (triangle) + stand.
@@ -228,6 +229,12 @@ export default function BalanceScaleEquations() {
   // (which changes `draw` every frame) never restarts this loop — no shaking.
   useEffect(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    // The beam still ends up at the right tilt, it just gets there at once.
+    if (skipMotion()) {
+      angleRef.current = targetAngle
+      drawRef.current()
+      return undefined
+    }
     const tick = () => {
       const cur = angleRef.current
       const next = cur + (targetAngle - cur) * 0.2

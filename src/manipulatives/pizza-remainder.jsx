@@ -137,8 +137,10 @@ export default function PizzaRemainder() {
 
     // Compute a resting position for every pizza from its placement.
     const perPlateIdx = Array(friends).fill(0)
-    let pileK = 0
-    let trayK = 0
+    // Counters live on an object rather than as `let`s: the callback below
+    // reassigning a captured variable is a React-rules violation, while
+    // stepping a property (as perPlateIdx already does) is not.
+    const next = { pile: 0, tray: 0 }
     const positions = place.map((p) => {
       if (p.loc === 'plate' && p.f < friends) {
         const idx = perPlateIdx[p.f]
@@ -153,14 +155,14 @@ export default function PizzaRemainder() {
         }
       }
       if (p.loc === 'tray') {
-        const k = trayK
-        trayK += 1
+        const k = next.tray
+        next.tray += 1
         const startX = tray.cx - (status.trayCount - 1) * gap * 0.5
         return { x: startX + k * gap, y: tray.cy, loc: 'tray' }
       }
-      const col = pileK % pileCols
-      const row = Math.floor(pileK / pileCols)
-      pileK += 1
+      const col = next.pile % pileCols
+      const row = Math.floor(next.pile / pileCols)
+      next.pile += 1
       return { x: pileX0 + col * pileGap, y: pileY0 + row * pileGap, loc: 'pile' }
     })
 
@@ -244,7 +246,7 @@ export default function PizzaRemainder() {
     if (dragIndex >= 0 && dragPosRef.current) {
       drawPizza(ctx, dragPosRef.current.x, dragPosRef.current.y, r * 1.1, false, true)
     }
-  }, [canvasWidth, layout, friends, status.pileCount])
+  }, [canvasWidth, layout, friends, status.pileCount, status.trayCount])
 
   useEffect(() => {
     draw()

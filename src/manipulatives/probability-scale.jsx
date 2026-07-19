@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cream, ink, muted, border, purple as chipPurple, green as trueGreen } from './shared/palette'
 import { useCanvasBox } from './shared/useCanvasBox'
+import { skipMotion } from './shared/motion'
 import GhostButton from './shared/GhostButton'
 
 const axisColor = ink
@@ -227,6 +228,15 @@ export default function ProbabilityScale() {
 
   useEffect(() => {
     cancelAnimationFrame(rafRef.current)
+    // Chips still land on their marks, they just do not slide there.
+    if (skipMotion()) {
+      EV.forEach((e) => {
+        const tgt = targets[e.id]
+        if (tgt) dispRef.current[e.id] = { ...tgt }
+      })
+      draw()
+      return undefined
+    }
     const tick = () => {
       let moving = false
       EV.forEach((e) => {

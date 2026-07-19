@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cream, ink, muted, border, purple as numberPurple, green as roundGreen } from './shared/palette'
 import { useCanvasBox } from './shared/useCanvasBox'
+import { skipMotion } from './shared/motion'
 import GhostButton from './shared/GhostButton'
 
 const midGray = '#9AA0AA'
@@ -34,7 +35,8 @@ export default function RoundingNumberLine() {
   const max = CONFIG[base].max
   const step = CONFIG[base].step
 
-  const fmt = (v) => (base === 1 ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : String(v))
+  // Memoised so it can be a stable dependency of draw().
+  const fmt = useCallback((v) => (base === 1 ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : String(v)), [base])
   const roundOf = useCallback(
     (v) => {
       const lower = Math.floor(v / base) * base
@@ -181,7 +183,7 @@ export default function RoundingNumberLine() {
     // Ghost point floating from the number to its rounded value.
     if (ghostRef.current) {
       const g = ghostRef.current
-      const t = clamp((performance.now() - g.start) / GHOST_MS, 0, 1)
+      const t = g.start === null ? 0 : clamp((performance.now() - g.start) / GHOST_MS, 0, 1)
       const gx = g.fromX + (g.toX - g.fromX) * easeOut(t)
       const gy = axisY - 26 * Math.sin(Math.PI * t)
       ctx.globalAlpha = 0.6 * (1 - t)
@@ -221,7 +223,7 @@ export default function RoundingNumberLine() {
     ctx.lineTo(nx, axisY - 46)
     ctx.closePath()
     ctx.fill()
-  }, [canvasWidth, geo, base, n, lower, upper, mid, rounded, hideAnswer])
+  }, [canvasWidth, geo, base, n, lower, upper, mid, rounded, hideAnswer, fmt, max])
 
   useEffect(() => {
     draw()
@@ -233,10 +235,11 @@ export default function RoundingNumberLine() {
 
   const runGhost = useCallback(() => {
     if (ghostRafRef.current) cancelAnimationFrame(ghostRafRef.current)
-    const tick = () => {
+    const tick = (now) => {
       const g = ghostRef.current
       if (!g) return
-      if (performance.now() - g.start >= GHOST_MS) {
+      if (g.start === null) g.start = now // the first frame starts the clock
+      if (now - g.start >= GHOST_MS) {
         ghostRef.current = null
         draw()
         return
@@ -250,7 +253,12 @@ export default function RoundingNumberLine() {
   const spawnGhost = (v) => {
     const rv = roundOf(v)
     if (rv === v) return
-    ghostRef.current = { fromX: geo.xFor(v), toX: geo.xFor(rv), start: performance.now() }
+    // Reduced motion: the rounded value still lands on its tick, it just does
+    // not travel there.
+    if (skipMotion()) return
+    // `start` is stamped by the first frame rather than read from the clock
+    // here — reading it now would be an impure call in the render body.
+    ghostRef.current = { fromX: geo.xFor(v), toX: geo.xFor(rv), start: null }
     runGhost()
   }
 
