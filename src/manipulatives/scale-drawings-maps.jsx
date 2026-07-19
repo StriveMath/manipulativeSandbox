@@ -1,759 +1,808 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-const scaleOptions = [
-  { id: 'scale-10', label: '1 cm = 10 m', metersPerCm: 10 },
-  { id: 'scale-20', label: '1 cm = 20 m', metersPerCm: 20 },
-  { id: 'scale-50', label: '1 cm = 50 m', metersPerCm: 50 },
+const plan = { width: 12.5, height: 7.5 }
+const plot = { left: 42, top: 12, width: 440, height: 264 }
+const svgSize = { width: 500, height: 300 }
+const unitsToPixels = plot.width / plan.width
+const fixedAnchor = { x: 1, y: 1 }
+const animationDurationMs = 2500
+const multiplySymbol = '\u00D7'
+
+const scaleFactors = [
+  {
+    id: 'half',
+    label: '\u00BD\u00D7',
+    mathLabel: '\u00BD',
+    accessibleLabel: 'Scale by one half',
+    value: 0.5,
+    observation: 'Every corresponding length was halved. The shape and angles stayed the same.',
+  },
+  {
+    id: 'double',
+    label: `2${multiplySymbol}`,
+    mathLabel: '2',
+    accessibleLabel: 'Scale by two',
+    value: 2,
+    observation: 'Every corresponding length doubled. The shape and angles stayed the same.',
+  },
+  {
+    id: 'triple',
+    label: `3${multiplySymbol}`,
+    mathLabel: '3',
+    accessibleLabel: 'Scale by three',
+    value: 3,
+    observation: 'Every corresponding length tripled. The shape and angles stayed the same.',
+  },
 ]
-
-const plan = { widthCm: 10, heightCm: 6 }
-const toleranceMeters = 2
 
 const objectDefinitions = [
   {
     id: 'school',
-    type: 'building',
     label: 'School',
     shortLabel: 'SCH',
-    color: '#10b981',
-    targetRealWidthM: 40,
-    targetRealHeightM: 30,
-    initialWidthCm: 2.8,
-    initialHeightCm: 2.1,
-  },
-  {
-    id: 'library',
-    type: 'building',
-    label: 'Library',
-    shortLabel: 'LIB',
-    color: '#8b5cf6',
-    targetRealWidthM: 30,
-    targetRealHeightM: 20,
-    initialWidthCm: 2.1,
-    initialHeightCm: 1.4,
-  },
-  {
-    id: 'gym',
-    type: 'building',
-    label: 'Gym',
-    shortLabel: 'GYM',
-    color: '#0ea5e9',
-    targetRealWidthM: 50,
-    targetRealHeightM: 30,
-    initialWidthCm: 3,
-    initialHeightCm: 1.8,
-  },
-  {
-    id: 'park',
-    type: 'park',
-    label: 'Park',
-    shortLabel: 'PARK',
-    color: '#22c55e',
-    targetRealWidthM: 60,
-    targetRealHeightM: 40,
-    initialWidthCm: 4.2,
-    initialHeightCm: 2.8,
+    color: '#059669',
+    width: 3,
+    height: 2,
+    shape: 'rectangle',
+    dimensionMode: 'width-height',
   },
   {
     id: 'garden',
-    type: 'park',
     label: 'Garden',
     shortLabel: 'GDN',
-    color: '#f59e0b',
-    targetRealWidthM: 30,
-    targetRealHeightM: 30,
-    initialWidthCm: 2.1,
-    initialHeightCm: 2.1,
+    color: '#d97706',
+    width: 1.5,
+    height: 1.5,
+    shape: 'square',
+    dimensionMode: 'width-height',
+  },
+  {
+    id: 'fountain',
+    label: 'Fountain',
+    shortLabel: 'FTN',
+    color: '#0284c7',
+    width: 1.5,
+    height: 1.5,
+    shape: 'circle',
+    dimensionMode: 'diameter',
+  },
+  {
+    id: 'plaza',
+    label: 'Plaza',
+    shortLabel: 'PLZ',
+    color: '#7c3aed',
+    width: 2.5,
+    height: 2,
+    shape: 'triangle',
+    dimensionMode: 'base-height',
+  },
+  {
+    id: 'park',
+    label: 'Park',
+    shortLabel: 'PARK',
+    color: '#65a30d',
+    width: 2.5,
+    height: 2,
+    shape: 'l-shape',
+    dimensionMode: 'width-height',
   },
   {
     id: 'main-road',
-    type: 'road',
-    orientation: 'horizontal',
     label: 'Main Road',
     shortLabel: 'ROAD',
-    color: '#64748b',
-    targetRealWidthM: 80,
-    targetRealHeightM: 8,
-    initialWidthCm: 5.6,
-    initialHeightCm: 0.55,
-  },
-  {
-    id: 'side-road',
-    type: 'road',
-    orientation: 'vertical',
-    label: 'Side Road',
-    shortLabel: 'ROAD',
     color: '#475569',
-    targetRealWidthM: 8,
-    targetRealHeightM: 50,
-    initialWidthCm: 0.55,
-    initialHeightCm: 3.5,
+    width: 3,
+    height: 0.5,
+    shape: 'road',
+    dimensionMode: 'width-height',
   },
 ]
 
-const requiredObjectIds = ['school', 'park', 'main-road']
+const formatNumber = (value) =>
+  value.toLocaleString('en-US', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  })
 
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
-
-const formatNumber = (value) => {
-  const rounded = Math.round(value * 10) / 10
-  return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(1)
-}
-
-const definitionById = new Map(objectDefinitions.map((definition) => [definition.id, definition]))
-
-const getObjectDefinition = (item) => definitionById.get(item.definitionId)
-
-const realDimensions = (item, scale) => ({
-  width: item.widthCm * scale.metersPerCm,
-  height: item.heightCm * scale.metersPerCm,
+const scaledDimensions = (definition, factor) => ({
+  width: definition.width * factor.value,
+  height: definition.height * factor.value,
 })
 
-const isObjectComplete = (item, scale) => {
-  const definition = getObjectDefinition(item)
-  const real = realDimensions(item, scale)
+const shapeGeometry = (definition, dimensions) => {
+  const widthPx = dimensions.width * unitsToPixels
+  const heightPx = dimensions.height * unitsToPixels
 
-  if (definition.type === 'road') {
-    const currentLength = definition.orientation === 'vertical' ? real.height : real.width
-    const targetLength =
-      definition.orientation === 'vertical' ? definition.targetRealHeightM : definition.targetRealWidthM
-    return Math.abs(currentLength - targetLength) <= toleranceMeters
+  if (definition.shape === 'circle') {
+    return {
+      heightPx,
+      widthPx,
+      x: plot.left + (plot.width - widthPx) / 2,
+      y: plot.top + (plot.height - heightPx) / 2,
+    }
+  }
+
+  return {
+    heightPx,
+    widthPx,
+    x: plot.left + fixedAnchor.x * unitsToPixels,
+    y: plot.top + plot.height - fixedAnchor.y * unitsToPixels - heightPx,
+  }
+}
+
+const dimensionItems = (definition) => {
+  if (definition.dimensionMode === 'diameter') {
+    return [{ key: 'diameter', label: 'Diameter', value: definition.width }]
+  }
+
+  if (definition.dimensionMode === 'base-height') {
+    return [
+      { key: 'base', label: 'Base', value: definition.width },
+      { key: 'height', label: 'Height', value: definition.height },
+    ]
+  }
+
+  return [
+    { key: 'width', label: 'Width', value: definition.width },
+    { key: 'height', label: 'Height', value: definition.height },
+  ]
+}
+
+const dimensionSummary = (definition) => {
+  if (definition.dimensionMode === 'diameter') return `diameter ${formatNumber(definition.width)} units`
+  if (definition.dimensionMode === 'base-height') {
+    return `base ${formatNumber(definition.width)} and height ${formatNumber(definition.height)} units`
+  }
+  return `${formatNumber(definition.width)} by ${formatNumber(definition.height)} units`
+}
+
+const compactDimensionSummary = (definition) => {
+  if (definition.dimensionMode === 'diameter') return `d ${formatNumber(definition.width)}`
+  if (definition.dimensionMode === 'base-height') {
+    return `b ${formatNumber(definition.width)} ${multiplySymbol} h ${formatNumber(definition.height)}`
+  }
+  return `${formatNumber(definition.width)} ${multiplySymbol} ${formatNumber(definition.height)}`
+}
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+function ShapeForm({ definition, height, strokeWidth = 2, width, x, y }) {
+  const fill = `${definition.color}2f`
+  const common = {
+    fill,
+    stroke: definition.color,
+    strokeWidth,
+    vectorEffect: 'non-scaling-stroke',
+  }
+
+  if (definition.shape === 'circle') {
+    return <ellipse cx={x + width / 2} cy={y + height / 2} rx={width / 2} ry={height / 2} {...common} />
+  }
+
+  if (definition.shape === 'triangle') {
+    return <polygon points={`${x + width / 2},${y} ${x + width},${y + height} ${x},${y + height}`} {...common} />
+  }
+
+  if (definition.shape === 'l-shape') {
+    const cornerX = x + width * 0.42
+    const cornerY = y + height * 0.55
+    return (
+      <path
+        d={`M ${x} ${y} H ${cornerX} V ${cornerY} H ${x + width} V ${y + height} H ${x} Z`}
+        strokeLinejoin="round"
+        {...common}
+      />
+    )
+  }
+
+  if (definition.shape === 'road') {
+    return (
+      <g>
+        <rect height={height} rx={Math.min(8, height / 3)} width={width} x={x} y={y} {...common} />
+        <line
+          stroke="#f8fafc"
+          strokeDasharray="10 7"
+          strokeWidth={Math.max(1.4, strokeWidth)}
+          vectorEffect="non-scaling-stroke"
+          x1={x + 5}
+          x2={x + width - 5}
+          y1={y + height / 2}
+          y2={y + height / 2}
+        />
+      </g>
+    )
   }
 
   return (
-    Math.abs(real.width - definition.targetRealWidthM) <= toleranceMeters &&
-    Math.abs(real.height - definition.targetRealHeightM) <= toleranceMeters
+    <rect
+      height={height}
+      rx={definition.shape === 'square' ? 7 : 5}
+      width={width}
+      x={x}
+      y={y}
+      {...common}
+    />
   )
 }
 
-const targetDrawingSize = (definition, scale) => ({
-  widthCm: definition.targetRealWidthM / scale.metersPerCm,
-  heightCm: definition.targetRealHeightM / scale.metersPerCm,
-})
-
-const getPlanPoint = (event, element) => {
-  const rect = element.getBoundingClientRect()
-  return {
-    x: clamp(((event.clientX - rect.left) / rect.width) * plan.widthCm, 0, plan.widthCm),
-    y: clamp(((event.clientY - rect.top) / rect.height) * plan.heightCm, 0, plan.heightCm),
-  }
+function ShapePreview({ definition }) {
+  return (
+    <svg aria-hidden="true" className="h-5 w-6 shrink-0" viewBox="0 0 100 100">
+      <ShapeForm definition={definition} height={76} strokeWidth={5} width={82} x={9} y={12} />
+    </svg>
+  )
 }
 
-const clampObjectToPlan = (item) => ({
-  ...item,
-  xCm: clamp(item.xCm, 0, Math.max(0, plan.widthCm - item.widthCm)),
-  yCm: clamp(item.yCm, 0, Math.max(0, plan.heightCm - item.heightCm)),
-})
-
-const createPlacedObject = (definition, point, scale) => {
-  const target = targetDrawingSize(definition, scale)
-  const widthCm =
-    definition.type === 'road' && definition.orientation === 'vertical'
-      ? definition.initialWidthCm
-      : Math.min(definition.initialWidthCm, Math.max(0.8, target.widthCm * 0.72))
-  const heightCm =
-    definition.type === 'road' && definition.orientation === 'horizontal'
-      ? definition.initialHeightCm
-      : Math.min(definition.initialHeightCm, Math.max(0.6, target.heightCm * 0.72))
-
-  return clampObjectToPlan({
-    id: `${definition.id}-${Date.now()}`,
-    definitionId: definition.id,
-    xCm: point.x - widthCm / 2,
-    yCm: point.y - heightCm / 2,
-    widthCm,
-    heightCm,
-  })
-}
-
-function ScaleButton({ active, scale, onClick }) {
+function PaletteButton({ active, definition, disabled, onClick }) {
   return (
     <button
-      className={`rounded border px-2 py-1 text-left shadow-sm transition ${
+      aria-label={`Choose ${definition.label}, ${dimensionSummary(definition)}`}
+      aria-pressed={active}
+      className={`scale-compare-palette flex h-9 min-w-0 items-center gap-1 rounded border px-1.5 text-left shadow-sm transition ${
         active
-          ? 'border-amber-400 bg-amber-100 text-amber-900 ring-2 ring-amber-200'
-          : 'border-slate-200 bg-white text-slate-700 hover:border-amber-300 hover:bg-amber-50'
+          ? 'border-sky-400 bg-sky-50 ring-2 ring-sky-200'
+          : 'border-slate-200 bg-white hover:border-sky-300 hover:bg-sky-50'
       }`}
+      disabled={disabled}
       onClick={onClick}
       type="button"
     >
-      <div className="text-[9px] font-black uppercase text-slate-500">Scale</div>
-      <div className="text-[11px] font-black tabular-nums">{scale.label}</div>
-    </button>
-  )
-}
-
-function PaletteItem({ definition, onPointerDown }) {
-  return (
-    <button
-      className="scale-town-palette-item flex h-8 items-center gap-1.5 rounded border border-slate-200 bg-white px-1.5 text-left shadow-sm transition hover:border-sky-300 hover:bg-sky-50"
-      onPointerDown={(event) => onPointerDown(event, definition.id)}
-      type="button"
-    >
-      <span
-        className="h-5 w-7 shrink-0 rounded border-2"
-        style={{ backgroundColor: `${definition.color}24`, borderColor: definition.color }}
-      />
+      <ShapePreview definition={definition} />
       <span className="min-w-0">
-        <span className="block truncate text-[11px] font-black text-slate-800">{definition.label}</span>
-        <span className="block text-[9px] font-black uppercase text-slate-400">
-          {definition.type === 'road' ? 'Road' : definition.type}
+        <span className="block truncate text-[9px] font-black leading-3 text-slate-800">{definition.label}</span>
+        <span className="block whitespace-nowrap text-[8px] font-bold leading-2 text-slate-400">
+          {compactDimensionSummary(definition)}
         </span>
       </span>
     </button>
   )
 }
 
-function MissionCard({ completeCount, totalRequired }) {
+function ScaleButton({ active, disabled, factor, onClick }) {
   return (
-    <div className="rounded border border-amber-200 bg-amber-50 p-1.5 shadow-sm">
-      <div className="text-[10px] font-black uppercase text-amber-700">Planner mission</div>
-      <div className="mt-0.5 text-[11px] font-black leading-3 text-slate-900">
-        Build a mini town with a 40 m x 30 m school, a 60 m x 40 m park, and an 80 m road.
-      </div>
-      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white">
-        <div
-          className="h-full rounded-full bg-amber-400 transition-all"
-          style={{ width: `${(completeCount / totalRequired) * 100}%` }}
-        />
-      </div>
-      <div className="mt-0.5 text-[9px] font-black text-amber-800">
-        {completeCount}/{totalRequired} required objects correct
-      </div>
-    </div>
+    <button
+      aria-label={factor.accessibleLabel}
+      aria-pressed={active}
+      className={`h-9 rounded border text-lg font-black shadow-sm transition ${
+        active
+          ? 'border-amber-500 bg-amber-200 text-amber-950 ring-2 ring-amber-300'
+          : 'border-amber-200 bg-white text-amber-800 hover:border-amber-400 hover:bg-amber-50'
+      } ${!disabled && !active ? 'scale-compare-ready' : ''}`}
+      disabled={disabled}
+      onClick={onClick}
+      type="button"
+    >
+      {factor.label}
+    </button>
   )
 }
 
-function SelectedReadout({ item, scale }) {
-  if (!item) {
-    return (
-      <div className="rounded border border-slate-200 bg-white p-1.5 text-[10px] font-bold leading-3 text-slate-500 shadow-sm">
-        Select a town object to see its drawing size, real size, and target.
-      </div>
-    )
-  }
-
-  const definition = getObjectDefinition(item)
-  const real = realDimensions(item, scale)
-  const complete = isObjectComplete(item, scale)
-  const targetText =
-    definition.type === 'road'
-      ? `${definition.orientation === 'vertical' ? definition.targetRealHeightM : definition.targetRealWidthM} m long`
-      : `${definition.targetRealWidthM} m x ${definition.targetRealHeightM} m`
+function CoordinatePlane() {
+  const xGrid = Array.from({ length: 12 }, (_, index) => index + 1)
+  const yGrid = Array.from({ length: 7 }, (_, index) => index + 1)
+  const xTicks = Array.from({ length: 26 }, (_, index) => index * 0.5)
+  const yTicks = Array.from({ length: 16 }, (_, index) => index * 0.5)
+  const xLabels = [0, 2.5, 5, 7.5, 10, 12.5]
+  const yLabels = [2.5, 5, 7.5]
+  const xFor = (value) => plot.left + value * unitsToPixels
+  const yFor = (value) => plot.top + plot.height - value * unitsToPixels
 
   return (
-    <div
-      className={`rounded border p-1.5 shadow-sm ${
-        complete ? 'border-sky-300 bg-sky-50' : 'border-slate-200 bg-white'
-      }`}
-    >
-      <div className="text-[10px] font-black uppercase text-slate-500">Selected object</div>
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-[12px] font-black" style={{ color: definition.color }}>
-          {definition.label}
-        </div>
-        <div
-          className={`rounded px-1.5 py-0.5 text-[9px] font-black ${
-            complete ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-500'
-          }`}
-        >
-          {complete ? 'Correct size' : 'Resize'}
-        </div>
-      </div>
-      <div className="mt-1 grid grid-cols-2 gap-1 text-[9px] font-black">
-        <div className="rounded bg-slate-50 p-1 text-slate-600">
-          Drawing
-          <div className="text-[11px] text-teal-700 tabular-nums">
-            {formatNumber(item.widthCm)} x {formatNumber(item.heightCm)} cm
-          </div>
-        </div>
-        <div className="rounded bg-slate-50 p-1 text-slate-600">
-          Real
-          <div className="text-[11px] text-sky-700 tabular-nums">
-            {formatNumber(real.width)} x {formatNumber(real.height)} m
-          </div>
-        </div>
-      </div>
-      <div className="mt-0.5 text-[9px] font-black text-slate-500">Target: {targetText}</div>
-    </div>
-  )
-}
-
-function TownObject({ item, scale, selected, onPointerDown, onResizePointerDown, onSelect }) {
-  const definition = getObjectDefinition(item)
-  const complete = isObjectComplete(item, scale)
-  const real = realDimensions(item, scale)
-  const left = (item.xCm / plan.widthCm) * 100
-  const top = (item.yCm / plan.heightCm) * 100
-  const width = (item.widthCm / plan.widthCm) * 100
-  const height = (item.heightCm / plan.heightCm) * 100
-
-  return (
-    <div
-      className={`scale-town-object absolute flex select-none items-center justify-center rounded border-2 text-center shadow-sm ${
-        complete ? 'scale-town-object-complete' : ''
-      } ${selected ? 'z-20 ring-4 ring-sky-200' : 'z-10'}`}
-      onClick={(event) => {
-        event.stopPropagation()
-        onSelect(item.id)
-      }}
-      onPointerDown={(event) => onPointerDown(event, item.id)}
-      style={{
-        backgroundColor: `${definition.color}1f`,
-        borderColor: definition.color,
-        color: definition.color,
-        height: `${height}%`,
-        left: `${left}%`,
-        top: `${top}%`,
-        width: `${width}%`,
-      }}
-    >
-      <div className="pointer-events-none">
-        <div className="text-[11px] font-black leading-3">{definition.shortLabel}</div>
-        {selected ? (
-          <div className="mt-0.5 rounded bg-white/90 px-1 text-[9px] font-black text-slate-700 shadow-sm">
-            {definition.type === 'road'
-              ? `${formatNumber(definition.orientation === 'vertical' ? real.height : real.width)} m`
-              : `${formatNumber(real.width)} x ${formatNumber(real.height)} m`}
-          </div>
-        ) : null}
-      </div>
-      {selected ? (
-        <>
-          <div className="scale-town-dimension-label absolute -top-5 left-1/2 -translate-x-1/2 rounded bg-white px-1.5 py-0.5 text-[9px] font-black text-teal-700 shadow">
-            {formatNumber(item.widthCm)} cm
-          </div>
-          <div className="scale-town-dimension-label absolute -right-10 top-1/2 -translate-y-1/2 rounded bg-white px-1.5 py-0.5 text-[9px] font-black text-teal-700 shadow">
-            {formatNumber(item.heightCm)} cm
-          </div>
-          <button
-            aria-label={`Resize ${definition.label}`}
-            className="scale-town-resize-handle absolute -bottom-2 -right-2 h-5 w-5 rounded-full border-2 border-white bg-slate-950 shadow"
-            onClick={(event) => event.stopPropagation()}
-            onPointerDown={(event) => onResizePointerDown(event, item.id)}
-            type="button"
-          />
-        </>
-      ) : null}
-    </div>
-  )
-}
-
-function BlueprintCanvas({
-  canvasRef,
-  items,
-  onCanvasClick,
-  onMovePointerDown,
-  onResizePointerDown,
-  onSelect,
-  scale,
-  selectedId,
-}) {
-  return (
-    <div
-      className="relative min-h-0 flex-1 overflow-hidden rounded border border-sky-200 bg-sky-50 shadow-inner"
-      onClick={onCanvasClick}
-      ref={canvasRef}
-    >
-      <div
-        className="absolute inset-0 opacity-80"
-        style={{
-          backgroundImage:
-            'linear-gradient(#bae6fd 1px, transparent 1px), linear-gradient(90deg, #bae6fd 1px, transparent 1px)',
-          backgroundSize: '9.6% 15.7%',
-        }}
-      />
-      <div className="absolute left-2 top-2 rounded bg-white/90 px-2 py-1 text-[10px] font-black uppercase text-sky-700 shadow-sm">
-        Blueprint grid: 10 cm x 6 cm
-      </div>
-      <div className="absolute bottom-2 right-2 rounded bg-white/90 px-2 py-1 text-[10px] font-black text-slate-500 shadow-sm">
-        {scale.label}
-      </div>
-
-      {items.map((item) => (
-        <TownObject
-          item={item}
-          key={item.id}
-          onPointerDown={onMovePointerDown}
-          onResizePointerDown={onResizePointerDown}
-          onSelect={onSelect}
-          scale={scale}
-          selected={item.id === selectedId}
+    <g aria-hidden="true">
+      <rect fill="#f0f9ff" height={plot.height} width={plot.width} x={plot.left} y={plot.top} />
+      {xGrid.map((value) => (
+        <line
+          key={`x-grid-${value}`}
+          stroke="#bae6fd"
+          strokeWidth="1"
+          x1={xFor(value)}
+          x2={xFor(value)}
+          y1={plot.top}
+          y2={plot.top + plot.height}
         />
       ))}
-
-    </div>
+      {yGrid.map((value) => (
+        <line
+          key={`y-grid-${value}`}
+          stroke="#bae6fd"
+          strokeWidth="1"
+          x1={plot.left}
+          x2={plot.left + plot.width}
+          y1={yFor(value)}
+          y2={yFor(value)}
+        />
+      ))}
+      <line stroke="#0f172a" strokeWidth="3" x1={plot.left} x2={plot.left + plot.width} y1={plot.top + plot.height} y2={plot.top + plot.height} />
+      <line stroke="#0f172a" strokeWidth="3" x1={plot.left} x2={plot.left} y1={plot.top} y2={plot.top + plot.height} />
+      {xTicks.map((value) => (
+        <line
+          key={`x-tick-${value}`}
+          stroke="#0f172a"
+          strokeWidth={Number.isInteger(value) ? 2.1 : 1.35}
+          x1={xFor(value)}
+          x2={xFor(value)}
+          y1={plot.top + plot.height}
+          y2={plot.top + plot.height + (Number.isInteger(value) ? 8 : 5)}
+        />
+      ))}
+      {yTicks.map((value) => (
+        <line
+          key={`y-tick-${value}`}
+          stroke="#0f172a"
+          strokeWidth={Number.isInteger(value) ? 2.1 : 1.35}
+          x1={plot.left - (Number.isInteger(value) ? 8 : 5)}
+          x2={plot.left}
+          y1={yFor(value)}
+          y2={yFor(value)}
+        />
+      ))}
+      {xLabels.map((value) => (
+        <text
+          fill="#334155"
+          fontSize="14"
+          fontWeight="900"
+          key={`x-label-${value}`}
+          textAnchor="middle"
+          x={xFor(value)}
+          y={plot.top + plot.height + 19}
+        >
+          {formatNumber(value)}
+        </text>
+      ))}
+      {yLabels.map((value) => (
+        <text
+          dominantBaseline="middle"
+          fill="#334155"
+          fontSize="14"
+          fontWeight="900"
+          key={`y-label-${value}`}
+          textAnchor="end"
+          x={plot.left - 12}
+          y={yFor(value)}
+        >
+          {formatNumber(value)}
+        </text>
+      ))}
+      <text fill="#0f172a" fontSize="15" fontWeight="900" x={plot.left + plot.width + 7} y={plot.top + plot.height + 4}>x</text>
+      <text fill="#0f172a" fontSize="15" fontWeight="900" x={plot.left - 3} y={plot.top + 1}>y</text>
+    </g>
   )
 }
 
-function EquationStrip({ item, scale, missionComplete }) {
-  if (missionComplete) {
-    return (
-      <div className="scale-town-equation-refresh flex h-[56px] items-center justify-center rounded border border-sky-200 bg-sky-50 px-3 text-center shadow-sm">
-        <div className="text-lg font-black text-sky-700">Town plan complete. Every required object is proportional.</div>
-      </div>
-    )
-  }
+function DimensionTag({ color, label, rotate = false, x, y }) {
+  const tagWidth = Math.max(64, label.length * 8 + 18)
+  return (
+    <g transform={`translate(${x} ${y})${rotate ? ' rotate(-90)' : ''}`}>
+      <rect
+        fill="#ffffff"
+        fillOpacity="0.94"
+        height="24"
+        rx="6"
+        stroke={color}
+        strokeOpacity="0.32"
+        width={tagWidth}
+        x={-tagWidth / 2}
+        y="-12"
+      />
+      <text dominantBaseline="middle" fill={color} fontSize="15" fontWeight="900" textAnchor="middle" y="0.5">
+        {label}
+      </text>
+    </g>
+  )
+}
 
-  if (!item) {
-    return (
-      <div className="flex h-[56px] items-center justify-center rounded border border-sky-200 bg-sky-50 px-3 text-center text-[13px] font-black text-slate-500 shadow-sm">
-        Drag a town object onto the blueprint, then resize it to match the real-world target.
-      </div>
-    )
+function DimensionGuides({ definition, dimensions, geometry, markerId }) {
+  const { height, width } = dimensions
+  const { heightPx, widthPx, x, y } = geometry
+  const bottomGuideY = Math.min(plot.top + plot.height - 22, y + heightPx + 8)
+  const rightGuideX = Math.min(plot.left + plot.width - 14, x + widthPx + 15)
+  const horizontalLabel = `${formatNumber(width)} units`
+  const verticalLabel = `${formatNumber(height)} units`
+  const lineProps = {
+    markerEnd: `url(#${markerId})`,
+    markerStart: `url(#${markerId})`,
+    stroke: definition.color,
+    strokeWidth: 1.5,
   }
-
-  const definition = getObjectDefinition(item)
-  const real = realDimensions(item, scale)
-  const primaryCm =
-    definition.type === 'road' && definition.orientation === 'vertical' ? item.heightCm : item.widthCm
-  const primaryMeters =
-    definition.type === 'road' && definition.orientation === 'vertical' ? real.height : real.width
-  const dimensionLabel = definition.type === 'road' ? 'length' : 'width'
 
   return (
-    <div
-      className="scale-town-equation-refresh grid h-[56px] grid-cols-[1fr_160px] gap-2 rounded border border-sky-200 bg-sky-50 p-1.5 shadow-sm"
-      key={`${item.id}-${formatNumber(primaryCm)}-${scale.id}`}
-    >
-      <div className="flex items-center justify-center gap-3 rounded border border-sky-100 bg-white px-3">
-        <span className="text-[11px] font-black uppercase text-slate-500">{definition.label} {dimensionLabel}</span>
-        <span className="text-base font-black text-teal-700 tabular-nums">{formatNumber(primaryCm)} cm</span>
-        <span className="rounded bg-amber-100 px-2 py-0.5 text-base font-black text-amber-700">x</span>
-        <span className="text-base font-black text-amber-700 tabular-nums">{scale.metersPerCm} m per cm</span>
-        <span className="text-lg font-black text-slate-400">=</span>
-        <span className="text-xl font-black text-sky-700 tabular-nums">{formatNumber(primaryMeters)} m</span>
-      </div>
-      <div className="flex flex-col justify-center rounded border border-sky-100 bg-white px-3">
-        <div className="text-[10px] font-black uppercase text-slate-400">Target</div>
-        <div className="text-[13px] font-black text-slate-800">
-          {definition.type === 'road'
-            ? `${definition.orientation === 'vertical' ? definition.targetRealHeightM : definition.targetRealWidthM} m long`
-            : `${definition.targetRealWidthM} x ${definition.targetRealHeightM} m`}
+    <g className="scale-compare-dimensions">
+      <line x1={x + 3} x2={x + widthPx - 3} y1={bottomGuideY} y2={bottomGuideY} {...lineProps} />
+      <line stroke={definition.color} strokeOpacity="0.45" strokeWidth="1" x1={x} x2={x} y1={y + heightPx} y2={bottomGuideY + 3} />
+      <line stroke={definition.color} strokeOpacity="0.45" strokeWidth="1" x1={x + widthPx} x2={x + widthPx} y1={y + heightPx} y2={bottomGuideY + 3} />
+      <DimensionTag color={definition.color} label={horizontalLabel} x={x + widthPx / 2} y={bottomGuideY + 10} />
+      {definition.dimensionMode !== 'diameter' ? (
+        <>
+          <line x1={rightGuideX} x2={rightGuideX} y1={y + 3} y2={y + heightPx - 3} {...lineProps} />
+          <line stroke={definition.color} strokeOpacity="0.45" strokeWidth="1" x1={x + widthPx} x2={rightGuideX + 3} y1={y} y2={y} />
+          <line stroke={definition.color} strokeOpacity="0.45" strokeWidth="1" x1={x + widthPx} x2={rightGuideX + 3} y1={y + heightPx} y2={y + heightPx} />
+          <DimensionTag color={definition.color} label={verticalLabel} rotate x={rightGuideX + 12} y={y + heightPx / 2} />
+        </>
+      ) : null}
+    </g>
+  )
+}
+
+function CanvasObject({ definition, dimensions, markerId, objectRef, result }) {
+  const geometry = shapeGeometry(definition, dimensions)
+  const { heightPx, widthPx, x, y } = geometry
+  const showLabel = widthPx >= 38 && heightPx >= 22
+  const accessibleDimensions = definition.dimensionMode === 'diameter'
+    ? `diameter ${formatNumber(dimensions.width)} units`
+    : definition.dimensionMode === 'base-height'
+      ? `base ${formatNumber(dimensions.width)} and height ${formatNumber(dimensions.height)} units`
+      : `${formatNumber(dimensions.width)} by ${formatNumber(dimensions.height)} units`
+
+  const anchoredDescription = definition.shape === 'circle'
+    ? ''
+    : `, from (1,1) to (${formatNumber(fixedAnchor.x + dimensions.width)},${formatNumber(fixedAnchor.y + dimensions.height)})`
+
+  return (
+    <g aria-label={`${result ? 'Scaled' : 'Original'} ${definition.label}, ${accessibleDimensions}${anchoredDescription}`} role="img">
+      <g
+        className={result ? 'scale-compare-result' : 'scale-compare-original'}
+        ref={objectRef}
+        style={{ transformOrigin: `${x + widthPx / 2}px ${y + heightPx / 2}px` }}
+      >
+        <ShapeForm definition={definition} height={heightPx} width={widthPx} x={x} y={y} />
+        {showLabel ? (
+          <text
+            dominantBaseline="middle"
+            fill={definition.color}
+            fontSize={Math.min(18, Math.max(12, heightPx * 0.25))}
+            fontWeight="900"
+            textAnchor="middle"
+            x={x + widthPx / 2}
+            y={y + heightPx / 2}
+          >
+            {definition.shortLabel}
+          </text>
+        ) : null}
+      </g>
+      {definition.shape !== 'circle' ? (
+        <g aria-hidden="true" className="scale-compare-dimensions">
+          <circle
+            cx={x}
+            cy={y + heightPx}
+            fill="#f59e0b"
+            r="4.5"
+            stroke="#ffffff"
+            strokeWidth="2"
+          />
+          <text
+            fill="#92400e"
+            fontSize="13"
+            fontWeight="900"
+            textAnchor="end"
+            x={x - 7}
+            y={y + heightPx + 4}
+          >
+            (1,1)
+          </text>
+        </g>
+      ) : null}
+      <DimensionGuides
+        definition={definition}
+        dimensions={dimensions}
+        geometry={geometry}
+        markerId={markerId}
+      />
+    </g>
+  )
+}
+
+function ComparisonCanvas({ canvasRef, definition, factor, originalObjectRef, result }) {
+  const isOriginal = !result
+  const dimensions = definition
+    ? isOriginal
+      ? { width: definition.width, height: definition.height }
+      : scaledDimensions(definition, factor)
+    : null
+  const markerId = isOriginal ? 'dimension-arrow-original' : 'dimension-arrow-scaled'
+
+  return (
+    <section className="flex min-w-0 flex-col rounded border border-sky-200 bg-white p-1 shadow-sm">
+      <div className="mb-0.5 flex items-center justify-between gap-2 px-1">
+        <div>
+          <div className={`text-[11px] font-black uppercase ${isOriginal ? 'text-teal-700' : 'text-sky-700'}`}>
+            {isOriginal ? 'Original drawing' : 'Scaled drawing'}
+          </div>
+          <div className="text-[10px] font-bold text-slate-500">
+            {isOriginal ? `Scale factor: 1${multiplySymbol}` : factor ? `Scale factor: ${factor.label}` : 'Choose a scale factor'}
+          </div>
+        </div>
+        <div className={`rounded px-2 py-1 text-base font-black ${isOriginal ? 'bg-teal-50 text-teal-700' : 'bg-sky-50 text-sky-700'}`}>
+          {isOriginal ? '1:1' : factor?.label ?? '?'}
         </div>
       </div>
-    </div>
+
+      <svg
+        aria-label={`${isOriginal ? 'Original' : 'Scaled'} coordinate plane, 12.5 units by 7.5 units`}
+        className="mx-auto aspect-[5/3] w-full overflow-visible rounded border border-sky-300 bg-white"
+        ref={canvasRef}
+        role="img"
+        viewBox={`0 0 ${svgSize.width} ${svgSize.height}`}
+      >
+        <defs>
+          <marker id={markerId} markerHeight="5" markerWidth="5" orient="auto-start-reverse" refX="2.5" refY="2.5">
+            <path d="M 5 0 L 0 2.5 L 5 5 Z" fill={definition?.color ?? '#0284c7'} />
+          </marker>
+        </defs>
+        <CoordinatePlane />
+        {!definition ? (
+          <text fill="#94a3b8" fontSize="14" fontWeight="800" textAnchor="middle" x="250" y="153">
+            {isOriginal ? 'Choose a town object.' : 'The scaled copy will land here.'}
+          </text>
+        ) : null}
+        {dimensions ? (
+          <CanvasObject
+            definition={definition}
+            dimensions={dimensions}
+            markerId={markerId}
+            objectRef={isOriginal ? originalObjectRef : undefined}
+            result={!isOriginal}
+          />
+        ) : null}
+      </svg>
+    </section>
+  )
+}
+
+function TransferGhost({ animation }) {
+  if (!animation) return null
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="scale-compare-flight pointer-events-none absolute z-50 overflow-visible drop-shadow-xl"
+      style={{
+        '--center-x': `${animation.centerX}px`,
+        '--center-y': `${animation.centerY}px`,
+        '--factor': animation.factor,
+        '--landing-factor': animation.factor * 1.04,
+        '--target-x': `${animation.targetX}px`,
+        '--target-y': `${animation.targetY}px`,
+        height: `${animation.height}px`,
+        left: `${animation.left}px`,
+        top: `${animation.top}px`,
+        width: `${animation.width}px`,
+      }}
+      viewBox="0 0 100 100"
+    >
+      <ShapeForm definition={animation.definition} height={96} strokeWidth={4} width={96} x={2} y={2} />
+    </svg>
+  )
+}
+
+function EquationPanel({ definition, factor, resultFactor, animating }) {
+  if (!definition) {
+    return (
+      <section className="flex h-[76px] items-center justify-center rounded border border-sky-200 bg-sky-50 text-center text-sm font-black text-slate-500 shadow-sm">
+        Choose one town shape to begin comparing scale drawings.
+      </section>
+    )
+  }
+
+  const displayedFactor = resultFactor ?? factor
+  if (!displayedFactor) {
+    return (
+      <section className="flex h-[76px] items-center justify-center rounded border border-sky-200 bg-sky-50 text-center text-sm font-black text-slate-600 shadow-sm">
+        <span className="mr-2 text-teal-700">Original {definition.label}: {dimensionSummary(definition)}.</span>
+        Choose a scale factor.
+      </section>
+    )
+  }
+
+  const items = dimensionItems(definition)
+
+  return (
+    <section className="grid h-[76px] grid-cols-[1.15fr_0.85fr] gap-2 rounded border border-sky-200 bg-sky-50 p-2 shadow-sm">
+      <div className={`grid items-center gap-2 rounded bg-white px-2 shadow-sm ${items.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+        {items.map((item) => {
+          const scaledValue = item.value * displayedFactor.value
+          return (
+            <div className="text-center" key={item.key}>
+              <div className="text-[9px] font-black uppercase text-slate-500">{item.label}</div>
+              <div className="whitespace-nowrap text-[15px] font-black">
+                <span className="text-teal-700">{formatNumber(item.value)}</span>
+                <span className="mx-1 text-amber-700">{multiplySymbol} {displayedFactor.mathLabel}</span>
+                <span className="mr-1 text-slate-400">=</span>
+                <span className="text-sky-700">{animating ? '\u2026' : formatNumber(scaledValue)}</span>
+                <span className="ml-1 text-[9px] text-slate-500">units</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex items-center justify-center rounded bg-white px-3 text-center text-[11px] font-black leading-4 text-slate-700 shadow-sm">
+        {animating ? 'Watch every corresponding length change by the same factor.' : displayedFactor.observation}
+      </div>
+    </section>
   )
 }
 
 export default function ScaleDrawingsMaps() {
-  const [activeScaleId, setActiveScaleId] = useState(scaleOptions[0].id)
-  const [items, setItems] = useState([])
-  const [selectedId, setSelectedId] = useState(null)
-  const [feedback, setFeedback] = useState('Drag the school, park, and road onto the blueprint.')
-  const [ghost, setGhost] = useState(null)
-  const canvasRef = useRef(null)
-  const actionRef = useRef(null)
+  const [selectedObjectId, setSelectedObjectId] = useState(null)
+  const [pendingFactorId, setPendingFactorId] = useState(null)
+  const [resultFactorId, setResultFactorId] = useState(null)
+  const [animation, setAnimation] = useState(null)
+  const rootRef = useRef(null)
+  const originalCanvasRef = useRef(null)
+  const originalObjectRef = useRef(null)
+  const resultCanvasRef = useRef(null)
+  const animationTimerRef = useRef(null)
 
-  const activeScale = scaleOptions.find((scale) => scale.id === activeScaleId) ?? scaleOptions[0]
-  const selectedItem = items.find((item) => item.id === selectedId) ?? null
-  const completeRequiredIds = new Set(
-    items
-      .filter((item) => requiredObjectIds.includes(item.definitionId) && isObjectComplete(item, activeScale))
-      .map((item) => item.definitionId)
+  const definition = objectDefinitions.find((item) => item.id === selectedObjectId) ?? null
+  const pendingFactor = scaleFactors.find((factor) => factor.id === pendingFactorId) ?? null
+  const resultFactor = scaleFactors.find((factor) => factor.id === resultFactorId) ?? null
+  const animating = animation !== null
+
+  useEffect(
+    () => () => {
+      if (animationTimerRef.current) window.clearTimeout(animationTimerRef.current)
+    },
+    []
   )
-  const completeCount = completeRequiredIds.size
-  const missionComplete = completeCount === requiredObjectIds.length
 
-  const updateGhostFromPointer = (event, definition) => {
-    const size = definition.type === 'road' ? { width: 70, height: 20 } : { width: 62, height: 44 }
-    setGhost({
-      color: definition.color,
-      heightPx: size.height,
-      widthPx: size.width,
-      xPx: event.clientX,
-      yPx: event.clientY,
+  const chooseObject = (objectId) => {
+    if (animating) return
+    setSelectedObjectId(objectId)
+    setPendingFactorId(null)
+    setResultFactorId(null)
+  }
+
+  const completeScale = (factorId) => {
+    setResultFactorId(factorId)
+    setPendingFactorId(null)
+    setAnimation(null)
+    animationTimerRef.current = null
+  }
+
+  const animateScale = (factor) => {
+    if (!definition || animating) return
+
+    setPendingFactorId(factor.id)
+    setResultFactorId(null)
+
+    if (prefersReducedMotion()) {
+      completeScale(factor.id)
+      return
+    }
+
+    const root = rootRef.current
+    const source = originalObjectRef.current
+    const targetCanvas = resultCanvasRef.current
+    if (!root || !source || !targetCanvas) {
+      completeScale(factor.id)
+      return
+    }
+
+    const rootRect = root.getBoundingClientRect()
+    const sourceRect = source.getBoundingClientRect()
+    const targetRect = targetCanvas.getBoundingClientRect()
+    const targetGeometry = shapeGeometry(definition, scaledDimensions(definition, factor))
+    const targetSvgScaleX = targetRect.width / svgSize.width
+    const targetSvgScaleY = targetRect.height / svgSize.height
+    const targetObjectCenterInViewportX = targetRect.left + (targetGeometry.x + targetGeometry.widthPx / 2) * targetSvgScaleX
+    const targetObjectCenterInViewportY = targetRect.top + (targetGeometry.y + targetGeometry.heightPx / 2) * targetSvgScaleY
+    const scaleX = rootRect.width / root.offsetWidth
+    const scaleY = rootRect.height / root.offsetHeight
+    const sourceCenterX = (sourceRect.left + sourceRect.width / 2 - rootRect.left) / scaleX
+    const sourceCenterY = (sourceRect.top + sourceRect.height / 2 - rootRect.top) / scaleY
+    const targetCenterX = (targetObjectCenterInViewportX - rootRect.left) / scaleX
+    const targetCenterY = (targetObjectCenterInViewportY - rootRect.top) / scaleY
+
+    setAnimation({
+      centerX: root.offsetWidth / 2 - sourceCenterX,
+      centerY: (sourceCenterY + targetCenterY) / 2 - sourceCenterY,
+      definition,
+      factor: factor.value,
+      height: sourceRect.height / scaleY,
+      left: (sourceRect.left - rootRect.left) / scaleX,
+      targetX: targetCenterX - sourceCenterX,
+      targetY: targetCenterY - sourceCenterY,
+      top: (sourceRect.top - rootRect.top) / scaleY,
+      width: sourceRect.width / scaleX,
     })
+
+    animationTimerRef.current = window.setTimeout(() => completeScale(factor.id), animationDurationMs)
   }
 
-  const handlePalettePointerDown = (event, definitionId) => {
-    const definition = definitionById.get(definitionId)
-    event.currentTarget.setPointerCapture(event.pointerId)
-    actionRef.current = { mode: 'palette', definitionId, pointerId: event.pointerId }
-    updateGhostFromPointer(event, definition)
-    setFeedback(`Drag ${definition.label} onto the blueprint.`)
-  }
-
-  const handlePalettePointerMove = (event) => {
-    if (actionRef.current?.mode !== 'palette') return
-    const definition = definitionById.get(actionRef.current.definitionId)
-    updateGhostFromPointer(event, definition)
-  }
-
-  const handlePalettePointerUp = (event) => {
-    if (actionRef.current?.mode !== 'palette') return
-
-    const definition = definitionById.get(actionRef.current.definitionId)
-    const canvas = canvasRef.current
-    const rect = canvas?.getBoundingClientRect()
-    const droppedInside =
-      rect &&
-      event.clientX >= rect.left &&
-      event.clientX <= rect.right &&
-      event.clientY >= rect.top &&
-      event.clientY <= rect.bottom
-
-    if (droppedInside) {
-      const point = getPlanPoint(event, canvas)
-      const nextObject = createPlacedObject(definition, point, activeScale)
-      setItems((current) => [...current, nextObject])
-      setSelectedId(nextObject.id)
-      setFeedback(`${definition.label} added. Drag the resize handle until the real size matches the target.`)
-    } else {
-      setFeedback('Drop the object inside the blueprint town grid.')
-    }
-
-    setGhost(null)
-    actionRef.current = null
-  }
-
-  const handleMovePointerDown = (event, itemId) => {
-    if (event.target.closest('button')) return
-
-    const item = items.find((candidate) => candidate.id === itemId)
-    if (!item) return
-
-    event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
-    setSelectedId(itemId)
-    actionRef.current = {
-      itemId,
-      mode: 'move',
-      pointerId: event.pointerId,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      startX: item.xCm,
-      startY: item.yCm,
-    }
-  }
-
-  const handleResizePointerDown = (event, itemId) => {
-    const item = items.find((candidate) => candidate.id === itemId)
-    if (!item) return
-
-    event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
-    setSelectedId(itemId)
-    actionRef.current = {
-      itemId,
-      mode: 'resize',
-      pointerId: event.pointerId,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      startHeight: item.heightCm,
-      startWidth: item.widthCm,
-      startX: item.xCm,
-      startY: item.yCm,
-    }
-  }
-
-  const handleCanvasPointerMove = (event) => {
-    const action = actionRef.current
-    if (!action || action.mode === 'palette') return
-
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const rect = canvas.getBoundingClientRect()
-    const dxCm = ((event.clientX - action.startClientX) / rect.width) * plan.widthCm
-    const dyCm = ((event.clientY - action.startClientY) / rect.height) * plan.heightCm
-
-    setItems((current) =>
-      current.map((item) => {
-        if (item.id !== action.itemId) return item
-        const definition = getObjectDefinition(item)
-
-        if (action.mode === 'move') {
-          return clampObjectToPlan({
-            ...item,
-            xCm: action.startX + dxCm,
-            yCm: action.startY + dyCm,
-          })
-        }
-
-        let nextWidth = action.startWidth
-        let nextHeight = action.startHeight
-
-        if (definition.type === 'road') {
-          if (definition.orientation === 'vertical') {
-            nextHeight = clamp(action.startHeight + dyCm, 0.45, plan.heightCm - action.startY)
-          } else {
-            nextWidth = clamp(action.startWidth + dxCm, 0.7, plan.widthCm - action.startX)
-          }
-        } else {
-          const aspect = definition.targetRealWidthM / definition.targetRealHeightM
-          nextWidth = clamp(action.startWidth + dxCm, 0.7, plan.widthCm - action.startX)
-          nextHeight = nextWidth / aspect
-          if (action.startY + nextHeight > plan.heightCm) {
-            nextHeight = plan.heightCm - action.startY
-            nextWidth = nextHeight * aspect
-          }
-        }
-
-        return {
-          ...item,
-          heightCm: Math.max(0.35, nextHeight),
-          widthCm: Math.max(0.35, nextWidth),
-        }
-      })
-    )
-  }
-
-  const handleCanvasPointerUp = (event) => {
-    const action = actionRef.current
-    if (!action || action.mode === 'palette') return
-
-    if (action.pointerId === event.pointerId) {
-      actionRef.current = null
-    }
-
-    setItems((current) =>
-      current.map((item) => {
-        if (item.id !== action.itemId) return item
-        const definition = getObjectDefinition(item)
-        if (!isObjectComplete(item, activeScale)) return item
-
-        const target = targetDrawingSize(definition, activeScale)
-        setFeedback(`${definition.label} is proportional to the target size.`)
-
-        if (definition.type === 'road') {
-          return clampObjectToPlan({
-            ...item,
-            heightCm: definition.orientation === 'vertical' ? target.heightCm : item.heightCm,
-            widthCm: definition.orientation === 'vertical' ? item.widthCm : target.widthCm,
-          })
-        }
-
-        return clampObjectToPlan({
-          ...item,
-          heightCm: target.heightCm,
-          widthCm: target.widthCm,
-        })
-      })
-    )
-  }
-
-  const resetTown = () => {
-    setActiveScaleId(scaleOptions[0].id)
-    setItems([])
-    setSelectedId(null)
-    setGhost(null)
-    actionRef.current = null
-    setFeedback('Town cleared. Drag the school, park, and road onto the blueprint.')
-  }
-
-  const handleScaleChange = (scaleId) => {
-    setActiveScaleId(scaleId)
-    setFeedback('Scale changed. Drawing sizes stayed the same, but the real-world sizes recalculated.')
-  }
-
-  const handleRootPointerMove = (event) => {
-    if (actionRef.current?.mode === 'palette') {
-      handlePalettePointerMove(event)
-      return
-    }
-
-    handleCanvasPointerMove(event)
-  }
-
-  const handleRootPointerUp = (event) => {
-    if (actionRef.current?.mode === 'palette') {
-      handlePalettePointerUp(event)
-      return
-    }
-
-    handleCanvasPointerUp(event)
+  const reset = () => {
+    if (animationTimerRef.current) window.clearTimeout(animationTimerRef.current)
+    animationTimerRef.current = null
+    setSelectedObjectId(null)
+    setPendingFactorId(null)
+    setResultFactorId(null)
+    setAnimation(null)
   }
 
   return (
     <div
-      className="box-border flex h-[500px] flex-col overflow-hidden bg-slate-50 px-3 py-1.5 text-slate-800"
-      onPointerMove={handleRootPointerMove}
-      onPointerUp={handleRootPointerUp}
+      className="relative box-border flex h-[500px] flex-col overflow-hidden bg-slate-50 px-2 py-2 text-slate-800"
+      ref={rootRef}
     >
-      <div className="mb-1 flex shrink-0 items-start justify-between">
+      <header className="flex h-10 shrink-0 items-start justify-between">
         <div>
-          <h2 className="text-base font-black text-slate-950">Scale Drawings & Maps</h2>
-          <p className="text-[11px] font-semibold text-slate-500">
-            Become a city planner. Resize the miniature town so every object stays proportional.
-          </p>
+          <h2 className="text-lg font-black text-slate-950">Scale Drawings</h2>
+          <p className="text-[11px] font-semibold text-slate-500">Compare one original shape with its scaled copy.</p>
         </div>
         <button
-          className="h-9 rounded bg-slate-950 px-4 text-[12px] font-black text-white shadow-sm"
-          onClick={resetTown}
+          className="h-8 rounded bg-slate-950 px-4 text-[11px] font-black text-white shadow-sm disabled:opacity-40"
+          disabled={animating}
+          onClick={reset}
           type="button"
         >
           Reset
         </button>
+      </header>
+
+      <div className="grid h-[58px] shrink-0 grid-cols-[1fr_220px] gap-2">
+        <section className="rounded border border-slate-200 bg-white p-1.5 shadow-sm">
+          <div className="mb-1 text-[9px] font-black uppercase text-slate-500">Choose one object</div>
+          <div className="grid grid-cols-6 gap-1">
+            {objectDefinitions.map((item) => (
+              <PaletteButton
+                active={item.id === selectedObjectId}
+                definition={item}
+                disabled={animating}
+                key={item.id}
+                onClick={() => chooseObject(item.id)}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded border border-amber-200 bg-amber-50 p-1.5 shadow-sm">
+          <div className="mb-1 text-[9px] font-black uppercase text-amber-700">Choose scale factor</div>
+          <div className="grid grid-cols-3 gap-1">
+            {scaleFactors.map((factor) => (
+              <ScaleButton
+                active={factor.id === (pendingFactorId ?? resultFactorId)}
+                disabled={!definition || animating}
+                factor={factor}
+                key={factor.id}
+                onClick={() => animateScale(factor)}
+              />
+            ))}
+          </div>
+        </section>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[218px_1fr] gap-2 overflow-hidden">
-        <aside
-          className="min-h-0 space-y-1 overflow-hidden"
-        >
-          <MissionCard completeCount={completeCount} totalRequired={requiredObjectIds.length} />
-
-          <div className="rounded border border-slate-200 bg-white p-1.5 shadow-sm">
-            <div className="mb-1 text-[10px] font-black uppercase text-slate-500">Choose scale</div>
-            <div className="grid grid-cols-1 gap-1">
-              {scaleOptions.map((scale) => (
-                <ScaleButton
-                  active={scale.id === activeScaleId}
-                  key={scale.id}
-                  onClick={() => handleScaleChange(scale.id)}
-                  scale={scale}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded border border-slate-200 bg-white p-1.5 shadow-sm">
-            <div className="mb-1 text-[10px] font-black uppercase text-slate-500">Object palette</div>
-            <div className="grid grid-cols-2 gap-1">
-              {objectDefinitions.map((definition) => (
-                <PaletteItem
-                  definition={definition}
-                  key={definition.id}
-                  onPointerDown={handlePalettePointerDown}
-                />
-              ))}
-            </div>
-          </div>
-
-          <SelectedReadout item={selectedItem} scale={activeScale} />
-        </aside>
-
-        <main className="flex min-h-0 flex-col gap-2 overflow-hidden">
-          <BlueprintCanvas
-            canvasRef={canvasRef}
-            items={items}
-            onCanvasClick={() => setSelectedId(null)}
-            onMovePointerDown={handleMovePointerDown}
-            onResizePointerDown={handleResizePointerDown}
-            onSelect={setSelectedId}
-            scale={activeScale}
-            selectedId={selectedId}
-          />
-          <div className="rounded border border-sky-200 bg-sky-50 p-1.5 text-[11px] font-bold leading-3 text-sky-950 shadow-sm">
-            <span className="font-black uppercase text-sky-700">Planner note: </span>
-            {feedback}
-          </div>
-          <EquationStrip item={selectedItem} missionComplete={missionComplete} scale={activeScale} />
-        </main>
-      </div>
-
-      {ghost ? (
-        <div
-          className="pointer-events-none fixed z-50 rounded border-2 border-dashed bg-white/80 shadow-lg"
-          style={{
-            borderColor: ghost.color,
-            height: `${ghost.heightPx}px`,
-            left: `${ghost.xPx}px`,
-            top: `${ghost.yPx}px`,
-            transform: 'translate(-50%, -50%)',
-            width: `${ghost.widthPx}px`,
-          }}
+      <main className="my-1.5 grid min-h-0 flex-1 grid-cols-[1fr_28px_1fr] gap-1">
+        <ComparisonCanvas
+          canvasRef={originalCanvasRef}
+          definition={definition}
+          originalObjectRef={originalObjectRef}
+          result={false}
         />
-      ) : null}
+
+        <div className="flex flex-col items-center justify-center text-center">
+          <div className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-sm font-black ${
+            animating ? 'scale-compare-center-pulse border-amber-400 bg-amber-100 text-amber-800' : 'border-slate-200 bg-white text-slate-400'
+          }`}>
+            {pendingFactor?.label ?? resultFactor?.label ?? '\u2192'}
+          </div>
+          <div className="mt-1.5 text-[8px] font-black uppercase text-slate-400">Scale</div>
+        </div>
+
+        <ComparisonCanvas
+          canvasRef={resultCanvasRef}
+          definition={definition && resultFactor ? definition : null}
+          factor={resultFactor}
+          result
+        />
+      </main>
+
+      <EquationPanel
+        animating={animating}
+        definition={definition}
+        factor={pendingFactor}
+        resultFactor={resultFactor}
+      />
+
+      <TransferGhost animation={animation} />
     </div>
   )
 }

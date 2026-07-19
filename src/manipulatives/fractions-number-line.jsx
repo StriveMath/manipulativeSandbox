@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 const denominatorOptions = [2, 3, 4, 5, 6, 8, 10, 12]
 
@@ -133,7 +133,14 @@ function FractionText({ className = '', fraction }) {
   )
 }
 
-function FractionControl({ fraction, label, onChange, tone, maxNumerator }) {
+function FractionControl({
+  disabled = false,
+  fraction,
+  label,
+  onChange,
+  tone,
+  maxNumerator,
+}) {
   const updateNumerator = (numerator) => {
     onChange({
       ...fraction,
@@ -161,16 +168,21 @@ function FractionControl({ fraction, label, onChange, tone, maxNumerator }) {
         </div>
         <div className="grid grid-cols-2 gap-1">
           <button
+            aria-label={`Decrease ${label} numerator`}
             className="h-7 rounded border border-slate-300 bg-white text-sm font-black text-slate-700 disabled:opacity-35"
-            disabled={fraction.numerator <= 1}
+            disabled={disabled || fraction.numerator <= 1}
             onClick={() => updateNumerator(fraction.numerator - 1)}
             type="button"
           >
             -
           </button>
           <button
+            aria-label={`Increase ${label} numerator`}
             className="h-7 rounded border border-slate-300 bg-white text-sm font-black text-slate-700 disabled:opacity-35"
-            disabled={fraction.numerator >= (maxNumerator ?? fraction.denominator - 1)}
+            disabled={
+              disabled ||
+              fraction.numerator >= (maxNumerator ?? fraction.denominator - 1)
+            }
             onClick={() => updateNumerator(fraction.numerator + 1)}
             type="button"
           >
@@ -179,6 +191,7 @@ function FractionControl({ fraction, label, onChange, tone, maxNumerator }) {
           <select
             aria-label={`${label} denominator`}
             className="col-span-2 h-7 rounded border border-slate-300 bg-white px-1 text-[11px] font-bold text-slate-700"
+            disabled={disabled}
             onChange={(event) => updateDenominator(event.target.value)}
             value={fraction.denominator}
           >
@@ -214,17 +227,23 @@ function NumberLine({
   accentColor,
   animateBuild = false,
   benchmarkMarkers = [],
+  benchmarkTargets = [],
   buildKey,
+  comparisonEqual = false,
   denominator,
   disabled = false,
+  gap,
   jumps = [],
   marker,
+  markerRef,
+  onMarkerChange,
   onTickClick,
   showHalf = true,
   subtitle,
   title,
 }) {
   const [hoverTick, setHoverTick] = useState(null)
+  const markerDraggingRef = useRef(false)
   const left = 10
   const width = 564
   const viewBoxWidth = 584
@@ -252,6 +271,13 @@ function NumberLine({
   const hoverX = hoverTick == null ? 0 : xFor(hoverTick)
   const hoverBubbleWidth = Math.max(42, hoverLabel.length * 8 + 18)
   const hoverBubbleX = clamp(hoverX - hoverBubbleWidth / 2, 5, 584 - hoverBubbleWidth - 5)
+  const updateMarkerFromPointer = (clientX, svg) => {
+    if (!onMarkerChange || disabled) return
+
+    const bounds = svg.getBoundingClientRect()
+    const nextTick = clamp(tickFromClientX(clientX, bounds), 1, denominator - 1)
+    onMarkerChange(nextTick)
+  }
 
   return (
     <div className="relative h-[104px] rounded border border-slate-200 bg-white px-3 py-2 shadow-sm">
@@ -319,7 +345,7 @@ function NumberLine({
           const major = index === 0 || index === denominator
 
           return (
-            <g key={index}>
+            <g key={`${buildKey ?? 'static'}-${index}`}>
               <rect
                 fill="transparent"
                 height="58"
@@ -353,6 +379,34 @@ function NumberLine({
             </g>
           )
         })}
+        {gap ? (
+          <g className={gap.animate ? 'fraction-compare-gap' : ''}>
+            <line
+              x1={xFor(gap.from.units, gap.from.denominator)}
+              x2={xFor(gap.to.units, gap.to.denominator)}
+              y1={y}
+              y2={y}
+              stroke={gap.color ?? colors.guide.fill}
+              strokeLinecap="round"
+              strokeOpacity="0.34"
+              strokeWidth="13"
+            />
+            <text
+              fill={gap.color ?? '#b45309'}
+              fontSize="12"
+              fontWeight="900"
+              textAnchor="middle"
+              x={
+                (xFor(gap.from.units, gap.from.denominator) +
+                  xFor(gap.to.units, gap.to.denominator)) /
+                2
+              }
+              y={y + 29}
+            >
+              gap {gap.label}
+            </text>
+          </g>
+        ) : null}
         {!disabled && hoverTick != null ? (
           <g className="number-line-hover-preview" pointerEvents="none">
             <circle
@@ -415,7 +469,64 @@ function NumberLine({
           )
         })}
         {marker ? (
-          <g>
+          <g
+            aria-label={`${marker.label} marker at ${marker.units}/${marker.denominator}. Use Left and Right arrows to move it.`}
+            aria-valuemax={marker.denominator - 1}
+            aria-valuemin="1"
+            aria-valuenow={marker.units}
+            className={onMarkerChange ? 'number-line-draggable-marker' : ''}
+            onClick={(event) => onMarkerChange && event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (!onMarkerChange || disabled) return
+              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+
+              event.preventDefault()
+              onMarkerChange(
+                clamp(
+                  marker.units + (event.key === 'ArrowRight' ? 1 : -1),
+                  1,
+                  marker.denominator - 1
+                )
+              )
+            }}
+            onPointerCancel={(event) => {
+              markerDraggingRef.current = false
+              if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+                event.currentTarget.releasePointerCapture(event.pointerId)
+              }
+            }}
+            onPointerDown={(event) => {
+              if (!onMarkerChange || disabled) return
+              event.preventDefault()
+              event.stopPropagation()
+              markerDraggingRef.current = true
+              event.currentTarget.setPointerCapture?.(event.pointerId)
+              updateMarkerFromPointer(event.clientX, event.currentTarget.ownerSVGElement)
+            }}
+            onPointerMove={(event) => {
+              if (!markerDraggingRef.current) return
+              updateMarkerFromPointer(event.clientX, event.currentTarget.ownerSVGElement)
+            }}
+            onPointerUp={(event) => {
+              if (!markerDraggingRef.current) return
+              updateMarkerFromPointer(event.clientX, event.currentTarget.ownerSVGElement)
+              markerDraggingRef.current = false
+              if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+                event.currentTarget.releasePointerCapture(event.pointerId)
+              }
+            }}
+            role={onMarkerChange ? 'slider' : undefined}
+            style={{ touchAction: 'none' }}
+            tabIndex={onMarkerChange && !disabled ? 0 : undefined}
+          >
+            {onMarkerChange ? (
+              <circle
+                cx={xFor(marker.units, marker.denominator)}
+                cy={y - 34}
+                fill="transparent"
+                r="25"
+              />
+            ) : null}
             <line
               x1={xFor(marker.units, marker.denominator)}
               x2={xFor(marker.units, marker.denominator)}
@@ -434,6 +545,8 @@ function NumberLine({
               />
             ) : null}
             <circle
+              className={onMarkerChange ? 'number-line-marker-core' : undefined}
+              ref={markerRef}
               cx={xFor(marker.units, marker.denominator)}
               cy={y - 34}
               fill={marker.color}
@@ -452,6 +565,28 @@ function NumberLine({
             </text>
           </g>
         ) : null}
+        {comparisonEqual && benchmarkMarkers.length ? (
+          <circle
+            className="fraction-compare-equality-aura"
+            cx={xFor(benchmarkMarkers[0].units, benchmarkMarkers[0].denominator)}
+            cy={y - 34}
+            fill="none"
+            r="26"
+            stroke={colors.guide.fill}
+            strokeWidth="4"
+          />
+        ) : null}
+        {benchmarkTargets.map((target) => (
+          <circle
+            aria-hidden="true"
+            cx={xFor(target.units, target.denominator)}
+            cy={y - 34 + (target.yOffset ?? 0)}
+            fill="transparent"
+            key={target.key}
+            ref={target.targetRef}
+            r="13"
+          />
+        ))}
         {benchmarkMarkers.map((benchmarkMarker) => {
           const markerX = xFor(benchmarkMarker.units, benchmarkMarker.denominator)
           const markerY = y - 34 + (benchmarkMarker.yOffset ?? 0)
@@ -505,290 +640,350 @@ function NumberLine({
 function CompareMode() {
   const [first, setFirst] = useState({ numerator: 3, denominator: 4 })
   const [second, setSecond] = useState({ numerator: 2, denominator: 3 })
-  const [placed, setPlaced] = useState({ first: false, second: false })
-  const [stage, setStage] = useState('setup')
-  const [buildRun, setBuildRun] = useState(0)
-  const [feedback, setFeedback] = useState('Choose two fractions, then create their number lines.')
+  const [comparisonPhase, setComparisonPhase] = useState('idle')
+  const [transfer, setTransfer] = useState(null)
+  const rootRef = useRef(null)
+  const firstMarkerRef = useRef(null)
+  const secondMarkerRef = useRef(null)
+  const firstTargetRef = useRef(null)
+  const secondTargetRef = useRef(null)
+  const animationTimerRef = useRef(null)
 
-  const resetCompare = () => {
-    setStage('setup')
-    setPlaced({ first: false, second: false })
-    setFeedback('Choose two fractions, then create their number lines.')
-  }
+  const comparisonModel = useMemo(() => {
+    const difference =
+      first.numerator * second.denominator -
+      second.numerator * first.denominator
+    const comparison = difference === 0 ? '=' : difference > 0 ? '>' : '<'
+    const gap = simplify(
+      Math.abs(difference),
+      first.denominator * second.denominator
+    )
+    const firstIsLeft = valueOf(first) <= valueOf(second)
 
-  const comparison = useMemo(() => {
-    const diff = first.numerator * second.denominator - second.numerator * first.denominator
-
-    if (diff === 0) return '='
-    if (diff > 0) return '>'
-
-    return '<'
+    return {
+      comparison,
+      firstIsLeft,
+      gap,
+      gapText: formatFraction(gap),
+    }
   }, [first, second])
 
-  const showFirstLine = stage !== 'setup'
-  const showSecondLine = !['setup', 'building-a'].includes(stage)
-  const showBenchmark = ['comparing', 'result'].includes(stage)
-  const canPlace = ['placing', 'compare-ready'].includes(stage)
-  const resultShown = stage === 'result'
+  const clearComparison = () => {
+    if (animationTimerRef.current) {
+      window.clearTimeout(animationTimerRef.current)
+      animationTimerRef.current = null
+    }
+    setComparisonPhase('idle')
+    setTransfer(null)
+  }
 
-  useEffect(() => {
-    if (stage === 'building-a') {
-      const timer = window.setTimeout(() => {
-        setStage('building-b')
-        setFeedback('Fraction A line is ready. Now Fraction B is being created.')
-      }, 1350)
+  useEffect(
+    () => () => {
+      if (animationTimerRef.current) {
+        window.clearTimeout(animationTimerRef.current)
+      }
+    },
+    []
+  )
 
-      return () => window.clearTimeout(timer)
+  const updateFraction = (side, nextFraction) => {
+    clearComparison()
+    if (side === 'first') setFirst(properFraction(nextFraction))
+    else setSecond(properFraction(nextFraction))
+  }
+
+  const localCenter = (element) => {
+    const root = rootRef.current
+    if (!root || !element) return null
+
+    const rootBounds = root.getBoundingClientRect()
+    const bounds = element.getBoundingClientRect()
+    const scaleX = rootBounds.width / root.offsetWidth || 1
+    const scaleY = rootBounds.height / root.offsetHeight || 1
+
+    return {
+      x: (bounds.left + bounds.width / 2 - rootBounds.left) / scaleX,
+      y: (bounds.top + bounds.height / 2 - rootBounds.top) / scaleY,
+    }
+  }
+
+  const animateComparison = () => {
+    if (comparisonPhase === 'animating') return
+
+    const reducedMotion = window.matchMedia?.(
+      '(prefers-reduced-motion: reduce)'
+    ).matches
+    if (reducedMotion) {
+      setTransfer(null)
+      setComparisonPhase('revealed')
+      return
     }
 
-    if (stage === 'building-b') {
-      const timer = window.setTimeout(() => {
-        setStage('placing')
-        setFeedback('Click the correct tick on each fraction line.')
-      }, 1350)
+    const firstFrom = localCenter(firstMarkerRef.current)
+    const firstTo = localCenter(firstTargetRef.current)
+    const secondFrom = localCenter(secondMarkerRef.current)
+    const secondTo = localCenter(secondTargetRef.current)
 
-      return () => window.clearTimeout(timer)
+    if (!firstFrom || !firstTo || !secondFrom || !secondTo) {
+      setComparisonPhase('revealed')
+      return
     }
 
-    if (stage === 'comparing') {
-      const timer = window.setTimeout(() => {
-        setStage('result')
-        setFeedback(
-          comparison === '>'
-            ? 'Fraction A lands farther right, so it is greater.'
-            : comparison === '<'
-              ? 'Fraction A lands to the left, so it is less.'
-              : 'Both fractions land at the same point, so they are equal.'
-        )
-      }, 1900)
+    setComparisonPhase('animating')
+    setTransfer({
+      first: { from: firstFrom, to: firstTo },
+      id: performance.now(),
+      second: { from: secondFrom, to: secondTo },
+    })
+    animationTimerRef.current = window.setTimeout(() => {
+      setTransfer(null)
+      setComparisonPhase('revealed')
+      animationTimerRef.current = null
+    }, 1580)
+  }
 
-      return () => window.clearTimeout(timer)
-    }
-
-    return undefined
-  }, [comparison, stage])
-
-  const startLineBuild = () => {
-    setBuildRun((run) => run + 1)
-    setPlaced({ first: false, second: false })
-    setStage('building-a')
-    setFeedback('Fraction A line is being created.')
+  const reset = () => {
+    clearComparison()
+    setFirst({ numerator: 3, denominator: 4 })
+    setSecond({ numerator: 2, denominator: 3 })
   }
 
   const resultDescription =
-    comparison === '>'
-      ? 'farther right than'
-      : comparison === '<'
-        ? 'left of'
-        : 'at the same point as'
-  const guidanceTitle =
-    stage === 'setup'
-      ? 'Create the lines'
-      : stage === 'compare-ready'
-        ? 'Ready to compare'
-        : resultShown
-          ? 'Comparison'
-          : 'Next step'
-  const guidanceBody = resultShown ? (
-    <>
-      <FractionText className={colors.first.text} fraction={first} /> is{' '}
-      {resultDescription}{' '}
-      <FractionText className={colors.second.text} fraction={second} />.
-    </>
-  ) : (
-    feedback
-  )
+    comparisonModel.comparison === '='
+      ? 'The fractions occupy the same point, so the gap is 0.'
+      : comparisonModel.comparison === '>'
+        ? `${formatFraction(first)} is ${comparisonModel.gapText} farther right than ${formatFraction(second)}.`
+        : `${formatFraction(second)} is ${comparisonModel.gapText} farther right than ${formatFraction(first)}.`
+  const comparisonRevealed = comparisonPhase === 'revealed'
+  const controlsDisabled = comparisonPhase === 'animating'
+  const equalityOffset = comparisonModel.comparison === '=' ? 12 : 0
+  const sharedMarkers = comparisonRevealed
+    ? [
+        {
+          color: colors.first.fill,
+          denominator: first.denominator,
+          key: 'shared-a',
+          label: 'A',
+          units: first.numerator,
+          yOffset: -equalityOffset,
+        },
+        {
+          color: colors.second.fill,
+          denominator: second.denominator,
+          key: 'shared-b',
+          label: 'B',
+          units: second.numerator,
+          yOffset: equalityOffset,
+        },
+      ]
+    : []
+  const sharedTargets = [
+    {
+      denominator: first.denominator,
+      key: 'target-a',
+      targetRef: firstTargetRef,
+      units: first.numerator,
+      yOffset: -equalityOffset,
+    },
+    {
+      denominator: second.denominator,
+      key: 'target-b',
+      targetRef: secondTargetRef,
+      units: second.numerator,
+      yOffset: equalityOffset,
+    },
+  ]
+  const gap =
+    comparisonRevealed && comparisonModel.comparison !== '='
+      ? {
+          animate: true,
+          color: colors.guide.fill,
+          from: comparisonModel.firstIsLeft
+            ? { denominator: first.denominator, units: first.numerator }
+            : { denominator: second.denominator, units: second.numerator },
+          label: comparisonModel.gapText,
+          to: comparisonModel.firstIsLeft
+            ? { denominator: second.denominator, units: second.numerator }
+            : { denominator: first.denominator, units: first.numerator },
+        }
+      : null
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[230px_1fr] gap-3">
-      <aside className="space-y-2">
+    <div
+      className="relative grid h-full min-h-0 grid-cols-[220px_1fr] gap-3 overflow-hidden"
+      ref={rootRef}
+    >
+      <aside className="grid content-start gap-2">
         <FractionControl
+          disabled={controlsDisabled}
           fraction={first}
           label="Fraction A"
-          onChange={(next) => {
-            setFirst(properFraction(next))
-            resetCompare()
-          }}
+          onChange={(next) => updateFraction('first', next)}
           tone={colors.first}
         />
         <FractionControl
+          disabled={controlsDisabled}
           fraction={second}
           label="Fraction B"
-          onChange={(next) => {
-            setSecond(properFraction(next))
-            resetCompare()
-          }}
+          onChange={(next) => updateFraction('second', next)}
           tone={colors.second}
         />
         <div className="rounded border border-sky-200 bg-sky-50 p-3 shadow-sm">
           <div className="mb-1 text-[10px] font-black uppercase text-sky-700">
-            {guidanceTitle}
+            Explore positions
           </div>
-          <div className="text-[13px] font-black leading-5 text-slate-700">
-            {guidanceBody}
+          <div className="text-[12px] font-bold leading-5 text-slate-700">
+            Drag either marker left or right, or click a tick. Then bring both
+            markers onto one line.
           </div>
-          {stage === 'setup' ? (
-            <button
-              className="fraction-step-ready-aura mt-3 h-11 w-full rounded border border-sky-300 bg-sky-500 px-4 text-sm font-black text-white shadow-sm"
-              onClick={startLineBuild}
-              type="button"
-            >
-              Create lines
-            </button>
-          ) : null}
-          {stage === 'compare-ready' ? (
-            <button
-              className="fraction-step-ready-aura mt-3 h-11 w-full rounded border border-sky-300 bg-sky-500 px-4 text-sm font-black text-white shadow-sm"
-              onClick={() => {
-                setStage('comparing')
-                setFeedback('Watch each marker move to the benchmark line.')
-              }}
-              type="button"
-            >
-              Compare
-            </button>
-          ) : null}
+          <button
+            className="fraction-step-ready-aura mt-3 h-11 w-full rounded border border-sky-300 bg-sky-500 px-3 text-sm font-black text-white shadow-sm disabled:cursor-wait disabled:opacity-60"
+            disabled={controlsDisabled}
+            onClick={animateComparison}
+            type="button"
+          >
+            {comparisonPhase === 'animating'
+              ? 'Comparing...'
+              : comparisonRevealed
+                ? 'Animate again'
+                : 'Animate comparison'}
+          </button>
+          <button
+            className="mt-2 h-9 w-full rounded border border-slate-300 bg-white text-xs font-black text-slate-600 shadow-sm disabled:opacity-40"
+            disabled={controlsDisabled}
+            onClick={reset}
+            type="button"
+          >
+            Reset fractions
+          </button>
         </div>
       </aside>
 
-      <section className="flex min-h-0 flex-col gap-2">
-        <div className="grid min-h-0 flex-1 content-start gap-2">
-          {!showFirstLine ? (
-            <div className="min-h-[398px] rounded border border-dashed border-slate-300 bg-white shadow-sm">
-              <div className="grid h-full place-items-center text-sm font-black text-slate-300">
-                Number line workspace
-              </div>
-            </div>
-          ) : null}
-
-          {showFirstLine ? (
-            <NumberLine
-              animateBuild={stage === 'building-a'}
-              buildKey={`a-${buildRun}`}
-              denominator={first.denominator}
-              disabled={!canPlace || placed.first}
-              marker={
-                placed.first
-                  ? {
-                      units: first.numerator,
-                      denominator: first.denominator,
-                      color: colors.first.fill,
-                      label: 'A',
-                      glow: true,
-                    }
-                  : null
-              }
-              onTickClick={(tick) => {
-                if (tick === first.numerator) {
-                  setPlaced((current) => ({ ...current, first: true }))
-                  if (placed.second) {
-                    setStage('compare-ready')
-                    setFeedback('Both fractions are placed. Compare them on the benchmark line.')
-                    return
-                  }
-                  setFeedback('Fraction A is snapped to the correct tick.')
-                  return
-                }
-                setFeedback(
-                  `Not quite. Count ${first.numerator} parts out of ${first.denominator}.`
-                )
-              }}
-              accentColor={colors.first.fill}
-              showHalf={false}
-              subtitle={`${first.denominator} equal parts`}
-              title="Fraction A line"
-            />
-          ) : null}
-
-          {showSecondLine ? (
-            <NumberLine
-              animateBuild={stage === 'building-b'}
-              buildKey={`b-${buildRun}`}
-              denominator={second.denominator}
-              disabled={!canPlace || placed.second}
-              marker={
-                placed.second
-                  ? {
-                      units: second.numerator,
-                      denominator: second.denominator,
-                      color: colors.second.fill,
-                      label: 'B',
-                      glow: true,
-                    }
-                  : null
-              }
-              onTickClick={(tick) => {
-                if (tick === second.numerator) {
-                  setPlaced((current) => ({ ...current, second: true }))
-                  if (placed.first) {
-                    setStage('compare-ready')
-                    setFeedback('Both fractions are placed. Compare them on the benchmark line.')
-                    return
-                  }
-                  setFeedback('Fraction B is snapped to the correct tick.')
-                  return
-                }
-                setFeedback(
-                  `Not quite. Count ${second.numerator} parts out of ${second.denominator}.`
-                )
-              }}
-              accentColor={colors.second.fill}
-              showHalf={false}
-              subtitle={`${second.denominator} equal parts`}
-              title="Fraction B line"
-            />
-          ) : null}
-
-          {showBenchmark ? (
-            <NumberLine
-              benchmarkMarkers={[
-                {
-                  color: colors.first.fill,
-                  delay: '120ms',
-                  denominator: first.denominator,
-                  key: 'benchmark-a',
-                  label: 'A',
-                  transfer: true,
-                  units: first.numerator,
-                  yOffset: comparison === '=' ? -12 : 0,
-                },
-                {
-                  color: colors.second.fill,
-                  delay: '820ms',
-                  denominator: second.denominator,
-                  key: 'benchmark-b',
-                  label: 'B',
-                  transfer: true,
-                  units: second.numerator,
-                  yOffset: comparison === '=' ? 12 : 0,
-                },
-              ]}
-              denominator={2}
-              disabled
-              showHalf
-              subtitle="0, 1/2, and 1 help you compare"
-              title="Benchmark line"
-            />
-          ) : null}
-        </div>
-        {resultShown ? (
-          <div className="rounded border border-sky-200 bg-sky-50 px-4 py-2 text-center shadow-sm">
+      <section className="grid min-h-0 grid-rows-[104px_104px_104px_1fr] gap-2">
+        <NumberLine
+          accentColor={colors.first.fill}
+          animateBuild
+          buildKey={`a-${first.denominator}`}
+          denominator={first.denominator}
+          disabled={controlsDisabled}
+          marker={{
+            color: colors.first.fill,
+            denominator: first.denominator,
+            glow: true,
+            label: 'A',
+            units: first.numerator,
+          }}
+          markerRef={firstMarkerRef}
+          onMarkerChange={(numerator) =>
+            updateFraction('first', { ...first, numerator })
+          }
+          onTickClick={(tick) =>
+            updateFraction('first', {
+              ...first,
+              numerator: clamp(tick, 1, first.denominator - 1),
+            })
+          }
+          showHalf={false}
+          subtitle={`${first.denominator} equal parts`}
+          title="Fraction A line"
+        />
+        <NumberLine
+          accentColor={colors.second.fill}
+          animateBuild
+          buildKey={`b-${second.denominator}`}
+          denominator={second.denominator}
+          disabled={controlsDisabled}
+          marker={{
+            color: colors.second.fill,
+            denominator: second.denominator,
+            glow: true,
+            label: 'B',
+            units: second.numerator,
+          }}
+          markerRef={secondMarkerRef}
+          onMarkerChange={(numerator) =>
+            updateFraction('second', { ...second, numerator })
+          }
+          onTickClick={(tick) =>
+            updateFraction('second', {
+              ...second,
+              numerator: clamp(tick, 1, second.denominator - 1),
+            })
+          }
+          showHalf={false}
+          subtitle={`${second.denominator} equal parts`}
+          title="Fraction B line"
+        />
+        <NumberLine
+          benchmarkMarkers={sharedMarkers}
+          benchmarkTargets={sharedTargets}
+          comparisonEqual={
+            comparisonRevealed && comparisonModel.comparison === '='
+          }
+          denominator={2}
+          disabled
+          gap={gap}
+          showHalf
+          subtitle="0, 1/2, and 1 show the shared whole"
+          title="Shared comparison line"
+        />
+        <div className="min-h-0">
+          {comparisonRevealed ? (
+            <div className="fraction-compare-result-reveal grid h-full place-content-center rounded border border-sky-200 bg-sky-50 px-4 py-1 text-center shadow-sm">
             <div className="text-[10px] font-black uppercase tracking-wide text-sky-700">
               Compare positions
             </div>
-            <div className="text-3xl font-black">
+            <div className="text-2xl font-black">
               <FractionText className={colors.first.text} fraction={first} />
-              <span className="px-3 text-slate-500">{comparison}</span>
+              <span className="px-3 text-slate-500">
+                {comparisonModel.comparison}
+              </span>
               <FractionText className={colors.second.text} fraction={second} />
             </div>
-            <div className="mt-1 text-[13px] font-black text-sky-800">
-              <FractionText className={colors.first.text} fraction={first} /> is{' '}
-              {resultDescription}{' '}
-              <FractionText className={colors.second.text} fraction={second} />.
+            <div className="text-[12px] font-black text-sky-800">
+              {resultDescription}
             </div>
           </div>
-        ) : null}
+          ) : (
+            <div className="grid h-full place-content-center rounded border border-dashed border-slate-300 bg-white text-center text-[12px] font-black text-slate-400">
+              {comparisonPhase === 'animating'
+                ? 'Watch A and B move onto the shared line.'
+                : 'Move either marker, then animate the comparison.'}
+            </div>
+          )}
+        </div>
       </section>
+
+      {transfer ? (
+        <div className="pointer-events-none absolute inset-0 z-50" key={transfer.id}>
+          {[
+            { color: colors.first.fill, delay: '0ms', label: 'A', trip: transfer.first },
+            {
+              color: colors.second.fill,
+              delay: '720ms',
+              label: 'B',
+              trip: transfer.second,
+            },
+          ].map((flight) => (
+            <div
+              className="fraction-compare-marker-flight absolute grid h-7 w-7 place-items-center rounded-full border-2 border-white text-[11px] font-black text-white shadow-lg"
+              key={flight.label}
+              style={{
+                '--compare-delay': flight.delay,
+                '--compare-from-x': `${flight.trip.from.x}px`,
+                '--compare-from-y': `${flight.trip.from.y}px`,
+                '--compare-mid-x': `${(flight.trip.from.x + flight.trip.to.x) / 2}px`,
+                '--compare-mid-y': `${Math.min(flight.trip.from.y, flight.trip.to.y) - 24}px`,
+                '--compare-to-x': `${flight.trip.to.x}px`,
+                '--compare-to-y': `${flight.trip.to.y}px`,
+                backgroundColor: flight.color,
+              }}
+            >
+              {flight.label}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -1185,9 +1380,9 @@ export default function FractionsNumberLine() {
     <div className="box-border flex h-full w-full flex-col overflow-hidden bg-slate-50 px-3 py-2 text-slate-900">
       <header className="mb-2">
         <div>
-          <h2 className="text-xl font-black">Fractions on a Number Line</h2>
+          <h2 className="text-xl font-black">Compare Fractions on a Number Line</h2>
           <p className="text-[12px] font-semibold text-slate-500">
-            Place fractions, compare positions, and order values.
+            Move fractions, bring them onto one line, and measure the gap.
           </p>
         </div>
       </header>

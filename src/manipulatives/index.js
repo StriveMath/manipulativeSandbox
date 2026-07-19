@@ -1,5 +1,6 @@
 import AreaModelMultiplication from './area-model-multiplication.jsx'
 import AddingSubtractingFractions from './adding-subtracting-fractions.jsx'
+import AddingSubtractingIntegers from './adding-subtracting-integers.jsx'
 import DecimalHundredthsGrid from './decimal-hundredths-grid.jsx'
 import DecimalNumberLine from './decimal-number-line.jsx'
 import DecimalPlaceValueDisks from './decimal-place-value-disks.jsx'
@@ -43,6 +44,11 @@ export const manipulatives = [
     component: AddingSubtractingFractions,
   },
   {
+    id: 'adding-subtracting-integers',
+    name: 'Adding & Subtracting Integers',
+    component: AddingSubtractingIntegers,
+  },
+  {
     id: 'fractions-number-line',
     name: 'Compare Fractions on a Number Line',
     component: FractionsNumberLine,
@@ -54,7 +60,7 @@ export const manipulatives = [
   },
   {
     id: 'scale-drawings-maps',
-    name: 'Scale Drawings & Maps',
+    name: 'Scale Drawings',
     component: ScaleDrawingsMaps,
   },
   {
