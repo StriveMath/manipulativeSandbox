@@ -3,6 +3,7 @@ import { cream, ink, muted, border, purple as chipPurple, green as trueGreen } f
 import { useCanvasBox } from './shared/useCanvasBox'
 import { skipMotion } from './shared/motion'
 import GhostButton from './shared/GhostButton'
+import ToggleChip from './shared/ToggleChip'
 
 const axisColor = ink
 
@@ -373,10 +374,8 @@ export default function ProbabilityScale() {
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <button type="button" onClick={() => setShowAnswers((s) => !s)} className="rounded-full px-5 py-2 text-sm font-black text-white" style={{ background: showAnswers ? muted : trueGreen }}>
-          {showAnswers ? 'Hide answers' : 'Show answers'}
-        </button>
-        <button type="button" onClick={() => setEditing((e) => !e)} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: editing ? chipPurple : muted }}>
+        <ToggleChip label="Show answers" color={trueGreen} on={showAnswers} onClick={() => setShowAnswers((s) => !s)} />
+        <button type="button" onClick={() => setEditing((e) => !e)} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: editing ? chipPurple : border, color: editing ? chipPurple : muted }}>
           {editing ? 'Done editing' : 'Edit events'}
         </button>
         <GhostButton onClick={() => { setPlaced({}); setShowAnswers(false) }} ariaLabel="Reset the probability scale">

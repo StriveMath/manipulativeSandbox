@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cream, ink, muted, border, blue as friendBlue, green as quotientGreen, orange as remOrange } from './shared/palette'
 import { useCanvasBox } from './shared/useCanvasBox'
 import GhostButton from './shared/GhostButton'
+import ToggleChip from './shared/ToggleChip'
 import Stepper from './shared/Stepper'
 
 const crust = '#E0A458'
@@ -365,9 +366,7 @@ export default function PizzaRemainder() {
           )}
         </p>
         {status.solved && (
-          <button type="button" onClick={() => setHideAnswer((h) => !h)} className="rounded-full border px-3 py-1 text-xs font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
-            {hideAnswer ? 'Show answer' : 'Hide answer'}
-          </button>
+          <ToggleChip label="Show answer" color={quotientGreen} on={!hideAnswer} onClick={() => setHideAnswer((h) => !h)} compact />
         )}
       </div>
 

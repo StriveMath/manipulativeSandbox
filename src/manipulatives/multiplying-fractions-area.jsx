@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cream, ink, muted, border, blue, amber as orange, green } from './shared/palette'
 import { useCanvasBox } from './shared/useCanvasBox'
+import ToggleChip from './shared/ToggleChip'
 
 const MIN_DEN = 2
 const MAX_DEN = 8
@@ -188,14 +189,7 @@ export default function MultiplyingFractionsArea() {
             </div>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => setHideAnswer((h) => !h)}
-          className="rounded-full border px-3 py-1 text-xs font-bold"
-          style={{ borderColor: '#E0DDD6', color: muted }}
-        >
-          {hideAnswer ? 'Show answer' : 'Hide answer'}
-        </button>
+        <ToggleChip label="Show product" color={green} on={!hideAnswer} onClick={() => setHideAnswer((h) => !h)} compact />
       </div>
 
       {/* Square + legend */}

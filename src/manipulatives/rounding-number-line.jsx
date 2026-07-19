@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cream, ink, muted, border, purple as numberPurple, green as roundGreen } from './shared/palette'
 import { useCanvasBox } from './shared/useCanvasBox'
 import { skipMotion } from './shared/motion'
-import GhostButton from './shared/GhostButton'
+import ToggleChip from './shared/ToggleChip'
 
 const midGray = '#9AA0AA'
 const axisColor = ink
@@ -349,9 +349,7 @@ export default function RoundingNumberLine() {
             <button type="button" onClick={() => stepNumber(1)} className="h-10 text-2xl font-black" style={{ color: roundGreen }} aria-label="Increase number">+</button>
           </div>
         </div>
-        <GhostButton onClick={() => setHideAnswer((h) => !h)}>
-          {hideAnswer ? 'Show answer' : 'Hide answer'}
-        </GhostButton>
+        <ToggleChip label="Show rounded" color={roundGreen} on={!hideAnswer} onClick={() => setHideAnswer((h) => !h)} />
       </div>
     </div>
   )

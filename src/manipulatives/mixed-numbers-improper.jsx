@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cream, ink, muted, border, green as wholeGreen, orange as fracOrange, purple as improperPurple } from './shared/palette'
 import { useCanvasBox } from './shared/useCanvasBox'
-import GhostButton from './shared/GhostButton'
+import ToggleChip from './shared/ToggleChip'
 import Stepper from './shared/Stepper'
 
 const MIN_DEN = 2
@@ -199,9 +199,7 @@ export default function MixedNumbersImproper() {
           decLabel="Fewer Denominator"
           incLabel="More Denominator"
         />
-        <GhostButton onClick={() => setHideMixed((h) => !h)}>
-          {hideMixed ? 'Show mixed number' : 'Hide mixed number'}
-        </GhostButton>
+        <ToggleChip label="Show mixed number" color={wholeGreen} on={!hideMixed} onClick={() => setHideMixed((h) => !h)} />
       </div>
     </div>
   )
