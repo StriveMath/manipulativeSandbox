@@ -3,7 +3,7 @@ import ManipulativeCanvas from './ManipulativeCanvas.jsx'
 import { manipulatives } from './manipulatives/index.js'
 
 export default function App() {
-  const [activeId, setActiveId] = useState(manipulatives[0].id)
+  const [activeId, setActiveId] = useState('percent-park-designer')
   const active = manipulatives.find((m) => m.id === activeId) ?? manipulatives[0]
   const ActiveComponent = active.component
 

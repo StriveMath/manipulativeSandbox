@@ -1,6 +1,7 @@
 import AngleRelationships from './angle-relationships.jsx'
 import AddingUnlikeFractions from './adding-unlike-fractions.jsx'
 import BoxPlotBuilder from './box-plot-builder.jsx'
+import ComparingTwoPopulations from './comparing-two-populations.jsx'
 import CoordinateConnectDots from './coordinate-connect-dots.jsx'
 import CoordinateTreasureMap from './coordinate-treasure-map.jsx'
 import DistributiveAreaModel from './distributive-area-model.jsx'
@@ -11,7 +12,9 @@ import FactorRainbow from './factor-rainbow.jsx'
 import FactorTree from './factor-tree.jsx'
 import FractionsNumberLine from './fractions-number-line.jsx'
 import FunctionMachineDetective from './function-machine-detective.jsx'
+import HcfBuilder from './hcf-builder.jsx'
 import IntegerMultiplyDivide from './integer-multiply-divide.jsx'
+import LcmCirclingPairs from './lcm-circling-pairs.jsx'
 import LinearEquationGrapher from './linear-equation-grapher.jsx'
 import MeanBalancePoint from './mean-balance-point.jsx'
 import NetsSurfaceArea from './nets-surface-area.jsx'
@@ -27,10 +30,29 @@ import SubstitutionMachine from './substitution-machine.jsx'
 import SystemsOfEquations from './systems-of-equations.jsx'
 import TwoWayTables from './two-way-tables.jsx'
 import TwoFactorTrees from './two-factor-trees.jsx'
+import TwoStepEquationSolver from './two-step-equation-solver.jsx'
 import UnitRateExplorer from './unit-rate-better-buy.jsx'
 import VolumePrisms from './volume-prisms.jsx'
+import LinearVsNonlinear from './linear-vs-nonlinear.jsx'
+import RateOfChangeExplorer from './rate-of-change-explorer.jsx'
+import PercentParkDesigner from './percent-park-designer.jsx'
 
 export const manipulatives = [
+  {
+    id: 'percent-park-designer',
+    name: 'Percent Park Designer',
+    component: PercentParkDesigner,
+  },
+  {
+    id: 'rate-of-change-explorer',
+    name: 'Rate of Change Explorer',
+    component: RateOfChangeExplorer,
+  },
+  {
+    id: 'linear-vs-nonlinear',
+    name: 'Linear vs Non-Linear',
+    component: LinearVsNonlinear,
+  },
   {
     id: 'adding-unlike-fractions',
     name: 'Adding Unlike Fractions',
@@ -45,6 +67,11 @@ export const manipulatives = [
     id: 'box-plot-builder',
     name: 'Box Plot Builder',
     component: BoxPlotBuilder,
+  },
+  {
+    id: 'comparing-two-populations',
+    name: 'Comparing Two Populations',
+    component: ComparingTwoPopulations,
   },
   {
     id: 'coordinate-connect-dots',
@@ -92,9 +119,19 @@ export const manipulatives = [
     component: FunctionMachineDetective,
   },
   {
+    id: 'hcf-builder',
+    name: 'HCF / GCF Builder',
+    component: HcfBuilder,
+  },
+  {
     id: 'integer-multiply-divide',
     name: 'Integer Multiply/Divide',
     component: IntegerMultiplyDivide,
+  },
+  {
+    id: 'lcm-circling-pairs',
+    name: 'LCM Builder',
+    component: LcmCirclingPairs,
   },
   {
     id: 'linear-equation-grapher',
@@ -155,6 +192,11 @@ export const manipulatives = [
     id: 'two-way-tables',
     name: 'Two-Way Tables',
     component: TwoWayTables,
+  },
+  {
+    id: 'two-step-equation-solver',
+    name: 'Two-Step Equation Solver',
+    component: TwoStepEquationSolver,
   },
   {
     id: 'slope-explorer',

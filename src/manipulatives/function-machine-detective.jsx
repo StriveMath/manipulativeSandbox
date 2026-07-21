@@ -33,7 +33,8 @@ const rulePool = [
 ]
 
 function applyRule(rule, input) {
-  return rule.op === 'multiply' ? input * rule.value : input + rule.value
+  const amount = Number(rule.value)
+  return rule.op === 'multiply' ? input * amount : input + amount
 }
 
 function ruleText(rule) {
@@ -55,6 +56,19 @@ function easeInOut(t) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
+}
+
+function guessLimits(op) {
+  return op === 'multiply' ? { min: 2, max: 5 } : { min: 1, max: 12 }
+}
+
+function normalizeGuess(guess) {
+  const { min, max } = guessLimits(guess.op)
+  const next = Number(guess.value)
+  return {
+    ...guess,
+    value: String(clamp(Number.isFinite(next) ? Math.round(next) : min, min, max)),
+  }
 }
 
 function MachineScene({ anim, rule, cracked }) {
@@ -173,8 +187,7 @@ export default function FunctionMachineDetective() {
   const distinctInputs = rows.length
   const canRun = !anim.active && input !== ''
   const quickValues = [1, 2, 3, 5, 10]
-  const guessMin = guess.op === 'multiply' ? 2 : 1
-  const guessMax = guess.op === 'multiply' ? 5 : 12
+  const { min: guessMin, max: guessMax } = guessLimits(guess.op)
 
   const stopAnimation = useCallback(() => {
     if (frameRef.current) cancelAnimationFrame(frameRef.current)
@@ -226,23 +239,26 @@ export default function FunctionMachineDetective() {
   }, [anim.active, input, logRow, rows.length, rule, stopAnimation])
 
   const setGuessOperation = (op) => {
+    const { min, max } = guessLimits(op)
     setGuess((current) => ({
       op,
-      value: op === 'multiply' ? clamp(current.value, 2, 5) : clamp(current.value, 1, 12),
+      value: String(clamp(Number.isFinite(Number(current.value)) ? Math.round(Number(current.value)) : min, min, max)),
     }))
   }
 
   const testGuess = () => {
+    const checkedGuess = normalizeGuess(guess)
+    setGuess(checkedGuess)
     if (rows.length === 0) {
       setMessage({ kind: 'amber', text: 'Feed the machine first so your rule has clues to match.' })
       return
     }
-    const broken = rows.find((row) => applyRule(guess, row.input) !== row.output)
+    const broken = rows.find((row) => applyRule(checkedGuess, row.input) !== row.output)
     if (broken) {
       setCracked(false)
       setMessage({
         kind: 'wrong',
-        text: `Your rule turns ${broken.input} into ${applyRule(guess, broken.input)}, but the machine made ${broken.output}.`,
+        text: `Your rule turns ${broken.input} into ${applyRule(checkedGuess, broken.input)}, but the machine made ${broken.output}.`,
       })
       return
     }
@@ -364,11 +380,9 @@ export default function FunctionMachineDetective() {
                   max={guessMax}
                   value={guess.value}
                   onChange={(event) => {
-                    const next = Number(event.target.value)
-                    if (Number.isFinite(next)) {
-                      setGuess((current) => ({ ...current, value: clamp(Math.round(next), guessMin, guessMax) }))
-                    }
+                    setGuess((current) => ({ ...current, value: event.target.value }))
                   }}
+                  onBlur={() => setGuess((current) => normalizeGuess(current))}
                   className="h-10 w-20 rounded-xl border bg-white px-2 text-center font-mono text-xl font-black outline-none"
                   style={{ borderColor: colors.rule, color: colors.rule }}
                   aria-label="Guess number"
