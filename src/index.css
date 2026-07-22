@@ -2855,6 +2855,485 @@ input[type="number"] {
   opacity: 0.58;
 }
 
+@keyframes number-microscope-digit-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.72);
+  }
+  72% {
+    opacity: 1;
+    transform: translateY(3px) scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes number-microscope-repeat-loop {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(196 181 253 / 0.08);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgb(196 181 253 / 0.2);
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes number-microscope-zero-settle {
+  0% {
+    color: rgb(110 231 183 / 0);
+    transform: scale(0.6);
+  }
+  100% {
+    color: rgb(167 243 208);
+    transform: scale(1);
+  }
+}
+
+@keyframes number-microscope-ellipsis {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(4px);
+  }
+}
+
+@keyframes number-microscope-ready {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(14 165 233 / 0.16);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(14 165 233 / 0.12);
+  }
+}
+
+@keyframes number-microscope-bound-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(245 158 11 / 0.18);
+    transform: scaleY(1);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(245 158 11 / 0.12);
+    transform: scaleY(1.1);
+  }
+}
+
+@keyframes number-microscope-line-zoom {
+  0% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  45% {
+    opacity: 0.38;
+    transform: scaleX(0.34);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes number-microscope-marker-land {
+  0% {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.62);
+  }
+  72% {
+    opacity: 1;
+    transform: translateY(3px) scale(1.14);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes number-microscope-evidence-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.number-microscope-digit {
+  animation: number-microscope-digit-enter 440ms cubic-bezier(0.2, 0.85, 0.2, 1.1) both;
+  animation-delay: var(--number-digit-delay);
+}
+
+.number-microscope-repeat {
+  animation:
+    number-microscope-digit-enter 440ms cubic-bezier(0.2, 0.85, 0.2, 1.1) both,
+    number-microscope-repeat-loop 1100ms ease-in-out infinite;
+  animation-delay: var(--number-digit-delay), calc(var(--number-digit-delay) + 520ms);
+}
+
+.number-microscope-zero {
+  animation:
+    number-microscope-digit-enter 440ms cubic-bezier(0.2, 0.85, 0.2, 1.1) both,
+    number-microscope-zero-settle 420ms ease-out both;
+  animation-delay: var(--number-digit-delay), calc(var(--number-digit-delay) + 250ms);
+}
+
+.number-microscope-ellipsis {
+  animation: number-microscope-ellipsis 950ms ease-in-out infinite;
+}
+
+.number-microscope-ready {
+  animation: number-microscope-ready 1200ms ease-in-out infinite;
+}
+
+.number-microscope-bound-selected {
+  animation: number-microscope-bound-pulse 950ms ease-in-out infinite;
+  transform-origin: center;
+}
+
+.number-microscope-line-zoom {
+  animation: number-microscope-line-zoom 620ms ease-in-out both;
+  transform-origin: center;
+}
+
+.number-microscope-exact-marker,
+.number-microscope-final-marker {
+  animation: number-microscope-marker-land 520ms cubic-bezier(0.2, 0.85, 0.2, 1.15) both;
+}
+
+.number-microscope-evidence {
+  animation: number-microscope-evidence-reveal 420ms ease-out both;
+}
+
+@keyframes compound-grid-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes compound-vertex-pop {
+  0% { opacity: 0; transform: scale(0.25); }
+  70% { transform: scale(1.25); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes compound-cut-draw {
+  from { stroke-dashoffset: 600; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes compound-cut-invalid {
+  0%, 100% { opacity: 0; transform: translateX(0); }
+  20%, 60% { opacity: 1; transform: translateX(-4px); }
+  40%, 80% { opacity: 1; transform: translateX(4px); }
+}
+
+@keyframes compound-piece-separate {
+  0% { filter: brightness(1); transform: translate(0, 0); }
+  42% { filter: brightness(1.08); transform: translate(var(--compound-move-x), var(--compound-move-y)); }
+  72% { transform: translate(var(--compound-return-x), var(--compound-return-y)); }
+  100% { filter: brightness(1); transform: translate(0, 0); }
+}
+
+@keyframes compound-formula-enter {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes compound-total-reveal {
+  0% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0); transform: scale(0.985); }
+  60% { box-shadow: 0 0 0 5px rgba(14, 165, 233, 0.18); transform: scale(1.006); }
+  100% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0); transform: scale(1); }
+}
+
+@keyframes compound-ready-button {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.12); }
+  50% { box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.23); }
+}
+
+@keyframes compound-boundary-selected {
+  0%, 100% { opacity: 0.86; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.5); }
+}
+
+.compound-grid-reveal {
+  animation: compound-grid-reveal 360ms ease-out both;
+  animation-delay: var(--compound-delay);
+}
+
+.compound-builder-line {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.compound-vertex-pop {
+  animation: compound-vertex-pop 320ms cubic-bezier(0.2, 0.85, 0.2, 1.15) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.compound-cut-draw {
+  animation: compound-cut-draw 560ms ease-out both;
+  stroke-dasharray: 600;
+}
+
+.compound-cut-invalid {
+  animation: compound-cut-invalid 460ms ease-in-out both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.compound-piece-separate {
+  animation: compound-piece-separate 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.compound-formula-enter {
+  animation: compound-formula-enter 340ms ease-out both;
+  animation-delay: var(--compound-delay);
+}
+
+.compound-total-reveal {
+  animation: compound-total-reveal 620ms ease-out both;
+}
+
+.compound-ready-button {
+  animation: compound-ready-button 1150ms ease-in-out infinite;
+}
+
+.compound-boundary-selected {
+  animation: compound-boundary-selected 900ms ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.compound-boundary-point {
+  transition: r 160ms ease, fill 160ms ease, stroke 160ms ease;
+}
+
+.compound-dimension-label {
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.96);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+@keyframes circle-radius-handle {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(16, 185, 129, 0)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.75)); transform: scale(1.12); }
+}
+
+@keyframes circle-circumference-trace {
+  0% { stroke-dashoffset: 1; filter: drop-shadow(0 0 0 rgba(124, 58, 237, 0)); }
+  65% { stroke-dashoffset: 0; filter: drop-shadow(0 0 7px rgba(124, 58, 237, 0.75)); }
+  100% { stroke-dashoffset: 0; filter: drop-shadow(0 0 2px rgba(124, 58, 237, 0.35)); }
+}
+
+@keyframes circle-transfer-disc {
+  0% { opacity: 0; transform: scale(0.94); }
+  28% { opacity: 0.76; transform: scale(1.1); }
+  58% { opacity: 0.28; transform: scale(1.16); }
+  100% { opacity: 0; transform: scale(0.88); }
+}
+
+@keyframes circle-circumference-segment-flight {
+  0%, 18% {
+    opacity: 1;
+    transform: translate(var(--circle-source-x), var(--circle-source-y)) rotate(var(--circle-source-angle)) scaleX(var(--circle-source-length));
+  }
+  27% {
+    opacity: 1;
+    filter: drop-shadow(0 0 5px rgba(124, 58, 237, 0.65));
+    transform: translate(var(--circle-source-x), var(--circle-source-y)) rotate(var(--circle-source-angle)) scaleX(var(--circle-source-length)) scaleY(1.35);
+  }
+  57%, 70% {
+    opacity: 1;
+    filter: drop-shadow(0 0 3px rgba(124, 58, 237, 0.45));
+    transform: translate(var(--circle-temporary-x), var(--circle-temporary-y)) rotate(0) scaleX(var(--circle-temporary-length));
+  }
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 2px rgba(124, 58, 237, 0.35));
+    transform: translate(var(--circle-target-x), var(--circle-target-y)) rotate(0) scaleX(var(--circle-target-length));
+  }
+}
+
+@keyframes circle-circumference-land {
+  0% { opacity: 0; transform: translateY(-8px) scaleX(0.96); }
+  70% { opacity: 1; transform: translateY(2px) scaleX(1.01); }
+  100% { opacity: 1; transform: translateY(0) scaleX(1); }
+}
+
+@keyframes circle-diameter-strip {
+  0% { opacity: 0; transform: translateY(-28px) scale(0.9); }
+  72% { opacity: 1; transform: translateY(4px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes circle-source-sector {
+  0% { opacity: 0.35; transform: scale(0.92); }
+  65% { opacity: 1; transform: scale(1.035); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes circle-area-source-lift {
+  0%, 100% { opacity: 0.2; transform: scale(0.98); }
+  50% { opacity: 0.75; transform: scale(1.035); }
+}
+
+@keyframes circle-area-sector-flight {
+  0% {
+    fill: var(--circle-source-fill);
+    filter: drop-shadow(0 2px 2px rgba(14, 165, 233, 0.16));
+    opacity: 0.96;
+    transform: translate(var(--circle-source-x), var(--circle-source-y)) rotate(var(--circle-source-rotation)) scale(var(--circle-source-scale));
+  }
+  18% {
+    fill: var(--circle-source-fill);
+    filter: drop-shadow(0 7px 5px rgba(14, 165, 233, 0.32));
+    opacity: 1;
+    transform: translate(var(--circle-lift-x), var(--circle-lift-y)) rotate(var(--circle-source-rotation)) scale(var(--circle-lift-scale));
+  }
+  58% {
+    fill: var(--circle-target-fill);
+    filter: drop-shadow(0 9px 7px rgba(37, 99, 235, 0.3));
+    opacity: 1;
+    transform: translate(var(--circle-middle-x), var(--circle-middle-y)) rotate(var(--circle-target-rotation)) scale(var(--circle-middle-scale));
+  }
+  88% {
+    fill: var(--circle-target-fill);
+    filter: drop-shadow(0 5px 4px rgba(37, 99, 235, 0.25));
+    opacity: 1;
+    transform: translate(var(--circle-target-x), var(--circle-target-y)) rotate(var(--circle-target-rotation)) scale(var(--circle-target-scale-small));
+  }
+  95% {
+    fill: var(--circle-target-fill);
+    filter: drop-shadow(0 2px 2px rgba(37, 99, 235, 0.2));
+    opacity: 1;
+    transform: translate(var(--circle-target-x), var(--circle-target-y)) rotate(var(--circle-target-rotation)) scale(var(--circle-target-scale-large));
+  }
+  100% {
+    fill: var(--circle-target-fill);
+    filter: none;
+    opacity: 1;
+    transform: translate(var(--circle-target-x), var(--circle-target-y)) rotate(var(--circle-target-rotation)) scale(var(--circle-target-scale));
+  }
+}
+
+@keyframes circle-area-arranged-settle {
+  0% { filter: drop-shadow(0 4px 4px rgba(37, 99, 235, 0.24)); opacity: 0; }
+  100% { filter: none; opacity: 1; }
+}
+
+@keyframes circle-area-calculation-step {
+  0% { opacity: 0; transform: translateY(8px) scale(0.96); }
+  70% { opacity: 1; transform: translateY(-1px) scale(1.015); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes circle-area-complete-glow {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(14, 165, 233, 0)); }
+  50% { filter: drop-shadow(0 0 7px rgba(14, 165, 233, 0.62)); }
+}
+
+@keyframes circle-transform-reveal {
+  0% { opacity: 0; transform: translateY(10px) scale(0.96); }
+  70% { opacity: 1; transform: translateY(-2px) scale(1.015); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.circle-radius-handle {
+  animation: circle-radius-handle 1350ms ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.circle-circumference-trace {
+  animation: circle-circumference-trace 1100ms ease-out both;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.circle-transfer-disc {
+  animation: circle-transfer-disc 1050ms ease-out both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.circle-circumference-segment-flight {
+  animation: circle-circumference-segment-flight 1700ms cubic-bezier(0.22, 0.8, 0.2, 1) var(--circle-delay) both;
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.circle-circumference-land {
+  animation: circle-circumference-land 440ms ease-out both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.circle-diameter-strip {
+  animation: circle-diameter-strip 520ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--circle-delay) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.circle-source-sector {
+  animation: circle-source-sector 420ms ease-out var(--circle-delay) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.circle-area-source-lift {
+  animation: circle-area-source-lift 780ms ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.circle-area-sector-flight {
+  animation: circle-area-sector-flight 1850ms cubic-bezier(0.2, 0.76, 0.18, 1) var(--circle-delay) both;
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.circle-area-arranged-settle {
+  animation: circle-area-arranged-settle 320ms ease-out both;
+}
+
+.circle-area-calculation-step {
+  animation: circle-area-calculation-step 430ms ease-out var(--circle-delay, 0ms) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.circle-area-complete-glow {
+  animation: circle-area-complete-glow 760ms ease-out both;
+}
+
+.circle-transform-result,
+.circle-area-dimensions,
+.circle-formula-reveal {
+  animation: circle-transform-reveal 520ms ease-out both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.circle-measure-label {
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.96);
+  stroke-linejoin: round;
+  stroke-width: 4px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fraction-segment-lay,
   .fraction-break-piece,
@@ -2975,7 +3454,41 @@ input[type="number"] {
   .integer-operation-a-ghost,
   .integer-operation-b-ghost,
   .integer-operation-b-trigger,
-  .integer-operation-start-ready {
+  .integer-operation-start-ready,
+  .number-microscope-digit,
+  .number-microscope-repeat,
+  .number-microscope-zero,
+  .number-microscope-ellipsis,
+  .number-microscope-ready,
+  .number-microscope-bound-selected,
+  .number-microscope-line-zoom,
+  .number-microscope-exact-marker,
+  .number-microscope-final-marker,
+  .number-microscope-evidence,
+  .compound-grid-reveal,
+  .compound-vertex-pop,
+  .compound-cut-draw,
+  .compound-cut-invalid,
+  .compound-piece-separate,
+  .compound-formula-enter,
+  .compound-total-reveal,
+  .compound-ready-button,
+  .compound-boundary-selected,
+  .circle-radius-handle,
+  .circle-circumference-trace,
+  .circle-transfer-disc,
+  .circle-circumference-segment-flight,
+  .circle-circumference-land,
+  .circle-diameter-strip,
+  .circle-source-sector,
+  .circle-area-source-lift,
+  .circle-area-sector-flight,
+  .circle-area-arranged-settle,
+  .circle-area-calculation-step,
+  .circle-area-complete-glow,
+  .circle-transform-result,
+  .circle-area-dimensions,
+  .circle-formula-reveal {
     animation: none;
   }
 

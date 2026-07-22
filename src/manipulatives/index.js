@@ -1,6 +1,8 @@
 import AreaModelMultiplication from './area-model-multiplication.jsx'
 import AddingSubtractingFractions from './adding-subtracting-fractions.jsx'
 import AddingSubtractingIntegers from './adding-subtracting-integers.jsx'
+import AreaCircumferenceCircle from './area-circumference-circle.jsx'
+import CompoundFiguresDecomposer from './compound-figures-decomposer.jsx'
 import DecimalHundredthsGrid from './decimal-hundredths-grid.jsx'
 import DecimalNumberLine from './decimal-number-line.jsx'
 import DecimalPlaceValueDisks from './decimal-place-value-disks.jsx'
@@ -14,6 +16,7 @@ import PlaceValueDisks from './place-value-disks.jsx'
 import PowerOf10BlobExplorer from './power-of-10-blob-explorer.jsx'
 import PowersOf10PlaceValueShift from './powers-of-10-place-value-shift.jsx'
 import ProportionalVsNonProportionalGraphs from './proportional-vs-non-proportional-graphs.jsx'
+import RationalVsIrrationalNumbers from './rational-vs-irrational-numbers.jsx'
 import ScaleDrawingsMaps from './scale-drawings-maps.jsx'
 import TwoFactorTrees from './two-factor-trees.jsx'
 
@@ -49,6 +52,16 @@ export const manipulatives = [
     component: AddingSubtractingIntegers,
   },
   {
+    id: 'area-circumference-circle',
+    name: 'Area & Circumference of a Circle',
+    component: AreaCircumferenceCircle,
+  },
+  {
+    id: 'compound-figures-decomposer',
+    name: 'Compound Figures Decomposer',
+    component: CompoundFiguresDecomposer,
+  },
+  {
     id: 'fractions-number-line',
     name: 'Compare Fractions on a Number Line',
     component: FractionsNumberLine,
@@ -57,6 +70,11 @@ export const manipulatives = [
     id: 'proportional-vs-non-proportional-graphs',
     name: 'Proportional vs Non-Proportional Graphs',
     component: ProportionalVsNonProportionalGraphs,
+  },
+  {
+    id: 'rational-vs-irrational-numbers',
+    name: 'Rational vs Irrational Numbers',
+    component: RationalVsIrrationalNumbers,
   },
   {
     id: 'scale-drawings-maps',
