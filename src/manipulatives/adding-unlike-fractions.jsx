@@ -111,19 +111,82 @@ function drawBar(ctx, x, y, width, height, denominator, filled, fill, light, pro
   ctx.stroke()
 }
 
-function drawSegmentGrid(ctx, x, y, width, height, denominator, stroke = colors.ink) {
+function drawResliceBar(ctx, x, y, width, height, originalDenominator, originalFilled, finalDenominator, fill, light, progress) {
+  const drawPhase = easeInOut(clamp(progress / 0.38, 0, 1))
+  const holdPhase = clamp((progress - 0.38) / 0.38, 0, 1)
+  const shrinkPhase = easeInOut(clamp((progress - 0.76) / 0.24, 0, 1))
   drawRoundRect(ctx, x, y, width, height, 10)
   ctx.fillStyle = '#ffffff'
   ctx.fill()
-  ctx.strokeStyle = stroke
-  ctx.lineWidth = 2
-  ctx.stroke()
 
   ctx.save()
   ctx.beginPath()
   drawRoundRect(ctx, x, y, width, height, 10)
   ctx.clip()
-  ctx.strokeStyle = 'rgba(26, 26, 46, 0.22)'
+
+  ctx.fillStyle = light
+  ctx.fillRect(x, y, width, height)
+  ctx.fillStyle = fill
+  ctx.fillRect(x, y, (originalFilled / originalDenominator) * width, height)
+
+  ctx.strokeStyle = 'rgba(26, 26, 46, 0.34)'
+  ctx.lineWidth = 1.3
+  for (let i = 1; i < originalDenominator; i += 1) {
+    const lineX = x + (i / originalDenominator) * width
+    ctx.beginPath()
+    ctx.moveTo(lineX, y)
+    ctx.lineTo(lineX, y + height)
+    ctx.stroke()
+  }
+
+  ctx.lineCap = 'round'
+  for (let i = 1; i < finalDenominator; i += 1) {
+    const isOriginalCut = (i * originalDenominator) % finalDenominator === 0
+    if (isOriginalCut) continue
+    const stagger = (i / finalDenominator) * 0.22
+    const lineProgress = clamp((drawPhase - stagger) / 0.28, 0, 1)
+    if (lineProgress <= 0) continue
+    const lineX = x + (i / finalDenominator) * width
+    const pulse = lineProgress >= 1
+      ? 0.5 + 0.5 * Math.sin(holdPhase * Math.PI * 2)
+      : 0.5 + 0.5 * Math.sin(lineProgress * Math.PI * 6)
+    const holdGlow = (lineProgress >= 1 ? 0.45 + pulse * 0.55 : pulse) * (1 - shrinkPhase)
+    const thickWidth = 3.6 + holdGlow * 3.2
+    ctx.globalAlpha = Math.max(0.3, 0.9 * (1 - shrinkPhase))
+    ctx.strokeStyle = colors.amber
+    ctx.lineWidth = thickWidth
+    ctx.shadowColor = colors.amber
+    ctx.shadowBlur = 12 * Math.max(holdGlow, 0.35)
+    ctx.beginPath()
+    ctx.moveTo(lineX, y)
+    ctx.lineTo(lineX, y + height * lineProgress)
+    ctx.stroke()
+
+    ctx.globalAlpha = lineProgress * (0.22 + 0.68 * shrinkPhase)
+    ctx.strokeStyle = 'rgba(26, 26, 46, 0.45)'
+    ctx.lineWidth = 1.2 + 0.2 * shrinkPhase
+    ctx.shadowBlur = 0
+    ctx.beginPath()
+    ctx.moveTo(lineX, y)
+    ctx.lineTo(lineX, y + height * lineProgress)
+    ctx.stroke()
+  }
+  ctx.globalAlpha = 1
+  ctx.shadowBlur = 0
+  ctx.restore()
+
+  drawRoundRect(ctx, x, y, width, height, 10)
+  ctx.strokeStyle = colors.ink
+  ctx.lineWidth = 2
+  ctx.stroke()
+}
+
+function drawGridOverlay(ctx, x, y, width, height, denominator, stroke = colors.ink) {
+  ctx.save()
+  ctx.beginPath()
+  drawRoundRect(ctx, x, y, width, height, 10)
+  ctx.clip()
+  ctx.strokeStyle = 'rgba(26, 26, 46, 0.24)'
   ctx.lineWidth = 1
   for (let i = 1; i < denominator; i += 1) {
     const lineX = x + (i / denominator) * width
@@ -132,6 +195,34 @@ function drawSegmentGrid(ctx, x, y, width, height, denominator, stroke = colors.
     ctx.lineTo(lineX, y + height)
     ctx.stroke()
   }
+  ctx.restore()
+
+  drawRoundRect(ctx, x, y, width, height, 10)
+  ctx.strokeStyle = stroke
+  ctx.lineWidth = 2
+  ctx.stroke()
+}
+
+function drawPartitionedSegment(ctx, x, y, width, height, pieces, fill) {
+  if (pieces <= 0 || width <= 0) return
+  ctx.fillStyle = fill
+  ctx.fillRect(x, y, width, height)
+
+  ctx.save()
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)'
+  ctx.lineWidth = 1.4
+  const pieceW = width / pieces
+  for (let i = 1; i < pieces; i += 1) {
+    const lineX = x + i * pieceW
+    ctx.beginPath()
+    ctx.moveTo(lineX, y + 2)
+    ctx.lineTo(lineX, y + height - 2)
+    ctx.stroke()
+  }
+
+  ctx.strokeStyle = 'rgba(26, 26, 46, 0.32)'
+  ctx.lineWidth = 1.2
+  ctx.strokeRect(x, y, width, height)
   ctx.restore()
 }
 
@@ -146,7 +237,6 @@ function drawCanvas(ctx, width, data, step, progress) {
   const barX = 58
   const barW = width - 116
   const barH = 50
-  const p = easeInOut(progress)
 
   if (step === 1) {
     drawBar(ctx, barX, 66, barW, barH, a.d, a.n, colors.ruby, colors.rubyLight)
@@ -160,9 +250,11 @@ function drawCanvas(ctx, width, data, step, progress) {
   }
 
   if (step === 2) {
-    drawBar(ctx, barX, 66, barW, barH, L, a.n * mA, colors.ruby, colors.rubyLight)
-    drawBar(ctx, barX, 166, barW, barH, L, b.n * mB, colors.teal, colors.tealLight)
+    drawResliceBar(ctx, barX, 66, barW, barH, a.d, a.n, L, colors.ruby, colors.rubyLight, progress)
+    drawResliceBar(ctx, barX, 166, barW, barH, b.d, b.n, L, colors.teal, colors.tealLight, progress)
 
+    ctx.save()
+    ctx.globalAlpha = 0.35 + easeInOut(progress) * 0.65
     ctx.fillStyle = colors.amber
     ctx.font = '900 18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
     ctx.fillText(`x${mA}`, width - 76, 38)
@@ -178,58 +270,75 @@ function drawCanvas(ctx, width, data, step, progress) {
     ctx.fillStyle = colors.amber
     ctx.font = '800 14px Inter, system-ui, sans-serif'
     ctx.fillText(`Smallest common denominator: ${L}`, width / 2, 258)
+    ctx.restore()
     return
   }
 
   const rubyPieces = a.n * mA
   const tealPieces = b.n * mB
+  const stepTwoA = 66
+  const stepTwoB = 166
+  const stepTwoH = 50
   const sourceA = 52
   const sourceB = 112
   const finalY = 194
   const moveH = 44
   const pieceW = barW / L
+  const prep = easeInOut(clamp(progress / 0.28, 0, 1))
+  const glide = easeInOut(clamp((progress - 0.28) / 0.55, 0, 1))
+  const finalReveal = easeInOut(clamp((progress - 0.83) / 0.17, 0, 1))
 
   ctx.fillStyle = colors.purple
   ctx.font = '900 19px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
   ctx.fillText(`${rubyPieces}/${L} + ${tealPieces}/${L} = ${total}/${L}`, width / 2, 26)
 
-  drawSegmentGrid(ctx, barX, sourceA, barW, moveH, L, colors.ruby)
-  drawSegmentGrid(ctx, barX, sourceB, barW, moveH, L, colors.teal)
-  drawSegmentGrid(ctx, barX, finalY, barW, moveH, L, colors.purple)
+  if (prep < 1) {
+    const yA = stepTwoA + (sourceA - stepTwoA) * prep
+    const yB = stepTwoB + (sourceB - stepTwoB) * prep
+    const h = stepTwoH + (moveH - stepTwoH) * prep
+    drawBar(ctx, barX, yA, barW, h, L, rubyPieces, colors.ruby, colors.rubyLight)
+    drawBar(ctx, barX, yB, barW, h, L, tealPieces, colors.teal, colors.tealLight)
+    return
+  }
+
+  if (glide < 0.98) {
+    ctx.save()
+    ctx.globalAlpha = 1 - glide * 0.72
+    drawBar(ctx, barX, sourceA, barW, moveH, L, rubyPieces, colors.ruby, colors.rubyLight)
+    drawBar(ctx, barX, sourceB, barW, moveH, L, tealPieces, colors.teal, colors.tealLight)
+    ctx.restore()
+  }
 
   ctx.save()
   ctx.beginPath()
   drawRoundRect(ctx, barX, 40, barW, finalY + moveH - 40, 10)
   ctx.clip()
-  for (let i = 0; i < rubyPieces; i += 1) {
-    const startX = barX + i * pieceW
-    const endX = barX + i * pieceW
-    const x = startX + (endX - startX) * p
-    const y = sourceA + (finalY - sourceA) * p
-    ctx.fillStyle = colors.ruby
-    ctx.fillRect(x, y, pieceW, moveH)
-  }
-  for (let i = 0; i < tealPieces; i += 1) {
-    const startX = barX + i * pieceW
-    const endX = barX + (rubyPieces + i) * pieceW
-    const x = startX + (endX - startX) * p
-    const y = sourceB + (finalY - sourceB) * p
-    ctx.fillStyle = colors.teal
-    ctx.fillRect(x, y, pieceW, moveH)
-  }
+  drawPartitionedSegment(
+    ctx,
+    barX,
+    sourceA + (finalY - sourceA) * glide,
+    rubyPieces * pieceW,
+    moveH,
+    rubyPieces,
+    colors.ruby,
+  )
+  drawPartitionedSegment(
+    ctx,
+    barX + rubyPieces * pieceW * glide,
+    sourceB + (finalY - sourceB) * glide,
+    tealPieces * pieceW,
+    moveH,
+    tealPieces,
+    colors.teal,
+  )
   ctx.restore()
 
-  for (let i = 1; i < L; i += 1) {
-    ctx.strokeStyle = 'rgba(26, 26, 46, 0.25)'
-    ctx.beginPath()
-    ctx.moveTo(barX + i * pieceW, finalY)
-    ctx.lineTo(barX + i * pieceW, finalY + moveH)
-    ctx.stroke()
+  if (finalReveal > 0) {
+    ctx.save()
+    ctx.globalAlpha = finalReveal
+    drawGridOverlay(ctx, barX, finalY, barW, moveH, L, colors.purple)
+    ctx.restore()
   }
-  drawRoundRect(ctx, barX, finalY, barW, moveH, 10)
-  ctx.strokeStyle = colors.ink
-  ctx.lineWidth = 2
-  ctx.stroke()
 
   ctx.fillStyle = colors.purple
   ctx.font = '900 17px Inter, system-ui, sans-serif'
@@ -302,12 +411,12 @@ export default function AddingUnlikeFractions() {
   const goStep = (nextStep) => {
     if (frameRef.current) cancelAnimationFrame(frameRef.current)
     setStep(nextStep)
-    if (nextStep === 1 || nextStep === 2) {
+    if (nextStep === 1) {
       setProgress(1)
       return
     }
     setProgress(0)
-    const duration = 1200
+    const duration = nextStep === 2 ? 2600 : nextStep === 3 ? 1920 : 1200
     let start = null
     const tick = (now) => {
       if (start === null) start = now

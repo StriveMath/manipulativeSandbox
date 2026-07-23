@@ -93,7 +93,7 @@ function drawArrowLine(ctx, from, to, color, label, progress = 1) {
   ctx.restore()
 }
 
-function StatCard({ title, value, color, active }) {
+function StatCard({ title, value, color, active, hideValue = false }) {
   return (
     <div
       className={`rounded-xl border-[1.5px] bg-white px-3 py-2 transition-all ${active ? 'opacity-100' : 'opacity-35'}`}
@@ -103,7 +103,7 @@ function StatCard({ title, value, color, active }) {
         {title}
       </p>
       <p className="mt-0.5 text-xl font-black" style={{ color }}>
-        {value}
+        <span className={hideValue ? 'opacity-0 select-none' : 'opacity-100'}>{value}</span>
       </p>
     </div>
   )
@@ -120,6 +120,7 @@ export default function SlopeExplorer() {
   const [runT, setRunT] = useState(1)
   const [revealed, setRevealed] = useState({ rise: false, run: false, slope: false })
   const [liveMode, setLiveMode] = useState(false)
+  const [hideMeasurements, setHideMeasurements] = useState(true)
 
   const hasBoth = points.length === 2
   const a = points[0]
@@ -274,7 +275,7 @@ export default function SlopeExplorer() {
         const pb = toPx(b)
         const corner = { x: pb.x, y: pb.y }
 
-        if (hasBoth) {
+        if (!hideMeasurements) {
           const dx = pb.x - pa.x
           const dy = pb.y - pa.y
           const leftEdge = { x: 0, y: pa.y - (dy / (dx || 1)) * pa.x }
@@ -297,10 +298,10 @@ export default function SlopeExplorer() {
         }
 
         if (showRise || rProgress > 0) {
-          drawArrowLine(ctx, pa, { x: pa.x, y: pb.y }, colors.rise, signed(rise), rProgress)
+          drawArrowLine(ctx, pa, { x: pa.x, y: pb.y }, colors.rise, hideMeasurements ? '' : signed(rise), rProgress)
         }
         if (showRun || runProgress > 0) {
-          drawArrowLine(ctx, { x: pa.x, y: pb.y }, corner, colors.run, signed(run), runProgress)
+          drawArrowLine(ctx, { x: pa.x, y: pb.y }, corner, colors.run, hideMeasurements ? '' : signed(run), runProgress)
         }
       }
 
@@ -321,7 +322,7 @@ export default function SlopeExplorer() {
     }
 
     draw(riseT, runT)
-  }, [a, b, canvasSize, constants, hasBoth, points, rise, riseT, run, runT, showRise, showRun, toPx])
+  }, [a, b, canvasSize, constants, hasBoth, hideMeasurements, points, rise, riseT, run, runT, showRise, showRun, toPx])
 
   const canvasPoint = (event) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -348,6 +349,7 @@ export default function SlopeExplorer() {
     if (points.length < 2) {
       const next = [...points, toGrid(point.x, point.y)]
       setPoints(next)
+      setHideMeasurements(true)
       if (next.length === 2) setTimeout(startAnimation, 0)
     }
   }
@@ -367,6 +369,7 @@ export default function SlopeExplorer() {
     cancelAnimation()
     setPoints([])
     setLiveMode(false)
+    setHideMeasurements(true)
     setRiseT(1)
     setRunT(1)
     setRevealed({ rise: false, run: false, slope: false })
@@ -374,6 +377,7 @@ export default function SlopeExplorer() {
 
   const applyPreset = (preset) => {
     cancelAnimation()
+    setHideMeasurements(false)
     setPoints([preset.a, preset.b])
     setTimeout(startAnimation, 0)
   }
@@ -389,12 +393,20 @@ export default function SlopeExplorer() {
   return (
     <div className="flex h-full flex-col gap-2 overflow-hidden bg-[#F8F6F0] p-2 font-['Inter'] text-[#1A1A2E]">
       <div className="grid grid-cols-3 gap-2">
-        <StatCard title="Rise ↕" value={hasBoth ? signed(rise) : '—'} color={colors.rise} active={showRise} />
-        <StatCard title="Run ↔" value={hasBoth ? signed(run) : '—'} color={colors.run} active={showRun} />
-        <StatCard title="Slope" value={hasBoth ? (run === 0 ? '∞' : slope) : '—'} color={colors.slope} active={showSlope} />
+        <StatCard title="Rise" value={hasBoth ? signed(rise) : '-'} color={colors.rise} active={showRise} hideValue={hideMeasurements} />
+        <StatCard title="Run" value={hasBoth ? signed(run) : '-'} color={colors.run} active={showRun} hideValue={hideMeasurements} />
+        <StatCard title="Slope" value={hasBoth ? (run === 0 ? 'undefined' : slope) : '-'} color={colors.slope} active={showSlope} hideValue={hideMeasurements} />
       </div>
 
-      <div ref={wrapRef} className="overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
+      <div ref={wrapRef} className="relative overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
+        <button
+          type="button"
+          onClick={() => setHideMeasurements((current) => !current)}
+          className={`absolute right-2 top-2 z-10 rounded-full border px-3 py-1.5 text-xs font-black shadow-sm ${hideMeasurements ? 'bg-[#1A1A2E] text-white' : 'bg-white text-[#1A1A2E]'}`}
+          style={{ borderColor: colors.ink }}
+        >
+          {hideMeasurements ? 'Show values' : 'Hide values'}
+        </button>
         <canvas
           ref={canvasRef}
           className="block w-full touch-none cursor-crosshair"
@@ -405,24 +417,32 @@ export default function SlopeExplorer() {
         />
       </div>
 
-      <div className="rounded-xl border border-[#E0DDD6] bg-white px-3 py-2 text-center text-lg font-black">
-        <span style={{ color: colors.slope }}>slope</span>
-        <span className={hasBoth ? 'opacity-100' : 'opacity-30'}> = </span>
-        <span className={showRise ? 'opacity-100' : 'opacity-25'}>
-          <span style={{ color: colors.rise }}>rise</span>
-          <span>/</span>
-          <span style={{ color: colors.run }}>run</span>
-        </span>
-        <span className={showRun ? 'opacity-100' : 'opacity-25'}>
-          {' = '}
-          <span style={{ color: colors.rise }}>{hasBoth ? rise : '?'}</span>
-          <span>/</span>
-          <span style={{ color: colors.run }}>{hasBoth ? run : '?'}</span>
-        </span>
-        <span className={showSlope ? 'opacity-100' : 'opacity-25'}>
-          {' = '}
-          <span style={{ color: colors.slope }}>{hasBoth ? slope : '?'}</span>
-        </span>
+      <div className="flex h-[48px] shrink-0 items-center justify-center rounded-xl border border-[#E0DDD6] bg-white px-3 text-center text-lg font-black">
+        {!hideMeasurements ? (
+          <div className="leading-tight">
+            <span style={{ color: colors.slope }}>slope</span>
+            <span className={hasBoth ? 'opacity-100' : 'opacity-30'}> = </span>
+            <span className={showRise ? 'opacity-100' : 'opacity-25'}>
+              <span style={{ color: colors.rise }}>rise</span>
+              <span>/</span>
+              <span style={{ color: colors.run }}>run</span>
+            </span>
+            <span className={showRun ? 'opacity-100' : 'opacity-25'}>
+              {' = '}
+              <span style={{ color: colors.rise }}>{hasBoth ? rise : '?'}</span>
+              <span>/</span>
+              <span style={{ color: colors.run }}>{hasBoth ? run : '?'}</span>
+            </span>
+            <span className={showSlope ? 'opacity-100' : 'opacity-25'}>
+              {' = '}
+              <span style={{ color: colors.slope }}>{hasBoth ? slope : '?'}</span>
+            </span>
+          </div>
+        ) : (
+          <div className="text-sm leading-tight text-[#5F5E5A]">
+            Work out the slope yourself, then show the values to check.
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">

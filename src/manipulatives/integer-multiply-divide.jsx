@@ -67,26 +67,6 @@ function tickStep(min, max) {
   return max - min > 24 ? 5 : 1
 }
 
-function patternKeys(center, min = -Infinity, max = Infinity) {
-  const count = 6
-  let start = center + 2
-  let end = center - 3
-  if (Number.isFinite(max) && start > max) {
-    const shift = start - max
-    start -= shift
-    end -= shift
-  }
-  if (Number.isFinite(min) && end < min) {
-    const shift = min - end
-    start += shift
-  }
-  const keys = []
-  for (let value = start; keys.length < count; value -= 1) {
-    keys.push(value)
-  }
-  return keys
-}
-
 function quadPoint(fromX, toX, baseY, arcHeight, t) {
   const controlX = (fromX + toX) / 2
   return {
@@ -289,9 +269,9 @@ export default function IntegerMultiplyDivide() {
 
   const showJumps = () => {
     resetAnimation()
-    setPatternVisible(true)
     if (!jumps.length) {
       setResultVisible(true)
+      setPatternVisible(true)
       return
     }
     let jumpIndex = 0
@@ -310,6 +290,7 @@ export default function IntegerMultiplyDivide() {
         frameRef.current = null
         setAnimation({ playing: false, jumpIndex: jumps.length, progress: 1 })
         setResultVisible(true)
+        setPatternVisible(true)
       }
     }
     frameRef.current = requestAnimationFrame(tick)
@@ -339,25 +320,32 @@ export default function IntegerMultiplyDivide() {
 
   const tableRows = useMemo(() => {
     if (mode === 'multiply') {
-      const fixed = a
-      return patternKeys(b, -9, 9).map((second) => ({
-        key: second,
-        first: fixed,
-        second,
-        answer: fixed * second,
-        expression: `${fixed} * ${second} = ${fixed * second}`,
-        active: second === b,
-      }))
+      const direction = b < 0 ? -1 : 1
+      return Array.from({ length: Math.abs(b) }, (_, index) => {
+        const group = (index + 1) * direction
+        return {
+          key: group,
+          first: a,
+          operator: '×',
+          second: group,
+          answer: a * group,
+          active: index === Math.abs(b) - 1,
+        }
+      })
     }
     const divisor = cleanB
-    return patternKeys(result).map((quotient) => ({
+    const direction = result < 0 ? -1 : 1
+    return Array.from({ length: Math.abs(result) }, (_, index) => {
+      const quotient = (index + 1) * direction
+      return {
       key: quotient,
       first: divisor * quotient,
+      operator: '÷',
       second: divisor,
       answer: quotient,
-      expression: `(${divisor}*${quotient}) / ${divisor} = ${quotient}`,
-      active: quotient === result,
-    }))
+      active: index === Math.abs(result) - 1,
+      }
+    })
   }, [a, b, cleanB, mode, result])
 
   return (
@@ -407,7 +395,7 @@ export default function IntegerMultiplyDivide() {
             <>
               <p className="mb-1 text-center text-[11px] font-black text-[#5F5E5A]">Watch the pattern: same step each row</p>
               <div className="grid grid-cols-2 gap-1.5">
-                {[tableRows.slice(0, 3), tableRows.slice(3, 6)].map((column, columnIndex) => (
+                {[tableRows.filter((_, index) => index % 2 === 0), tableRows.filter((_, index) => index % 2 === 1)].map((column, columnIndex) => (
                   <div key={columnIndex} className="grid grid-cols-1 gap-1">
                     {column.map((row) => (
                       <div
@@ -416,7 +404,7 @@ export default function IntegerMultiplyDivide() {
                         style={{ backgroundColor: row.active ? colors.purpleFill : '#F8F6F0' }}
                       >
                         <span style={{ color: colors.ruby }}>{row.first}</span>
-                        <span className="text-[#5F5E5A]">{mode === 'multiply' ? '\u00d7' : '\u00f7'}</span>
+                        <span className="text-[#5F5E5A]">{row.operator}</span>
                         <span style={{ color: colors.teal }}>{row.second}</span>
                         <span className="text-[#5F5E5A]">=</span>
                         <span style={{ color: colors.purple }}>{row.answer}</span>

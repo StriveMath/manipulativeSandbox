@@ -16,6 +16,16 @@ function randomX() {
   return Math.floor(Math.random() * 15) - 6
 }
 
+const variableLetters = ['a', 'b', 'c', 'x', 'y', 'z']
+
+function randomVariable() {
+  return variableLetters[Math.floor(Math.random() * variableLetters.length)]
+}
+
+function withVariable(text, variable) {
+  return text.replace(/x/g, variable)
+}
+
 function Sup2() {
   return <sup className="ml-0.5 align-super text-[0.58em] leading-none">2</sup>
 }
@@ -38,8 +48,8 @@ const expressions = [
     title: '3x + 5',
     color: '#534AB7',
     substitution: (x) => <>3 * <span className="text-[#D85A30]">{formatNumber(x)}</span> + 5</>,
-    expressionMath: () => <>3<span className="text-[#D85A30]">x</span> + 5</>,
-    firstStepMath: (x, substituted) => <>3 * <span className="text-[#D85A30]">{substituted ? formatNumber(x) : 'x'}</span></>,
+    expressionMath: (variable) => <>3<span className="text-[#D85A30]">{variable}</span> + 5</>,
+    firstStepMath: (x, substituted, variable) => <>3 * <span className="text-[#D85A30]">{substituted ? formatNumber(x) : variable}</span></>,
     buildSteps: (x) => {
       const multiply = 3 * x
       const answer = multiply + 5
@@ -69,8 +79,8 @@ const expressions = [
     title: '2x^2 - 4',
     color: '#185FA5',
     substitution: (x) => <>2(<span className="text-[#D85A30]">{formatNumber(x)}</span>)<Sup2 /> - 4</>,
-    expressionMath: () => <>2<span className="text-[#D85A30]">x</span><Sup2 /> - 4</>,
-    firstStepMath: (x, substituted) => <><span className="text-[#D85A30]">{substituted ? formatNumber(x) : 'x'}</span><Sup2 /></>,
+    expressionMath: (variable) => <>2<span className="text-[#D85A30]">{variable}</span><Sup2 /> - 4</>,
+    firstStepMath: (x, substituted, variable) => <><span className="text-[#D85A30]">{substituted ? formatNumber(x) : variable}</span><Sup2 /></>,
     buildSteps: (x) => {
       const square = x * x
       const double = 2 * square
@@ -109,8 +119,8 @@ const expressions = [
     title: '4(x + 3)',
     color: '#0F6E56',
     substitution: (x) => <>4(<span className="text-[#D85A30]">{formatNumber(x)}</span> + 3)</>,
-    expressionMath: () => <>4(<span className="text-[#D85A30]">x</span> + 3)</>,
-    firstStepMath: (x, substituted) => <><span className="text-[#D85A30]">{substituted ? formatNumber(x) : 'x'}</span> + 3</>,
+    expressionMath: (variable) => <>4(<span className="text-[#D85A30]">{variable}</span> + 3)</>,
+    firstStepMath: (x, substituted, variable) => <><span className="text-[#D85A30]">{substituted ? formatNumber(x) : variable}</span> + 3</>,
     buildSteps: (x) => {
       const inside = x + 3
       const answer = 4 * inside
@@ -140,8 +150,8 @@ const expressions = [
     title: 'x^2 + 2x + 1',
     color: '#7C3AED',
     substitution: (x) => <><span className="text-[#D85A30]">{formatNumber(x)}</span><Sup2 /> + 2(<span className="text-[#D85A30]">{formatNumber(x)}</span>) + 1</>,
-    expressionMath: () => <><span className="text-[#D85A30]">x</span><Sup2 /> + 2<span className="text-[#D85A30]">x</span> + 1</>,
-    firstStepMath: (x, substituted) => <><span className="text-[#D85A30]">{substituted ? formatNumber(x) : 'x'}</span><Sup2 /></>,
+    expressionMath: (variable) => <><span className="text-[#D85A30]">{variable}</span><Sup2 /> + 2<span className="text-[#D85A30]">{variable}</span> + 1</>,
+    firstStepMath: (x, substituted, variable) => <><span className="text-[#D85A30]">{substituted ? formatNumber(x) : variable}</span><Sup2 /></>,
     buildSteps: (x) => {
       const square = x * x
       const twoX = 2 * x
@@ -181,8 +191,8 @@ const expressions = [
     title: '10 - 2x',
     color: '#BA7517',
     substitution: (x) => <>10 - 2(<span className="text-[#D85A30]">{formatNumber(x)}</span>)</>,
-    expressionMath: () => <>10 - 2<span className="text-[#D85A30]">x</span></>,
-    firstStepMath: (x, substituted) => <>2 * <span className="text-[#D85A30]">{substituted ? formatNumber(x) : 'x'}</span></>,
+    expressionMath: (variable) => <>10 - 2<span className="text-[#D85A30]">{variable}</span></>,
+    firstStepMath: (x, substituted, variable) => <>2 * <span className="text-[#D85A30]">{substituted ? formatNumber(x) : variable}</span></>,
     buildSteps: (x) => {
       const twoX = 2 * x
       const answer = 10 - twoX
@@ -212,8 +222,8 @@ const expressions = [
     title: '(x + 2)(x - 1)',
     color: '#993556',
     substitution: (x) => <>(<span className="text-[#D85A30]">{formatNumber(x)}</span> + 2)(<span className="text-[#D85A30]">{formatNumber(x)}</span> - 1)</>,
-    expressionMath: () => <>(<span className="text-[#D85A30]">x</span> + 2)(<span className="text-[#D85A30]">x</span> - 1)</>,
-    firstStepMath: (x, substituted) => <><span className="text-[#D85A30]">{substituted ? formatNumber(x) : 'x'}</span> + 2</>,
+    expressionMath: (variable) => <>(<span className="text-[#D85A30]">{variable}</span> + 2)(<span className="text-[#D85A30]">{variable}</span> - 1)</>,
+    firstStepMath: (x, substituted, variable) => <><span className="text-[#D85A30]">{substituted ? formatNumber(x) : variable}</span> + 2</>,
     buildSteps: (x) => {
       const left = x + 2
       const right = x - 1
@@ -317,7 +327,7 @@ function StepCard({ step, index, status, color }) {
   )
 }
 
-function WindowMath({ expression, xValue, completedSteps, phase, progress, currentStep, isComplete, answer }) {
+function WindowMath({ expression, xValue, variable, completedSteps, phase, progress, currentStep, lastStep, isComplete, answer }) {
   const isFirstAnimation = completedSteps === 0 && phase === 'animating'
   const isLaterAnimation = completedSteps > 0 && phase === 'animating'
   const showGlow = completedSteps === 0 && (!isFirstAnimation || progress < 0.58)
@@ -342,7 +352,7 @@ function WindowMath({ expression, xValue, completedSteps, phase, progress, curre
   ) : currentStep?.operation === 'Second bracket' ? (
     !isLaterAnimation || progress < 0.34 ? (
       <>
-        <span className="text-[#D85A30]">x</span> - 1
+        <span className="text-[#D85A30]">{variable}</span> - 1
       </>
     ) : (
       <>
@@ -352,7 +362,7 @@ function WindowMath({ expression, xValue, completedSteps, phase, progress, curre
   ) : currentStep?.symbol === '+2x' && isLaterAnimation ? (
     progress < 0.12 ? (
       <>
-        + 2<span className="text-[#D85A30]">x</span>
+        + 2<span className="text-[#D85A30]">{variable}</span>
       </>
     ) : progress < 0.28 ? (
       <>
@@ -387,12 +397,14 @@ function WindowMath({ expression, xValue, completedSteps, phase, progress, curre
       {isComplete ? (
         <span>{answer}</span>
       ) : isFirstAnimation ? (
-        <span>{expression.firstStepMath(xValue, xHasDroppedIn)}</span>
+        <span>{expression.firstStepMath(xValue, xHasDroppedIn, variable)}</span>
+      ) : phase === 'idle' && completedSteps > 0 && lastStep ? (
+        <span>{lastStep.after}</span>
       ) : completedSteps > 0 && currentStep ? (
         operationMath
       ) : (
         <span className={showGlow ? '[text-shadow:0_0_12px_rgba(216,90,48,0.35)]' : ''}>
-          {expression.expressionMath()}
+          {expression.expressionMath(variable)}
         </span>
       )}
     </div>
@@ -401,7 +413,8 @@ function WindowMath({ expression, xValue, completedSteps, phase, progress, curre
 
 export default function SubstitutionMachine() {
   const frameRef = useRef(null)
-  const [expressionIndex, setExpressionIndex] = useState(0)
+  const [expressionIndex, setExpressionIndex] = useState(() => Math.floor(Math.random() * expressions.length))
+  const [variable] = useState(() => randomVariable())
   const [xValue, setXValue] = useState(4)
   const [completedSteps, setCompletedSteps] = useState(0)
   const [phase, setPhase] = useState('idle')
@@ -411,6 +424,7 @@ export default function SubstitutionMachine() {
   const expression = expressions[expressionIndex]
   const steps = useMemo(() => expression.buildSteps(xValue), [expression, xValue])
   const currentStep = steps[completedSteps]
+  const lastStep = completedSteps > 0 ? steps[completedSteps - 1] : null
   const isComplete = completedSteps >= steps.length
   const isFinalStep = completedSteps === steps.length - 1
   const answer = steps[steps.length - 1]?.after ?? formatNumber(xValue)
@@ -435,7 +449,7 @@ export default function SubstitutionMachine() {
   const animateStep = () => {
     if (!currentStep || frameRef.current) return
     const duration = 3024
-    const topPause = 900
+    const topPause = 1000
     const startedAt = performance.now()
     setPhase('animating')
     setProgress(0)
@@ -498,7 +512,7 @@ export default function SubstitutionMachine() {
             <button
               type="button"
               onClick={() => cycleExpression(-1)}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-[#E0DDD6] bg-white text-2xl font-black text-[#1A1A2E]"
+              className="hidden h-8 w-8 items-center justify-center rounded-full border border-[#E0DDD6] bg-white text-2xl font-black text-[#1A1A2E]"
               aria-label="Previous expression"
             >
               ‹
@@ -507,18 +521,18 @@ export default function SubstitutionMachine() {
               className="min-w-[220px] rounded-[14px] border bg-white px-5 py-1.5 text-center font-mono text-xl font-black shadow-sm"
               style={{ borderColor: color, color }}
             >
-              <MathText>{expression.label}</MathText>
+              <MathText>{withVariable(expression.label, variable)}</MathText>
             </div>
             <button
               type="button"
               onClick={() => cycleExpression(1)}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-[#E0DDD6] bg-white text-2xl font-black text-[#1A1A2E]"
+              className="hidden h-8 w-8 items-center justify-center rounded-full border border-[#E0DDD6] bg-white text-2xl font-black text-[#1A1A2E]"
               aria-label="Next expression"
             >
               ›
             </button>
           </div>
-          <div className="flex gap-1.5">
+          <div className="hidden gap-1.5">
             {expressions.map((item, index) => (
               <button
                 key={item.id}
@@ -536,9 +550,9 @@ export default function SubstitutionMachine() {
         </div>
 
         <div className={`mx-auto h-[67px] shrink-0 rounded-[14px] border border-[#E0DDD6] bg-white px-4 py-1.5 text-center transition-opacity duration-200 ${hasStarted ? 'pointer-events-none invisible opacity-0' : 'opacity-100'}`}>
-          <p className="mb-0.5 text-[10px] font-black uppercase tracking-wide text-[#5F5E5A]">Set the value of x</p>
+          <p className="mb-0.5 text-[10px] font-black uppercase tracking-wide text-[#5F5E5A]">Set the value of {variable}</p>
           <div className="flex items-center gap-2 font-mono">
-            <span className="text-xl font-black text-[#1A1A2E]">x =</span>
+            <span className="text-xl font-black text-[#1A1A2E]">{variable} =</span>
             <button
               type="button"
               onClick={() => changeX(-1)}
@@ -561,14 +575,16 @@ export default function SubstitutionMachine() {
           </div>
         </div>
 
-        <div className="relative h-[250px] shrink-0 overflow-hidden rounded-[14px] border border-[#E0DDD6] bg-white px-4 pt-2">
-          <Token
-            value={tokenValue}
-            progress={progress}
-            phase={phase}
-            isFinalStep={isFinalStep}
-            isWaitingAtTray={completedSteps > 0 && !isComplete}
-          />
+        <div className="relative h-[286px] shrink-0 overflow-hidden rounded-[14px] border border-[#E0DDD6] bg-white px-4 pt-2">
+          {hasStarted ? (
+            <Token
+              value={tokenValue}
+              progress={progress}
+              phase={phase}
+              isFinalStep={isFinalStep}
+              isWaitingAtTray={completedSteps > 0 && !isComplete}
+            />
+          ) : null}
 
           <div className="absolute left-1/2 top-[20px] z-20 h-3.5 w-[150px] -translate-x-1/2 rounded-full shadow-sm" style={{ backgroundColor: color }} />
           <div className="absolute left-1/2 top-[32px] z-20 h-0 w-0 -translate-x-1/2 border-x-[48px] border-t-[38px] border-x-transparent" style={{ borderTopColor: color }} />
@@ -579,7 +595,7 @@ export default function SubstitutionMachine() {
             <div className="absolute left-5 top-5 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: withAlpha('#000000', 0.35) }} />
             <div className="absolute right-5 top-5 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: withAlpha('#000000', 0.35) }} />
             <div className="flex min-h-[74px] items-center justify-center rounded-[14px] bg-white px-4 text-center shadow-inner">
-              <WindowMath expression={expression} xValue={xValue} completedSteps={completedSteps} phase={phase} progress={progress} currentStep={currentStep} isComplete={isComplete} answer={answer} />
+              <WindowMath expression={expression} xValue={xValue} variable={variable} completedSteps={completedSteps} phase={phase} progress={progress} currentStep={currentStep} lastStep={lastStep} isComplete={isComplete} answer={answer} />
             </div>
             <div className="mt-4 flex justify-center gap-6">
               {[0, 1, 2].map((dot) => (
@@ -601,7 +617,7 @@ export default function SubstitutionMachine() {
           </div>
         </div>
 
-        <div className="flex shrink-0 gap-1.5 overflow-hidden">
+        <div className="hidden shrink-0 gap-1.5 overflow-hidden">
           {steps.map((step, index) => (
             <StepCard
               key={`${step.operation}-${index}`}
@@ -613,9 +629,9 @@ export default function SubstitutionMachine() {
           ))}
         </div>
 
-        <div className="grid shrink-0 grid-cols-[1fr_1fr_0.72fr] gap-2">
+        <div className="mt-1 grid shrink-0 grid-cols-[1fr_1fr_0.72fr] gap-2">
           <div className="flex min-h-10 items-center justify-center rounded-[14px] border bg-white px-3 py-2 text-center font-mono text-sm font-black" style={{ borderColor: color, color }}>
-            <MathText>{`${expression.title} when x = ${xValue}${isComplete ? ` -> ${answer}` : ''}`}</MathText>
+            <MathText>{`${withVariable(expression.title, variable)} when ${variable} = ${xValue}${isComplete ? ` -> ${answer}` : ''}`}</MathText>
           </div>
           <button
             type="button"
