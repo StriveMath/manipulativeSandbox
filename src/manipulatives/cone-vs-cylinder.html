@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8th Grade Math: Cone vs Cylinder</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+        :root {
+            --blue: #3498db; --bg: #f8f9fa; --text: #2c3e50; --border: #dee2e6;
+        }
+
+        * { box-sizing: border-box; user-select: none; }
+        html, body {
+            width: 800px; height: 500px; overflow: hidden;
+        }
+        body {
+            margin: 0; padding: 0; display: flex; justify-content: center; align-items: center;
+            min-height: 500px; background-color: #e9ecef; font-family: 'Inter', sans-serif;
+        }
+        #app {
+            width: 800px; height: 500px; background: white; border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1); position: relative; overflow: hidden;
+        }
+
+        #header {
+            position: absolute; top: 0; left: 0; right: 0; height: 70px;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 30px; border-bottom: 2px solid var(--border); background: white; z-index: 10;
+        }
+        .title { font-size: 20px; font-weight: 700; color: var(--text); }
+        .global-controls { display: flex; gap: 15px; align-items: center; font-size: 16px; }
+        
+        button {
+            padding: 10px 18px; border-radius: 6px; border: 1px solid var(--border);
+            background: white; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 15px;
+            cursor: pointer; color: var(--text); transition: 0.2s;
+        }
+        button:hover:not(:disabled) { background: var(--bg); border-color: #adb5bd; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        canvas { position: absolute; top: 70px; left: 0; width: 800px; height: 430px; }
+
+        #result-ui {
+            position: absolute; top: 75px; left: 50%; transform: translateX(-50%);
+            width: 620px; text-align: center; display: none; padding: 10px 18px;
+            background: #ffffff; border-radius: 8px; border: 1px solid var(--border);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08); z-index: 10;
+        }
+
+        .formula {
+            margin-top: 6px; padding-top: 6px; border-top: 1px dashed #ccc;
+            font-family: 'Times New Roman', Times, serif; font-size: 17px; color: #000; font-weight: bold;
+        }
+
+        .nudge {
+            position: absolute; bottom: 72px; left: 0; right: 0; text-align: center;
+            font-size: 15px; font-style: italic; color: #7f8c8d; pointer-events: none; z-index: 5;
+        }
+
+        #bottom-row {
+            position: absolute; bottom: 10px; left: 0; right: 0; height: 50px;
+            display: flex; justify-content: center; align-items: center; gap: 20px; padding: 0 40px;
+        }
+        .slider-container {
+            display: flex; align-items: center; gap: 12px; background: white;
+            padding: 8px 18px; border-radius: 24px; border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .slider-container label { font-size: 15px; font-weight: 700; color: #2c3e50; }
+        
+        .btn-action {
+            background: white; padding: 10px 20px; border-radius: 24px; font-size: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid var(--border);
+        }
+
+        .dimensions-display { font-weight: bold; color: var(--blue); background: #eaf2f8; padding: 8px 12px; border-radius: 6px; }
+        .math-symbol { font-family: 'Times New Roman', Times, serif; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="header">
+        <div class="title">Volume: Cone vs Cylinder</div>
+        <div class="global-controls">
+            <span class="dimensions-display" id="dim-text">r = 3, h = 6</span>
+            <button onclick="randomizeRadius()">New radius</button>
+        </div>
+    </div>
+
+    <canvas id="cvs" width="800" height="430"></canvas>
+
+    <div id="result-ui">
+        <p style="margin: 0 0 6px 0; font-size: 15px; color: #34495e; font-weight: 600;">
+            Since 1 cone filled 1/3 of the cylinder, cone volume = 1/3 &times; cylinder volume.
+        </p>
+        <div class="formula" id="formula-content"></div>
+    </div>
+
+    <div class="nudge" id="nudge-text">Guess before you pour!</div>
+
+    <div id="bottom-row">
+        <button class="btn-action" id="btn-pour" style="color: #d35400; border-color: #d35400;" onclick="pour()">Pour cone into cylinder</button>
+        
+        <div id="peel-controls" style="display: none; gap: 20px;">
+            <div class="slider-container">
+                <label for="cone-peel">Peel cone:</label>
+                <input type="range" id="cone-peel" min="0" max="100" value="0" style="width: 100px;" oninput="state.conePeel = this.value/100">
+            </div>
+            <div class="slider-container">
+                <label for="cyl-peel">Peel cylinder:</label>
+                <input type="range" id="cyl-peel" min="0" max="100" value="0" style="width: 100px;" oninput="state.cylPeel = this.value/100">
+            </div>
+        </div>
+        
+        <button class="btn-action" id="btn-reset" onclick="resetApp()" style="display: none;">Try again</button>
+    </div>
+</div>
+
+<script>
+    const cvs = document.getElementById('cvs');
+    const ctx = cvs.getContext('2d');
+    
+    const C = { cyl: '#2980b9', cylLight: '#5dade2', cone: '#d35400', coneLight: '#e67e22', empty: 'rgba(255,255,255,0.7)', outline: '#1c2833' };
+
+    const state = { 
+        r: 3, h: 6, time: 0, pours: 0, anim: 0, pouring: false, 
+        cylPeel: 0, conePeel: 0,
+        currentScale: 20, currentBaseY: 295 
+    };
+
+    function getRx(scale) { return state.r * scale; }
+    function getRy(scale) { return getRx(scale) * 0.35; }
+    function getH(scale) { return state.h * scale; }
+
+    function randomizeRadius() {
+        state.r = Math.floor(Math.random() * 3) + 2; 
+        state.h = state.r * 2;
+        document.getElementById('dim-text').innerText = `r = ${state.r}, h = ${state.h}`;
+        resetApp();
+    }
+
+    function pour() {
+        if (state.pouring || state.pours >= 3) return;
+        state.pouring = true; state.anim = 0;
+        document.getElementById('btn-pour').disabled = true;
+    }
+
+    function resetApp() {
+        state.pours = 0; state.anim = 0; state.pouring = false;
+        state.cylPeel = 0; state.conePeel = 0;
+        
+        document.getElementById('result-ui').style.display = 'none';
+        document.getElementById('btn-pour').style.display = 'block';
+        document.getElementById('btn-pour').disabled = false;
+        document.getElementById('nudge-text').style.display = 'block';
+        
+        document.getElementById('peel-controls').style.display = 'none';
+        document.getElementById('btn-reset').style.display = 'none';
+        document.getElementById('cyl-peel').value = 0;
+        document.getElementById('cone-peel').value = 0;
+    }
+
+    function drawCylinderSegment(x, y, rx, ry, segmentH, color, lightColor) {
+        ctx.fillStyle = color; ctx.strokeStyle = C.outline; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI);
+        ctx.lineTo(x - rx, y - segmentH); ctx.ellipse(x, y - segmentH, rx, ry, 0, Math.PI, 0, true);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = lightColor; ctx.beginPath();
+        ctx.ellipse(x, y - segmentH, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    function drawEmptyCylinder(x, y, rx, ry, h) {
+        ctx.fillStyle = C.empty; ctx.strokeStyle = C.outline; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI);
+        ctx.lineTo(x - rx, y - h); ctx.ellipse(x, y - h, rx, ry, 0, Math.PI, 0, true);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(x, y - h, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    function drawConeFrustumSegment(x, y, rxBottom, ryBottom, rxTop, ryTop, segmentH, color, lightColor) {
+        ctx.fillStyle = color; ctx.strokeStyle = C.outline; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(x, y, rxBottom, ryBottom, 0, 0, Math.PI);
+        ctx.lineTo(x - rxTop, y - segmentH); ctx.ellipse(x, y - segmentH, rxTop, ryTop, 0, Math.PI, 0, true);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = lightColor; ctx.beginPath();
+        ctx.ellipse(x, y - segmentH, rxTop, ryTop, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    function drawEmptyCone(x, y, rx, ry, h) {
+        ctx.strokeStyle = C.outline; ctx.fillStyle = C.empty; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, y - h); ctx.lineTo(x - rx, y);
+        ctx.moveTo(x, y - h); ctx.lineTo(x + rx, y); ctx.stroke();
+    }
+    function drawConeLiquid(x, y, rx, ry, h, fillRatio, color, lightColor) {
+        if (fillRatio <= 0) return;
+        let emptyRatio = Math.pow(1 - fillRatio, 1/3);
+        let hEmpty = h * emptyRatio, hLiq = h - hEmpty;
+        let rLiqX = rx * emptyRatio, rLiqY = ry * emptyRatio;
+        ctx.fillStyle = color; ctx.strokeStyle = C.outline; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI);
+        ctx.lineTo(x - rLiqX, y - hLiq); ctx.ellipse(x, y - hLiq, rLiqX, rLiqY, 0, Math.PI, 0, true);
+        ctx.lineTo(x + rx, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = lightColor; ctx.beginPath();
+        ctx.ellipse(x, y - hLiq, rLiqX, rLiqY, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    function drawStream(startX, startY, endX, endY, color) {
+        ctx.strokeStyle = color; ctx.lineWidth = 6; ctx.setLineDash([15, 15]); ctx.lineDashOffset = -state.time * 40;
+        ctx.beginPath(); ctx.moveTo(startX, startY);
+        let midX = (startX + endX) / 2, midY = Math.min(startY, endY) - 50;
+        ctx.quadraticCurveTo(midX, midY, endX, endY); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    function loop(timestamp) {
+        state.time = timestamp / 1000;
+        let isComplete = (state.pours === 3 && !state.pouring);
+
+        if (state.pouring) {
+            state.anim += 0.02;
+            if (state.anim >= 1) {
+                state.anim = 0; state.pours++; state.pouring = false;
+                if (state.pours < 3) {
+                    document.getElementById('btn-pour').disabled = false;
+                } else {
+                    document.getElementById('btn-pour').style.display = 'none';
+                    document.getElementById('nudge-text').style.display = 'none';
+                    document.getElementById('result-ui').style.display = 'block';
+                    document.getElementById('peel-controls').style.display = 'flex';
+                    document.getElementById('btn-reset').style.display = 'block';
+                    
+                    let vCyl = Math.PI * state.r * state.r * state.h;
+                    document.getElementById('formula-content').innerHTML = `
+                        V = <sup style="font-size:0.7em;">1</sup>&frasl;<sub style="font-size:0.7em;">3</sub>&pi;<span class="math-symbol">r</span>&sup2;<span class="math-symbol">h</span><br>
+                        V = <sup style="font-size:0.7em;">1</sup>&frasl;<sub style="font-size:0.7em;">3</sub> &times; &pi; &times; ${state.r}&sup2; &times; ${state.h} &approx; ${(vCyl/3).toFixed(1)}
+                    `;
+                }
+            }
+        }
+
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+        
+        // Smoothly animate scale and position based on state
+        let targetScale = isComplete ? 14 : 20;
+        let targetBaseY = isComplete ? 315 : 295;
+        state.currentScale += (targetScale - state.currentScale) * 0.1;
+        state.currentBaseY += (targetBaseY - state.currentBaseY) * 0.1;
+        
+        let s = state.currentScale;
+        let rx = getRx(s), ry = getRy(s), H = getH(s);
+        let base_y = state.currentBaseY; 
+        const P_CONE_X = 250, P_CYL_X = 550; 
+        
+        let numDiscs = state.h, dh = H / numDiscs;
+        let maxGapTotal = 35; // Constrained to prevent overlap with formula box
+        let cylGap = state.cylPeel * (maxGapTotal / (numDiscs - 1 || 1));
+        let coneGap = state.conePeel * (maxGapTotal / (numDiscs - 1 || 1));
+
+        // 1. DRAW SHAPES (Bottom Layer)
+        if (isComplete) {
+            for (let i = 0; i < numDiscs; i++) {
+                let y = base_y - i * dh - i * coneGap;
+                let rxB = rx * (numDiscs - i) / numDiscs, ryB = ry * (numDiscs - i) / numDiscs;
+                let rxT = rx * (numDiscs - i - 1) / numDiscs, ryT = ry * (numDiscs - i - 1) / numDiscs;
+                if(rxT < 0) rxT = 0; if(ryT < 0) ryT = 0;
+                drawConeFrustumSegment(P_CONE_X, y, rxB, ryB, rxT, ryT, dh, C.cone, C.coneLight);
+            }
+            for (let i = 0; i < numDiscs; i++) {
+                let y = base_y - i * dh - i * cylGap;
+                drawCylinderSegment(P_CYL_X, y, rx, ry, dh, C.cyl, C.cylLight);
+            }
+        } else {
+            let cylFill = (state.pours + (state.pouring ? state.anim : 0)) / 3;
+            if (cylFill > 0) drawCylinderSegment(P_CYL_X, base_y, rx, ry, H * cylFill, C.cone, C.coneLight);
+            drawEmptyCylinder(P_CYL_X, base_y, rx, ry, H);
+
+            let coneFill = state.pouring ? 1 - state.anim : (state.pours < 3 ? 1 : 0);
+            if (coneFill > 0) drawConeLiquid(P_CONE_X, base_y, rx, ry, H, coneFill, C.cone, C.coneLight);
+            drawEmptyCone(P_CONE_X, base_y, rx, ry, H);
+
+            if (state.pouring) {
+                let streamStartY = base_y - H * (1 - Math.pow(1 - coneFill, 1/3));
+                drawStream(P_CONE_X + rx * 0.5, streamStartY, P_CYL_X, base_y - H * cylFill, C.coneLight);
+            }
+        }
+
+        // --- Progressive mark lines (ON TOP of shapes) ---
+        if (!isComplete) {
+            ctx.strokeStyle = '#95a5a6'; ctx.fillStyle = '#2c3e50'; ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 5]); ctx.font = 'bold 16px Inter, sans-serif';
+            ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+            
+            for (let i = 1; i <= state.pours; i++) {
+                if (i === 3) continue; 
+                let lineY = base_y - (H * i / 3);
+                ctx.beginPath();
+                ctx.moveTo(P_CYL_X - rx - 10, lineY); ctx.lineTo(P_CYL_X + rx + 10, lineY);
+                ctx.stroke();
+                ctx.fillText(`${i}/3`, P_CYL_X - rx - 15, lineY);
+            }
+            ctx.setLineDash([]);
+        }
+
+        // 2. DRAW LABELS & DIMENSIONS (Front Layer)
+        let labelColor = '#2c3e50';
+        ctx.strokeStyle = C.outline; ctx.fillStyle = labelColor; ctx.lineWidth = 1.5;
+
+        // --- Cone Dimensions ---
+        let topY_cone = base_y - H;
+        if (isComplete) topY_cone = base_y - (numDiscs - 1) * dh - (numDiscs - 1) * coneGap - dh;
+
+        let crX = P_CONE_X - rx - 20;
+        ctx.setLineDash([5, 5]); ctx.beginPath();
+        ctx.moveTo(P_CONE_X, base_y); ctx.lineTo(crX, base_y); ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.font = 'bold 16px Inter, sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        ctx.fillText(`r = ${state.r}`, crX - 8, base_y);
+
+        let chX = P_CONE_X + rx + 25;
+        ctx.setLineDash([5, 5]); ctx.beginPath();
+        ctx.moveTo(chX - 10, base_y); ctx.lineTo(chX, base_y);
+        ctx.moveTo(chX, base_y); ctx.lineTo(chX, topY_cone);
+        ctx.moveTo(chX - 10, topY_cone); ctx.lineTo(chX, topY_cone); ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.textAlign = 'left'; ctx.fillText(`h = ${state.h}`, chX + 8, (base_y + topY_cone) / 2);
+
+        // --- Cylinder Dimensions ---
+        let topY_cyl = base_y - H;
+        if (isComplete) topY_cyl = base_y - (numDiscs - 1) * dh - (numDiscs - 1) * cylGap - dh;
+
+        let cyrX = P_CYL_X + rx + 20;
+        ctx.setLineDash([5, 5]); ctx.beginPath();
+        ctx.moveTo(P_CYL_X, topY_cyl); ctx.lineTo(cyrX, topY_cyl); ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.textAlign = 'left'; ctx.fillText(`r = ${state.r}`, cyrX + 8, topY_cyl);
+
+        let cyhX = P_CYL_X - rx - 55; 
+        ctx.setLineDash([5, 5]); ctx.beginPath();
+        ctx.moveTo(cyhX + 15, base_y); ctx.lineTo(cyhX, base_y);
+        ctx.moveTo(cyhX, base_y); ctx.lineTo(cyhX, topY_cyl);
+        ctx.moveTo(cyhX + 15, topY_cyl); ctx.lineTo(cyhX, topY_cyl); ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.textAlign = 'right'; ctx.fillText(`h = ${state.h}`, cyhX - 8, (base_y + topY_cyl) / 2);
+
+        // Poured Counter
+        ctx.fillStyle = '#154360'; ctx.font = 'bold 18px Inter, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        let poursDisplayed = isComplete ? 3 : state.pours;
+        ctx.fillText(`Poured: ${poursDisplayed}`, P_CYL_X, topY_cyl - 20);
+
+        // Peel text
+        let textBaseY = base_y + ry + 22; 
+        if (isComplete && state.conePeel > 0) {
+            ctx.textBaseline = 'middle'; ctx.font = 'bold 16px Inter, sans-serif';
+            ctx.fillText("Cone's discs shrink \u2014 less volume", P_CONE_X, textBaseY);
+        }
+        
+        requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+</script>
+</body>
+</html>

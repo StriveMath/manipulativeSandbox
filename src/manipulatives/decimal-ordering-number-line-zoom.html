@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Order Decimals: Number Line Zoom</title>
+    <style>
+        /* Neutral, clean reset */
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #e9ecef;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            touch-action: none; /* Prevent scrolling while dragging */
+        }
+
+        /* Fixed 800x500 container */
+        #app-container {
+            position: relative;
+            width: 800px;
+            height: 500px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.15);
+            overflow: hidden;
+            user-select: none;
+        }
+
+        canvas {
+            display: block;
+            width: 800px;
+            height: 500px;
+            cursor: default;
+        }
+
+        /* UI Controls Overlay */
+        .ui-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            letter-spacing: 0.3px;
+        }
+        
+        .ui-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Always Visible New Set Button (Top Right) */
+        #newBtn {
+            position: absolute;
+            background-color: #f8f9fa;
+            color: #495057;
+            border: 1px solid #ced4da;
+            top: 20px;
+            right: 30px;
+            z-index: 10;
+        }
+        #newBtn:hover { background-color: #e2e6ea; }
+
+        /* Central "Show Number Line" Button */
+        #showLineBtn {
+            position: absolute;
+            top: 230px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #457b9d;
+            color: white;
+            font-size: 16px;
+            padding: 12px 24px;
+            box-shadow: 0 4px 12px rgba(69, 123, 157, 0.3);
+            display: none;
+        }
+
+        #showLineBtn:hover:not(:disabled) {
+            background-color: #1d3557;
+        }
+
+        /* Bottom Control Bar */
+        #bottom-bar {
+            position: absolute;
+            bottom: 15px;
+            left: 0;
+            width: 100%;
+            padding: 0 30px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            display: none; /* Hidden until number line is active */
+        }
+
+        .left-controls, .right-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .zoom-btn {
+            background-color: #f8f9fa;
+            color: #212529;
+            border: 1px solid #ced4da;
+            padding: 8px 12px;
+        }
+        .zoom-btn:hover:not(:disabled) { background-color: #e2e6ea; }
+
+        #revealBtn {
+            background-color: #2a9d8f;
+            color: white;
+            display: none; /* Only on Level 3 */
+        }
+        #revealBtn:hover:not(:disabled) { background-color: #21867a; }
+
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <canvas id="canvas" width="800" height="500"></canvas>
+        
+        <button id="newBtn" class="ui-btn">New set</button>
+        <button id="showLineBtn" class="ui-btn">Show number line</button>
+        
+        <div id="bottom-bar">
+            <div class="left-controls">
+                <button id="zoomOutBtn" class="ui-btn zoom-btn">Zoom out</button>
+                <button id="zoomInBtn" class="ui-btn zoom-btn">Zoom in</button>
+                <button id="panLeftBtn" class="ui-btn zoom-btn">&#9664; Pan</button>
+                <button id="panRightBtn" class="ui-btn zoom-btn">Pan &#9654;</button>
+                <span id="zoomLabel" style="font-size: 14px; font-weight: 600; color: #6c757d; margin-left: 8px;">Level 1</span>
+            </div>
+            <div class="right-controls">
+                <button id="revealBtn" class="ui-btn">Reveal order</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // UI Elements
+        const showLineBtn = document.getElementById('showLineBtn');
+        const bottomBar = document.getElementById('bottom-bar');
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        const panLeftBtn = document.getElementById('panLeftBtn');
+        const panRightBtn = document.getElementById('panRightBtn');
+        const revealBtn = document.getElementById('revealBtn');
+        const newBtn = document.getElementById('newBtn');
+        const zoomLabel = document.getElementById('zoomLabel');
+
+        // Curated Sets containing step, precision and original bounding range for accurate window sizing
+        const RAW_SETS = [
+            {
+                vals: ["0.6", "0.65", "0.06", "0.599"],
+                levels: [
+                    { min: 0.0, max: 0.7, step: 0.1, prec: 1 },    // L1: Tenths
+                    { min: 0.55, max: 0.68, step: 0.01, prec: 2 },   // L2: Hundredths
+                    { min: 0.595, max: 0.605, step: 0.001, prec: 3 } // L3: Thousandths
+                ]
+            },
+            {
+                vals: ["0.45", "0.5", "0.09", "0.455"],
+                levels: [
+                    { min: 0.0, max: 0.6, step: 0.1, prec: 1 },
+                    { min: 0.40, max: 0.52, step: 0.01, prec: 2 },
+                    { min: 0.445, max: 0.460, step: 0.001, prec: 3 }
+                ]
+            },
+            {
+                vals: ["0.2", "0.105", "0.15", "0.201"],
+                levels: [
+                    { min: 0.0, max: 0.3, step: 0.1, prec: 1 },
+                    { min: 0.10, max: 0.25, step: 0.01, prec: 2 },
+                    { min: 0.195, max: 0.205, step: 0.001, prec: 3 }
+                ]
+            },
+            {
+                vals: ["0.7", "0.72", "0.07", "0.699"],
+                levels: [
+                    { min: 0.0, max: 0.8, step: 0.1, prec: 1 },
+                    { min: 0.65, max: 0.75, step: 0.01, prec: 2 },
+                    { min: 0.695, max: 0.705, step: 0.001, prec: 3 }
+                ]
+            }
+        ];
+
+        // Fixed distinct palette for the cards & points to aid cognitive mapping
+        const COLORS = ["#e63946", "#2a9d8f", "#f4a261", "#8338ec"];
+
+        let availableSets = [];
+        let currentSetData = null;
+        
+        let cards = [];
+        let slots = [];
+        
+        // Interaction states
+        let isDragging = false;
+        let dragCardId = null;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+        
+        let isPanning = false;   // Dragging the number line
+        let isScrolling = false; // Dragging the scrollbar thumb
+        let lastPanX = 0;
+
+        let feedbackMsg = "";
+        let showNumberLine = false;
+        let zoomLevel = 1; // 1, 2, 3
+        
+        // Dynamic view window (updated by zooming and panning)
+        let viewMin = 0;
+        let viewMax = 1;
+
+        let showRevealText = false;
+        let orderedReadout = "";
+
+        // Layout Constants
+        const CARD_W = 100;
+        const CARD_H = 50;
+        const POOL_Y = 60;
+        const SLOT_Y = 145;
+        const LINE_Y = 320; 
+        const TRACK_PADDING = 50;
+        const TRACK_W = 800 - (TRACK_PADDING * 2);
+
+        function init() {
+            // Setup Drop Slots
+            const startX = (800 - (4 * CARD_W + 3 * 30)) / 2;
+            for (let i = 0; i < 4; i++) {
+                slots.push({
+                    id: i,
+                    x: startX + i * (CARD_W + 30),
+                    y: SLOT_Y,
+                    w: CARD_W,
+                    h: CARD_H,
+                    cardId: null
+                });
+            }
+
+            // Bind Events
+            canvas.addEventListener('mousedown', handleStart);
+            canvas.addEventListener('mousemove', handleMove);
+            window.addEventListener('mouseup', handleEnd);
+
+            canvas.addEventListener('touchstart', handleStart, {passive: false});
+            canvas.addEventListener('touchmove', handleMove, {passive: false});
+            window.addEventListener('touchend', handleEnd);
+
+            newBtn.addEventListener('click', loadRandomSet);
+            
+            showLineBtn.addEventListener('click', () => {
+                showNumberLine = true;
+                setZoomLevel(1);
+            });
+
+            zoomInBtn.addEventListener('click', () => {
+                if (zoomLevel < 3) setZoomLevel(zoomLevel + 1);
+            });
+
+            zoomOutBtn.addEventListener('click', () => {
+                if (zoomLevel > 1) setZoomLevel(zoomLevel - 1);
+            });
+
+            // Adjusted Pan polarities so points shift in the arrow's direction
+            panLeftBtn.addEventListener('click', () => {
+                panByPercent(0.2);
+            });
+
+            panRightBtn.addEventListener('click', () => {
+                panByPercent(-0.2);
+            });
+
+            revealBtn.addEventListener('click', () => {
+                showRevealText = true;
+                updateUIState();
+            });
+
+            availableSets = [...RAW_SETS];
+            loadRandomSet();
+            requestAnimationFrame(drawLoop);
+        }
+
+        function loadRandomSet() {
+            if (availableSets.length === 0) availableSets = [...RAW_SETS];
+            
+            const idx = Math.floor(Math.random() * availableSets.length);
+            currentSetData = availableSets.splice(idx, 1)[0];
+            
+            // Assign colors and random starting positions
+            let poolOrder = [...currentSetData.vals].sort(() => Math.random() - 0.5);
+            cards = [];
+            
+            const startX = (800 - (4 * CARD_W + 3 * 30)) / 2;
+
+            poolOrder.forEach((valStr, i) => {
+                const origIdx = currentSetData.vals.indexOf(valStr);
+                let px = startX + i * (CARD_W + 30);
+                
+                cards.push({
+                    id: i,
+                    str: valStr,
+                    val: parseFloat(valStr),
+                    poolX: px,
+                    poolY: POOL_Y,
+                    x: px,
+                    y: POOL_Y,
+                    color: COLORS[origIdx],
+                    currentSlot: null,
+                    isDragging: false
+                });
+            });
+
+            orderedReadout = [...cards].sort((a,b) => a.val - b.val).map(c => c.str).join("  <  ");
+
+            // Reset States
+            slots.forEach(s => s.cardId = null);
+            feedbackMsg = "";
+            showNumberLine = false;
+            zoomLevel = 1;
+            showRevealText = false;
+            dragCardId = null;
+            isDragging = false;
+            isPanning = false;
+            isScrolling = false;
+            
+            updateUIState();
+        }
+
+        // Apply a specific zoom level and calculate perfect median centering
+        function setZoomLevel(targetLevel) {
+            zoomLevel = targetLevel;
+            const config = currentSetData.levels[zoomLevel - 1];
+            let windowSize = config.max - config.min;
+
+            if (zoomLevel === 1) {
+                // Wide view perfectly captures the exact bounds without auto-centering
+                viewMin = config.min;
+                viewMax = config.max;
+            } else {
+                // Tighter zoom levels auto-center on the median of all 4 points
+                let sortedVals = cards.map(c => c.val).sort((a, b) => a - b);
+                let median = (sortedVals[1] + sortedVals[2]) / 2;
+                viewMin = median - windowSize / 2;
+                viewMax = viewMin + windowSize;
+            }
+
+            clampPan();
+            showRevealText = false; // Collapse text when jumping levels
+            updateUIState();
+        }
+
+        function panByPercent(percentChange) {
+            let windowSize = viewMax - viewMin;
+            let dVal = windowSize * percentChange;
+            viewMin += dVal;
+            viewMax += dVal;
+            clampPan();
+        }
+
+        // Keep the user from panning infinitely far into the void
+        function clampPan() {
+            const absoluteMin = currentSetData.levels[0].min;
+            const absoluteMax = currentSetData.levels[0].max;
+            const windowSize = viewMax - viewMin;
+            
+            // Allow panning up to half a window size outside the absolute data bounds
+            const buffer = windowSize * 0.5;
+            
+            if (viewMin < absoluteMin - buffer) {
+                viewMin = absoluteMin - buffer;
+                viewMax = viewMin + windowSize;
+            }
+            if (viewMax > absoluteMax + buffer) {
+                viewMax = absoluteMax + buffer;
+                viewMin = viewMax - windowSize;
+            }
+        }
+
+        function updateUIState() {
+            let filledCount = slots.filter(s => s.cardId !== null).length;
+            
+            if (filledCount === 4 && !showNumberLine) {
+                showLineBtn.style.display = 'block';
+            } else {
+                showLineBtn.style.display = 'none';
+            }
+
+            if (showNumberLine) {
+                bottomBar.style.display = 'flex';
+                zoomOutBtn.disabled = (zoomLevel === 1);
+                zoomInBtn.disabled = (zoomLevel === 3);
+                zoomLabel.textContent = `Level ${zoomLevel}`;
+                revealBtn.style.display = (zoomLevel === 3) ? 'block' : 'none';
+            } else {
+                bottomBar.style.display = 'none';
+            }
+        }
+
+        // --- Interaction Logic ---
+        
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+
+        function handleStart(e) {
+            e.preventDefault();
+            const pos = getMousePos(e);
+            
+            // 1. Check if trying to drag a card
+            for (let i = cards.length - 1; i >= 0; i--) {
+                let c = cards[i];
+                if (pos.x >= c.x && pos.x <= c.x + CARD_W && pos.y >= c.y && pos.y <= c.y + CARD_H) {
+                    isDragging = true;
+                    dragCardId = c.id;
+                    c.isDragging = true;
+                    dragOffsetX = pos.x - c.x;
+                    dragOffsetY = pos.y - c.y;
+                    
+                    cards.push(cards.splice(i, 1)[0]); // Bring to front
+                    return;
+                }
+            }
+
+            if (showNumberLine) {
+                // 2. Check Scrollbar Track zone
+                if (pos.y >= LINE_Y + 25 && pos.y <= LINE_Y + 60) {
+                    isScrolling = true;
+                    lastPanX = pos.x;
+                    canvas.style.cursor = 'ew-resize';
+                    return;
+                }
+                
+                // 3. Check Number Line zone
+                if (pos.y >= LINE_Y - 40 && pos.y < LINE_Y + 25) {
+                    isPanning = true;
+                    lastPanX = pos.x;
+                    canvas.style.cursor = 'ew-resize';
+                    return;
+                }
+            }
+        }
+
+        function handleMove(e) {
+            const pos = getMousePos(e);
+
+            // Dragging the scrollbar thumb
+            if (isScrolling) {
+                e.preventDefault();
+                let dx = pos.x - lastPanX;
+                let fullRange = currentSetData.levels[0].max - currentSetData.levels[0].min;
+                // Thumb moves with mouse, view updates proportionately
+                let dVal = (dx / TRACK_W) * fullRange; 
+                viewMin += dVal;
+                viewMax += dVal;
+                lastPanX = pos.x;
+                clampPan();
+                return;
+            }
+
+            // Dragging the number line directly
+            if (isPanning) {
+                e.preventDefault();
+                let dx = pos.x - lastPanX;
+                let windowSize = viewMax - viewMin;
+                // Line moves with mouse
+                let dVal = - (dx / TRACK_W) * windowSize;
+                
+                viewMin += dVal;
+                viewMax += dVal;
+                lastPanX = pos.x;
+                clampPan();
+                return;
+            }
+
+            // Dragging a card
+            if (isDragging) {
+                e.preventDefault();
+                canvas.style.cursor = 'grabbing';
+                let c = cards.find(card => card.id === dragCardId);
+                if (c) {
+                    c.x = pos.x - dragOffsetX;
+                    c.y = pos.y - dragOffsetY;
+                }
+                return;
+            }
+
+            // Hover state adjustments
+            if (!isDragging && !isPanning && !isScrolling) {
+                let overCard = cards.some(c => pos.x >= c.x && pos.x <= c.x + CARD_W && pos.y >= c.y && pos.y <= c.y + CARD_H);
+                let overLine = (showNumberLine && pos.y >= LINE_Y - 40 && pos.y < LINE_Y + 25);
+                let overScrollbar = (showNumberLine && pos.y >= LINE_Y + 25 && pos.y <= LINE_Y + 60);
+                
+                if (overCard) canvas.style.cursor = 'grab';
+                else if (overLine || overScrollbar) canvas.style.cursor = 'ew-resize';
+                else canvas.style.cursor = 'default';
+            }
+        }
+
+        function handleEnd(e) {
+            if (isPanning || isScrolling) {
+                isPanning = false;
+                isScrolling = false;
+                canvas.style.cursor = 'default';
+                return;
+            }
+
+            if (!isDragging) return;
+            
+            let c = cards.find(card => card.id === dragCardId);
+            if (!c) {
+                isDragging = false; return;
+            }
+
+            c.isDragging = false;
+            isDragging = false;
+            canvas.style.cursor = 'default';
+
+            const centerX = c.x + CARD_W / 2;
+            const centerY = c.y + CARD_H / 2;
+            
+            let targetSlot = slots.find(s => 
+                centerX >= s.x && centerX <= s.x + s.w &&
+                centerY >= s.y && centerY <= s.y + s.h
+            );
+
+            if (c.currentSlot !== null) {
+                let oldSlot = slots.find(s => s.id === c.currentSlot);
+                if (oldSlot) oldSlot.cardId = null;
+                c.currentSlot = null;
+            }
+
+            if (targetSlot) {
+                if (targetSlot.cardId !== null) {
+                    let occupant = cards.find(card => card.id === targetSlot.cardId);
+                    occupant.x = occupant.poolX;
+                    occupant.y = occupant.poolY;
+                    occupant.currentSlot = null;
+                }
+                c.x = targetSlot.x;
+                c.y = targetSlot.y;
+                c.currentSlot = targetSlot.id;
+                targetSlot.cardId = c.id;
+            } else {
+                c.x = c.poolX;
+                c.y = c.poolY;
+            }
+
+            evaluateSlots();
+        }
+
+        function evaluateSlots() {
+            let filledCount = slots.filter(s => s.cardId !== null).length;
+            
+            if (filledCount < 4) {
+                feedbackMsg = "";
+            } else {
+                const userOrder = slots.map(s => cards.find(c => c.id === s.cardId).val);
+                const sortedOrder = [...userOrder].sort((a, b) => a - b);
+                
+                let isCorrect = true;
+                for (let i = 0; i < 4; i++) {
+                    if (userOrder[i] !== sortedOrder[i]) isCorrect = false;
+                }
+                feedbackMsg = isCorrect ? "Correct order!" : "Not quite in order yet.";
+            }
+            updateUIState();
+        }
+
+        // --- Drawing Routines ---
+
+        function drawLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Canvas Title
+            ctx.fillStyle = "#343a40";
+            ctx.font = "16px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("Drag into order: least to greatest", 400, 25);
+
+            // Draw Evaluative Feedback (Tightly above Number Line)
+            if (feedbackMsg) {
+                ctx.font = "bold 16px sans-serif";
+                ctx.fillStyle = feedbackMsg === "Correct order!" ? "#2a9d8f" : "#e63946";
+                ctx.fillText(feedbackMsg, 400, 210);
+            }
+
+            // Draw Empty Slots
+            slots.forEach((s, index) => {
+                ctx.beginPath();
+                ctx.setLineDash([6, 6]);
+                ctx.rect(s.x, s.y, s.w, s.h);
+                ctx.strokeStyle = "#ced4da";
+                ctx.lineWidth = 2;
+                ctx.fillStyle = "#f8f9fa";
+                ctx.fill();
+                ctx.stroke();
+                ctx.setLineDash([]); 
+
+                if (s.cardId === null) {
+                    ctx.fillStyle = "#adb5bd";
+                    ctx.font = "bold 18px sans-serif";
+                    ctx.fillText(index + 1, s.x + s.w / 2, s.y + s.h / 2);
+                }
+            });
+
+            // Draw Cards
+            cards.forEach(c => {
+                ctx.beginPath();
+                ctx.rect(c.x, c.y, CARD_W, CARD_H);
+                
+                if (c.isDragging) {
+                    ctx.shadowColor = 'rgba(0,0,0,0.2)';
+                    ctx.shadowBlur = 10;
+                    ctx.shadowOffsetY = 5;
+                    ctx.fillStyle = "#f1f3f5";
+                } else {
+                    ctx.fillStyle = "#ffffff";
+                }
+                ctx.fill();
+                ctx.shadowColor = 'transparent';
+
+                ctx.strokeStyle = c.color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = "#212529";
+                ctx.font = "bold 18px sans-serif";
+                ctx.fillText(c.str, c.x + CARD_W / 2, c.y + CARD_H / 2);
+            });
+
+            if (showNumberLine) {
+                drawNumberLine();
+            }
+
+            requestAnimationFrame(drawLoop);
+        }
+
+        function drawNumberLine() {
+            const config = currentSetData.levels[zoomLevel - 1];
+            
+            // Base Line
+            ctx.beginPath();
+            ctx.moveTo(TRACK_PADDING, LINE_Y);
+            ctx.lineTo(800 - TRACK_PADDING, LINE_Y);
+            ctx.strokeStyle = "#212529";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+            ctx.fillStyle = "#495057";
+            ctx.font = "13px sans-serif";
+            ctx.lineWidth = 2;
+
+            // Dynamically calculate visible ticks based on the shifted view window
+            let step = config.step;
+            let startTick = Math.ceil(viewMin / step);
+            let endTick = Math.floor(viewMax / step);
+
+            for (let i = startTick; i <= endTick; i++) {
+                let v = i * step;
+                v = Number(v.toFixed(config.prec)); // Handle JavaScript float imprecision
+                
+                let x = TRACK_PADDING + ((v - viewMin) / (viewMax - viewMin)) * TRACK_W;
+                
+                // Draw tick only if within main line bounds
+                if (x >= TRACK_PADDING - 2 && x <= 800 - TRACK_PADDING + 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, LINE_Y - 8);
+                    ctx.lineTo(x, LINE_Y + 8);
+                    ctx.stroke();
+
+                    let tickStr = v.toFixed(config.prec);
+                    ctx.fillText(tickStr, x, LINE_Y + 12);
+                }
+            }
+
+            // Map and filter points that are visibly inside the track area bounds
+            let visiblePoints = cards.map(c => {
+                let x = TRACK_PADDING + ((c.val - viewMin) / (viewMax - viewMin)) * TRACK_W;
+                return { ...c, nx: x };
+            }).filter(p => p.nx >= TRACK_PADDING - 5 && p.nx <= 800 - TRACK_PADDING + 5);
+
+            let levels = [-1000, -1000, -1000, -1000];
+            visiblePoints.sort((a, b) => a.nx - b.nx);
+            
+            visiblePoints.forEach(p => {
+                let placed = false;
+                const CLEARANCE = 55; // Pixels needed between labels on same level
+                for (let i = 0; i < levels.length; i++) {
+                    if (p.nx - levels[i] > CLEARANCE) {
+                        p.yLevel = i;
+                        levels[i] = p.nx;
+                        placed = true;
+                        break;
+                    }
+                }
+                if (!placed) p.yLevel = levels.length; 
+            });
+
+            // Draw Points and Labels above Number Line
+            visiblePoints.forEach(p => {
+                let labelY = LINE_Y - 25 - (p.yLevel * 28);
+                
+                ctx.beginPath();
+                ctx.moveTo(p.nx, LINE_Y);
+                ctx.lineTo(p.nx, labelY);
+                ctx.strokeStyle = p.color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(p.nx, LINE_Y, 6, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.fill();
+
+                ctx.font = "bold 14px sans-serif";
+                let tW = ctx.measureText(p.str).width + 12;
+                
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.roundRect(p.nx - tW/2, labelY - 10, tW, 20, 4);
+                ctx.fill();
+
+                ctx.fillStyle = "#ffffff";
+                ctx.textBaseline = "middle";
+                ctx.fillText(p.str, p.nx, labelY + 1);
+            });
+
+            // --- Draw Visual Scrollbar / Track Indicator ---
+            const trackY = LINE_Y + 38;
+            
+            // We measure the scrollbar against the absolute bounds of Level 1 (the widest view)
+            let fullMin = currentSetData.levels[0].min;
+            let fullMax = currentSetData.levels[0].max;
+            
+            // Adjust theoretical bounding track so thumb doesn't overflow if the user pans past limits
+            let trackMin = Math.min(fullMin, viewMin);
+            let trackMax = Math.max(fullMax, viewMax);
+            let trackRange = trackMax - trackMin;
+            
+            let thumbX = TRACK_PADDING + ((viewMin - trackMin) / trackRange) * TRACK_W;
+            let thumbW = ((viewMax - viewMin) / trackRange) * TRACK_W;
+
+            // Draw Background Track
+            ctx.beginPath();
+            ctx.moveTo(TRACK_PADDING, trackY);
+            ctx.lineTo(800 - TRACK_PADDING, trackY);
+            ctx.strokeStyle = "#e9ecef";
+            ctx.lineWidth = 6;
+            ctx.lineCap = "round";
+            ctx.stroke();
+
+            // Draw Active Thumb Window
+            ctx.beginPath();
+            ctx.moveTo(thumbX, trackY);
+            ctx.lineTo(thumbX + thumbW, trackY);
+            ctx.strokeStyle = "#adb5bd";
+            ctx.lineWidth = 6;
+            ctx.lineCap = "round";
+            ctx.stroke();
+
+            // Draw Readout Box neatly below Scrollbar (prevents overlapping)
+            if (showRevealText) {
+                ctx.fillStyle = "#f8f9fa";
+                ctx.strokeStyle = "#ced4da";
+                ctx.lineWidth = 1;
+                
+                const readoutY = LINE_Y + 55;
+                ctx.beginPath();
+                ctx.roundRect(TRACK_PADDING, readoutY, TRACK_W, 40, 6);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = "#212529";
+                ctx.font = "bold 16px sans-serif";
+                ctx.fillText("Confirmed order:  " + orderedReadout, 400, readoutY + 20);
+            }
+        }
+
+        // Initialize application on load
+        window.onload = init;
+    </script>
+</body>
+</html>

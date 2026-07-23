@@ -15,6 +15,12 @@ import DecimalHundredthsGrid from './decimal-hundredths-grid.jsx'
 import DecimalNumberLine from './decimal-number-line.jsx'
 import DecimalPlaceValueDisks from './decimal-place-value-disks.jsx'
 import DecimalPlaceValueStrips from './decimal-place-value-strips.jsx'
+import ComparingDecimals from './ComparingDecimals.tsx'
+import OrderingOfDecimals from './OrderingOfDecimals.tsx'
+import AbsoluteValueManipulative from './AbsoluteValueManipulative.tsx'
+import VolumeOfCylinders from './VolumeOfCylinders.tsx'
+import VolumeOfCone from './VolumeOfCone.tsx'
+import VolumeOfSphere from './VolumeOfSphere.tsx'
 import FactorTree from './factor-tree.jsx'
 import EquivalentFractionsVisual from './equivalent-fractions-visual.jsx'
 import FractionBars from './fraction-bars.jsx'
@@ -244,6 +250,36 @@ export const manipulatives = [
     id: 'area-of-trapezoid',
     name: 'Area of Trapezoid',
     component: TrapezoidAreaApp,
+  },
+  {
+    id: 'comparing-decimals',
+    name: 'Comparing decimals',
+    component: ComparingDecimals,
+  },
+  {
+    id: 'ordering-of-decimals',
+    name: 'Ordering of decimals',
+    component: OrderingOfDecimals,
+  },
+  {
+    id: 'absolute-value',
+    name: 'absolute value',
+    component: AbsoluteValueManipulative,
+  },
+  {
+    id: 'volume-of-cylinders',
+    name: 'Volume of Cylinders',
+    component: VolumeOfCylinders,
+  },
+  {
+    id: 'volume-of-cone',
+    name: 'Volume of cone',
+    component: VolumeOfCone,
+  },
+  {
+    id: 'volume-of-sphere',
+    name: 'Volume of Sphere',
+    component: VolumeOfSphere,
   },
   {
     id: 'factor-tree',
