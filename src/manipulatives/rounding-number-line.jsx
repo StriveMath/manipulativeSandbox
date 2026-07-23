@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cream, ink, muted, border, purple as numberPurple, green as roundGreen } from './shared/palette'
+import { useCanvasBox } from './shared/useCanvasBox'
+import { skipMotion } from './shared/motion'
+import ToggleChip from './shared/ToggleChip'
 
-const cream = '#F8F6F0'
-const ink = '#1A1A2E'
-const muted = '#5F5E5A'
-const numberPurple = '#7C3AED'
-const roundGreen = '#1D9E75'
 const midGray = '#9AA0AA'
-const axisColor = '#1A1A2E'
+const axisColor = ink
 
 const GHOST_MS = 680
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
@@ -22,7 +21,7 @@ const CONFIG = {
 export default function RoundingNumberLine() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const [canvasWidth, setCanvasWidth] = useState(720)
+  const { w: canvasWidth } = useCanvasBox(wrapRef, { minW: 420 })
   const [base, setBase] = useState(10)
   const [n, setN] = useState(27)
   const [hideAnswer, setHideAnswer] = useState(false)
@@ -36,7 +35,8 @@ export default function RoundingNumberLine() {
   const max = CONFIG[base].max
   const step = CONFIG[base].step
 
-  const fmt = (v) => (base === 1 ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : String(v))
+  // Memoised so it can be a stable dependency of draw().
+  const fmt = useCallback((v) => (base === 1 ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : String(v)), [base])
   const roundOf = useCallback(
     (v) => {
       const lower = Math.floor(v / base) * base
@@ -50,27 +50,15 @@ export default function RoundingNumberLine() {
   const mid = lower + base / 2
   const rounded = roundOf(n)
 
-  useLayoutEffect(() => {
-    const node = wrapRef.current
-    if (!node) return undefined
-    let raf = 0
-    const commit = (w) => {
-      const next = Math.max(420, Math.round(w))
-      setCanvasWidth((prev) => (Math.abs(prev - next) >= 1 ? next : prev))
-    }
-    commit(node.getBoundingClientRect().width)
-    const observer = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect?.width
-      if (!w) return
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => commit(w))
-    })
-    observer.observe(node)
-    return () => {
-      cancelAnimationFrame(raf)
-      observer.disconnect()
-    }
-  }, [])
+  // The canvas is the whole point of this manipulative, so it needs a text
+  // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
+  const summary = `Number line from ${fmt(min)} to ${fmt(max)}, rounding to the nearest ${base}. ${fmt(n)} is ${
+    n === mid
+      ? `exactly at the halfway point of ${fmt(mid)}`
+      : n < mid
+        ? `before the halfway point of ${fmt(mid)}, closer to ${fmt(lower)}`
+        : `after the halfway point of ${fmt(mid)}, closer to ${fmt(upper)}`
+  }.${hideAnswer ? ' The rounded answer is hidden.' : ` It rounds to ${fmt(rounded)}.`}`
 
   const geo = useMemo(() => {
     const PAD = 56
@@ -195,7 +183,7 @@ export default function RoundingNumberLine() {
     // Ghost point floating from the number to its rounded value.
     if (ghostRef.current) {
       const g = ghostRef.current
-      const t = clamp((performance.now() - g.start) / GHOST_MS, 0, 1)
+      const t = g.start === null ? 0 : clamp((performance.now() - g.start) / GHOST_MS, 0, 1)
       const gx = g.fromX + (g.toX - g.fromX) * easeOut(t)
       const gy = axisY - 26 * Math.sin(Math.PI * t)
       ctx.globalAlpha = 0.6 * (1 - t)
@@ -235,7 +223,7 @@ export default function RoundingNumberLine() {
     ctx.lineTo(nx, axisY - 46)
     ctx.closePath()
     ctx.fill()
-  }, [canvasWidth, geo, base, n, lower, upper, mid, rounded, hideAnswer])
+  }, [canvasWidth, geo, base, n, lower, upper, mid, rounded, hideAnswer, fmt, max])
 
   useEffect(() => {
     draw()
@@ -247,10 +235,11 @@ export default function RoundingNumberLine() {
 
   const runGhost = useCallback(() => {
     if (ghostRafRef.current) cancelAnimationFrame(ghostRafRef.current)
-    const tick = () => {
+    const tick = (now) => {
       const g = ghostRef.current
       if (!g) return
-      if (performance.now() - g.start >= GHOST_MS) {
+      if (g.start === null) g.start = now // the first frame starts the clock
+      if (now - g.start >= GHOST_MS) {
         ghostRef.current = null
         draw()
         return
@@ -264,7 +253,12 @@ export default function RoundingNumberLine() {
   const spawnGhost = (v) => {
     const rv = roundOf(v)
     if (rv === v) return
-    ghostRef.current = { fromX: geo.xFor(v), toX: geo.xFor(rv), start: performance.now() }
+    // Reduced motion: the rounded value still lands on its tick, it just does
+    // not travel there.
+    if (skipMotion()) return
+    // `start` is stamped by the first frame rather than read from the clock
+    // here — reading it now would be an impure call in the render body.
+    ghostRef.current = { fromX: geo.xFor(v), toX: geo.xFor(rv), start: null }
     runGhost()
   }
 
@@ -315,9 +309,11 @@ export default function RoundingNumberLine() {
         <span className="text-base font-bold" style={{ color: muted }}>(nearest {base})</span>
       </div>
 
-      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
+      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
         <canvas
           ref={canvasRef}
+          role="img"
+          aria-label={summary}
           className="h-full w-full touch-none cursor-grab active:cursor-grabbing"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -353,9 +349,7 @@ export default function RoundingNumberLine() {
             <button type="button" onClick={() => stepNumber(1)} className="h-10 text-2xl font-black" style={{ color: roundGreen }} aria-label="Increase number">+</button>
           </div>
         </div>
-        <button type="button" onClick={() => setHideAnswer((h) => !h)} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
-          {hideAnswer ? 'Show answer' : 'Hide answer'}
-        </button>
+        <ToggleChip label="Show rounded" color={roundGreen} on={!hideAnswer} onClick={() => setHideAnswer((h) => !h)} />
       </div>
     </div>
   )

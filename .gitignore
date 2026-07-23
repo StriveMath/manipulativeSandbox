@@ -27,3 +27,5 @@ repo_meta/
 *.njsproj
 *.sln
 *.sw?
+
+.claude/

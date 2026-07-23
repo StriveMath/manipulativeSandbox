@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-
-const cream = '#F8F6F0'
-const ink = '#1A1A2E'
-const muted = '#5F5E5A'
-const wholeGreen = '#1D9E75'
-const fracOrange = '#D85A30'
-const improperPurple = '#7C3AED'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cream, ink, muted, border, green as wholeGreen, orange as fracOrange, purple as improperPurple } from './shared/palette'
+import { useCanvasBox } from './shared/useCanvasBox'
+import ToggleChip from './shared/ToggleChip'
+import Stepper from './shared/Stepper'
 
 const MIN_DEN = 2
 const MAX_DEN = 8
@@ -15,7 +12,7 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
 export default function MixedNumbersImproper() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const [canvasWidth, setCanvasWidth] = useState(720)
+  const { w: canvasWidth } = useCanvasBox(wrapRef, { minW: 420 })
   const [den, setDen] = useState(4)
   const [num, setNum] = useState(7)
   const [hideMixed, setHideMixed] = useState(false)
@@ -26,27 +23,17 @@ export default function MixedNumbersImproper() {
   const whole = Math.floor(num / den)
   const rem = num % den
 
-  useLayoutEffect(() => {
-    const node = wrapRef.current
-    if (!node) return undefined
-    let raf = 0
-    const commit = (w) => {
-      const next = Math.max(420, Math.round(w))
-      setCanvasWidth((prev) => (Math.abs(prev - next) >= 1 ? next : prev))
-    }
-    commit(node.getBoundingClientRect().width)
-    const observer = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect?.width
-      if (!w) return
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => commit(w))
-    })
-    observer.observe(node)
-    return () => {
-      cancelAnimationFrame(raf)
-      observer.disconnect()
-    }
-  }, [])
+  // Mixed-number pieces for the equation (and the canvas's text equivalent).
+  const mixedParts = []
+  if (whole > 0) mixedParts.push({ text: String(whole), color: wholeGreen })
+  if (rem > 0) mixedParts.push({ text: `${rem}/${den}`, color: fracOrange })
+  if (mixedParts.length === 0) mixedParts.push({ text: '0', color: muted })
+
+  // The canvas is the whole point of this manipulative, so it needs a text
+  // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
+  const summary = `Bar model showing ${num}/${den}, split into ${den} equal parts per bar. ${
+    hideMixed ? 'The mixed-number equivalent is hidden.' : `That equals ${mixedParts.map((p) => p.text).join(' and ')} as a mixed number.`
+  }`
 
   const geo = useMemo(() => {
     const pad = 30
@@ -160,12 +147,6 @@ export default function MixedNumbersImproper() {
     setNum((v) => clamp(v, 0, nd * 5))
   }
 
-  // Mixed-number pieces for the equation.
-  const mixedParts = []
-  if (whole > 0) mixedParts.push({ text: String(whole), color: wholeGreen })
-  if (rem > 0) mixedParts.push({ text: `${rem}/${den}`, color: fracOrange })
-  if (mixedParts.length === 0) mixedParts.push({ text: '0', color: muted })
-
   return (
     <div className="flex h-full flex-col gap-2 overflow-hidden p-4 font-['Inter']" style={{ background: cream, color: ink }}>
       <div className="flex items-center justify-center gap-3 text-3xl font-black tabular-nums">
@@ -182,9 +163,11 @@ export default function MixedNumbersImproper() {
         )}
       </div>
 
-      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
+      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
         <canvas
           ref={canvasRef}
+          role="img"
+          aria-label={summary}
           className="h-full w-full touch-none cursor-grab active:cursor-grabbing"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -198,24 +181,25 @@ export default function MixedNumbersImproper() {
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <Stepper label="Pieces" color={improperPurple} value={num} onDec={() => setNum((v) => clamp(v - 1, 0, maxNum))} onInc={() => setNum((v) => clamp(v + 1, 0, maxNum))} />
-        <Stepper label="Denominator" color={ink} value={den} onDec={() => changeDen(den - 1)} onInc={() => changeDen(den + 1)} />
-        <button type="button" onClick={() => setHideMixed((h) => !h)} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
-          {hideMixed ? 'Show mixed number' : 'Hide mixed number'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function Stepper({ label, value, color, onDec, onInc }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm font-bold" style={{ color }}>{label}</span>
-      <div className="grid grid-cols-[38px_44px_38px] items-center overflow-hidden rounded-full border border-[#E0DDD6] bg-white">
-        <button type="button" onClick={onDec} className="h-10 text-2xl font-black" style={{ color: fracOrange }} aria-label={`Fewer ${label}`}>−</button>
-        <span className="border-x border-[#E0DDD6] py-2 text-center text-lg font-black tabular-nums">{value}</span>
-        <button type="button" onClick={onInc} className="h-10 text-2xl font-black" style={{ color: wholeGreen }} aria-label={`More ${label}`}>+</button>
+        <Stepper
+          label="Pieces"
+          color={improperPurple}
+          value={num}
+          onDec={() => setNum((v) => clamp(v - 1, 0, maxNum))}
+          onInc={() => setNum((v) => clamp(v + 1, 0, maxNum))}
+          decLabel="Fewer Pieces"
+          incLabel="More Pieces"
+        />
+        <Stepper
+          label="Denominator"
+          color={ink}
+          value={den}
+          onDec={() => changeDen(den - 1)}
+          onInc={() => changeDen(den + 1)}
+          decLabel="Fewer Denominator"
+          incLabel="More Denominator"
+        />
+        <ToggleChip label="Show mixed number" color={wholeGreen} on={!hideMixed} onClick={() => setHideMixed((h) => !h)} />
       </div>
     </div>
   )

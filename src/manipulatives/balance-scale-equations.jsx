@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cream, ink, muted, border, purple as xPurple, blue as unitBlue, green as balancedGreen, orange as offRed } from './shared/palette'
+import { useCanvasBox } from './shared/useCanvasBox'
+import { skipMotion } from './shared/motion'
+import GhostButton from './shared/GhostButton'
 
-const cream = '#F8F6F0'
-const ink = '#1A1A2E'
-const muted = '#5F5E5A'
-const xPurple = '#7C3AED'
-const unitBlue = '#2563EB'
 const beamWood = '#B07A3C'
-const balancedGreen = '#1D9E75'
-const offRed = '#D85A30'
 
 // ax + b = cx + d, solvable by removing equal tiles (|a - c| = 1).
 const PROBLEMS = [
@@ -25,8 +22,6 @@ const buildTiles = ({ x, u }) => [
   ...Array.from({ length: u }, () => ({ id: (tileSeq += 1), type: 'unit' })),
 ]
 
-const solveX = (p) => (p.right.u - p.left.u) / (p.left.x - p.right.x)
-
 const countType = (tiles, type) => tiles.filter((t) => t.type === type).length
 
 function sideLabel(xc, uc) {
@@ -40,19 +35,24 @@ function sideLabel(xc, uc) {
 export default function BalanceScaleEquations() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const [canvasWidth, setCanvasWidth] = useState(720)
+  const { w: canvasWidth } = useCanvasBox(wrapRef, { minW: 420 })
   const [problemIndex, setProblemIndex] = useState(0)
   const [left, setLeft] = useState(() => buildTiles(PROBLEMS[0].left))
   const [right, setRight] = useState(() => buildTiles(PROBLEMS[0].right))
   const [drag, setDrag] = useState(null) // { side, id, x, y, offX, offY }
 
   const canvasHeight = 360
-  const solution = useMemo(() => solveX(PROBLEMS[problemIndex]), [problemIndex])
 
   const leftX = countType(left, 'x')
   const leftU = countType(left, 'unit')
   const rightX = countType(right, 'x')
   const rightU = countType(right, 'unit')
+  // x is whatever value makes the equation currently on the pans true, so any
+  // equation the teacher builds works — nothing is hardcoded to a preset.
+  // If both sides hold the same number of x's there is no unique x; a nominal 1
+  // then correctly shows an identity as level and a no-solution as permanently tipped.
+  const denom = leftX - rightX
+  const solution = denom !== 0 ? (rightU - leftU) / denom : 1
   const leftW = leftX * solution + leftU
   const rightW = rightX * solution + rightU
   const balanced = leftW === rightW
@@ -62,29 +62,17 @@ export default function BalanceScaleEquations() {
       (rightX === 1 && rightU === 0 && leftX === 0 && leftU >= 1))
   const answer = solved ? (leftX === 1 ? rightU : leftU) : null
 
-  useLayoutEffect(() => {
-    const node = wrapRef.current
-    if (!node) return undefined
-    let raf = 0
-    // Measure before first paint; only commit a whole-pixel change, and defer
-    // via rAF so the observer can never feed back into itself (ResizeObserver "bounce").
-    const commit = (w) => {
-      const next = Math.max(420, Math.round(w))
-      setCanvasWidth((prev) => (Math.abs(prev - next) >= 1 ? next : prev))
-    }
-    commit(node.getBoundingClientRect().width)
-    const observer = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect?.width // unscaled content box — stable under parent transforms
-      if (!w) return
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => commit(w))
-    })
-    observer.observe(node)
-    return () => {
-      cancelAnimationFrame(raf)
-      observer.disconnect()
-    }
-  }, [])
+  const addTile = (side, type) => {
+    const tile = { id: (tileSeq += 1), type }
+    if (side === 'left') setLeft((prev) => [...prev, tile])
+    else setRight((prev) => [...prev, tile])
+  }
+
+  const clearAll = () => {
+    setLeft([])
+    setRight([])
+    setDrag(null)
+  }
 
   const loadProblem = (index) => {
     setProblemIndex(index)
@@ -152,7 +140,7 @@ export default function BalanceScaleEquations() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, canvasWidth, canvasHeight)
 
-    const { cx, pivotY, L, baseY } = geo
+    const { cx, pivotY, baseY } = geo
     const angle = angleRef.current
 
     // Fulcrum (triangle) + stand.
@@ -241,6 +229,12 @@ export default function BalanceScaleEquations() {
   // (which changes `draw` every frame) never restarts this loop — no shaking.
   useEffect(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    // The beam still ends up at the right tilt, it just gets there at once.
+    if (skipMotion()) {
+      angleRef.current = targetAngle
+      drawRef.current()
+      return undefined
+    }
     const tick = () => {
       const cur = angleRef.current
       const next = cur + (targetAngle - cur) * 0.2
@@ -298,14 +292,38 @@ export default function BalanceScaleEquations() {
     setDrag(null)
   }
 
-  const message = solved
-    ? `Solved!  x = ${answer}`
-    : !balanced
-      ? 'Unbalanced! Take the same tile off the OTHER side to level it again.'
-      : 'Balanced ✓  Drag matching tiles off both sides until one x sits alone.'
+  const isEmpty = left.length === 0 && right.length === 0
+  const noUniqueX = denom === 0 && !isEmpty
+  const message = isEmpty
+    ? 'Add x and 1 tiles to either pan to build an equation.'
+    : solved
+      ? `Solved!  x = ${answer}`
+      : noUniqueX
+        ? leftU === rightU
+          ? 'Both sides are identical — this is true for every value of x.'
+          : 'These sides can never balance — no value of x makes this true.'
+        : !balanced
+          ? 'Unbalanced! Take the same tile off the OTHER side to level it again.'
+          : 'Balanced ✓  Drag matching tiles off both sides until one x sits alone.'
 
   const leftEq = sideLabel(leftX, leftU)
   const rightEq = sideLabel(rightX, rightU)
+
+  // The canvas is the whole point of this manipulative, so it needs a text
+  // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
+  const summary = isEmpty
+    ? 'Empty balance scale. No tiles on either pan.'
+    : `Balance scale: left pan holds ${leftEq}, right pan holds ${rightEq}. ${
+        solved
+          ? `Solved — x equals ${answer}.`
+          : noUniqueX
+            ? leftU === rightU
+              ? 'Both sides are identical, true for every value of x.'
+              : 'These sides can never balance, no value of x works.'
+            : balanced
+              ? 'The scale is balanced.'
+              : 'The scale is tipped — the two sides are not equal.'
+      }`
 
   return (
     <div className="flex h-full flex-col gap-2 overflow-hidden p-4 font-['Inter']" style={{ background: cream, color: ink }}>
@@ -316,9 +334,11 @@ export default function BalanceScaleEquations() {
         <span style={{ color: solved ? balancedGreen : rightX ? xPurple : ink }}>{rightEq}</span>
       </div>
 
-      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
+      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
         <canvas
           ref={canvasRef}
+          role="img"
+          aria-label={summary}
           className="h-full w-full touch-none cursor-grab active:cursor-grabbing"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -331,17 +351,37 @@ export default function BalanceScaleEquations() {
         {message}
       </p>
 
-      <div className="flex flex-wrap items-center justify-center gap-4">
-        <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: muted }}>
-          <span className="inline-block h-4 w-4 rounded" style={{ background: xPurple }} /> = x
-          <span className="ml-3 inline-block h-4 w-4 rounded" style={{ background: unitBlue }} /> = 1
-        </div>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        {/* Build any equation: add tiles to either pan. */}
+        {['left', 'right'].map((side) => (
+          <div key={side} className="flex items-center gap-1.5">
+            <span className="text-xs font-black uppercase" style={{ color: muted }}>{side}</span>
+            <button
+              type="button"
+              onClick={() => addTile(side, 'x')}
+              className="rounded-lg px-3 py-1.5 text-sm font-black text-white"
+              style={{ background: xPurple }}
+              aria-label={`Add an x tile to the ${side} pan`}
+            >
+              + x
+            </button>
+            <button
+              type="button"
+              onClick={() => addTile(side, 'unit')}
+              className="rounded-lg px-3 py-1.5 text-sm font-black text-white"
+              style={{ background: unitBlue }}
+              aria-label={`Add a unit tile to the ${side} pan`}
+            >
+              + 1
+            </button>
+          </div>
+        ))}
         <label className="flex items-center gap-2 text-sm font-semibold" style={{ color: muted }}>
-          Problem:
+          Starter:
           <select
             value={problemIndex}
             onChange={(event) => loadProblem(Number(event.target.value))}
-            className="rounded-lg border border-[#E0DDD6] bg-white px-3 py-2 text-sm font-black outline-none"
+            className="rounded-lg border border-[#E0DDD6] bg-white px-2 py-1.5 text-sm font-black outline-none"
             style={{ color: xPurple }}
           >
             {PROBLEMS.map((p, i) => (
@@ -351,9 +391,12 @@ export default function BalanceScaleEquations() {
             ))}
           </select>
         </label>
-        <button type="button" onClick={() => loadProblem(problemIndex)} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+        <GhostButton compact onClick={() => loadProblem(problemIndex)} ariaLabel="Reset to the current problem's starting tiles">
           Reset
-        </button>
+        </GhostButton>
+        <GhostButton compact onClick={clearAll}>
+          Empty pans
+        </GhostButton>
       </div>
     </div>
   )

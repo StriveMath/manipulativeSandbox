@@ -1,16 +1,14 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-
-const cream = '#F8F6F0'
-const ink = '#1A1A2E'
-const muted = '#5F5E5A'
-const selBlue = '#2563EB'
-const totalPurple = '#7C3AED'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cream, ink, muted, border, blue as selBlue, purple as totalPurple } from './shared/palette'
+import { useCanvasBox } from './shared/useCanvasBox'
+import GhostButton from './shared/GhostButton'
+import ToggleChip from './shared/ToggleChip'
 
 const OPT_COLORS = {
   H: '#2563EB', T: '#D85A30',
   R: '#D8402F', B: '#2563EB', G: '#1D9E75',
 }
-const numColor = '#7C3AED'
+const numColor = totalPurple
 const colorOf = (o) => OPT_COLORS[o] || numColor
 
 const EXPERIMENTS = {
@@ -19,40 +17,39 @@ const EXPERIMENTS = {
   spinners: { name: 'Two spinners (R/B/G)', s1: ['R', 'B', 'G'], s2: ['R', 'B', 'G'] },
 }
 
+// Comma-separated options -> labels (max 6 a stage so the tree stays readable).
+const parseOpts = (text) => {
+  const o = text.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 6)
+  return o.length ? o : ['?']
+}
+
 export default function SampleSpaceTree() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const [size, setSize] = useState({ w: 720, h: 380 })
-  const [expKey, setExpKey] = useState('coins')
+  const size = useCanvasBox(wrapRef, { minW: 420, minH: 240 })
+  const [s1Text, setS1Text] = useState('H,T')
+  const [s2Text, setS2Text] = useState('H,T')
   const [selected, setSelected] = useState(() => new Set())
+  // Layered reveals: the teacher peels back one idea at a time.
+  const [show, setShow] = useState({ count: true, prob: true })
+  const toggle = (k) => setShow((s) => ({ ...s, [k]: !s[k] }))
 
-  const exp = EXPERIMENTS[expKey]
-  const a = exp.s1.length
-  const b = exp.s2.length
+  // Stages are free text, so a teacher (or the worksheet AI) can define any
+  // experiment; the presets below just load a starting pair.
+  const s1 = useMemo(() => parseOpts(s1Text), [s1Text])
+  const s2 = useMemo(() => parseOpts(s2Text), [s2Text])
+  const a = s1.length
+  const b = s2.length
   const N = a * b
+  const matchKey =
+    Object.entries(EXPERIMENTS).find(([, v]) => v.s1.join(',') === s1.join(',') && v.s2.join(',') === s2.join(','))?.[0] || 'custom'
 
-  useLayoutEffect(() => {
-    const node = wrapRef.current
-    if (!node) return undefined
-    let raf = 0
-    const commit = (box) => {
-      const w = Math.max(420, Math.round(box.width))
-      const h = Math.max(240, Math.round(box.height))
-      setSize((prev) => (Math.abs(prev.w - w) >= 1 || Math.abs(prev.h - h) >= 1 ? { w, h } : prev))
-    }
-    commit(node.getBoundingClientRect())
-    const observer = new ResizeObserver((entries) => {
-      const cr = entries[0]?.contentRect
-      if (!cr) return
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => commit(cr))
-    })
-    observer.observe(node)
-    return () => {
-      cancelAnimationFrame(raf)
-      observer.disconnect()
-    }
-  }, [])
+  // The canvas is the whole point of this manipulative, so it needs a text
+  // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
+  const summary =
+    `Sample space tree. Stage 1: ${s1.join(', ')} (${a} option${a === 1 ? '' : 's'}). ` +
+    `Stage 2: ${s2.join(', ')} (${b} option${b === 1 ? '' : 's'}). ${N} total outcome${N === 1 ? '' : 's'}, ${a} × ${b}. ` +
+    (selected.size > 0 ? `${selected.size} outcome${selected.size === 1 ? '' : 's'} selected.` : 'No outcomes selected.')
 
   const geo = useMemo(() => {
     const { w, h } = size
@@ -105,29 +102,31 @@ export default function SampleSpaceTree() {
     }
 
     // Branch probability labels (each branch is equally likely).
-    ctx.font = '700 10px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillStyle = muted
-    for (let j = 0; j < a; j += 1) {
-      const mx = rootX + 14 + (s1X - 14 - (rootX + 14)) * 0.42
-      const my = rootY + (s1Y(j) - rootY) * 0.42
-      ctx.fillText(`1/${a}`, mx, my - 7)
-    }
-    if (b <= 4) {
-      for (let k = 0; k < N; k += 1) {
-        const j = Math.floor(k / b)
-        const mx = s1X + 14 + (leafX - 12 - (s1X + 14)) * 0.45
-        const my = s1Y(j) + (leafY(k) - s1Y(j)) * 0.45
-        ctx.fillText(`1/${b}`, mx, my - 6)
+    if (show.prob) {
+      ctx.font = '700 10px Inter, system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = selBlue
+      for (let j = 0; j < a; j += 1) {
+        const mx = rootX + 14 + (s1X - 14 - (rootX + 14)) * 0.42
+        const my = rootY + (s1Y(j) - rootY) * 0.42
+        ctx.fillText(`1/${a}`, mx, my - 7)
       }
+      if (b <= 4) {
+        for (let k = 0; k < N; k += 1) {
+          const j = Math.floor(k / b)
+          const mx = s1X + 14 + (leafX - 12 - (s1X + 14)) * 0.45
+          const my = s1Y(j) + (leafY(k) - s1Y(j)) * 0.45
+          ctx.fillText(`1/${b}`, mx, my - 6)
+        }
+      }
+      // Per-outcome probability note.
+      ctx.fillStyle = selBlue
+      ctx.font = '800 11px Inter, system-ui, sans-serif'
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'top'
+      ctx.fillText(`each outcome = 1/${N}`, leafX - 12, 6)
     }
-    // Per-outcome probability note.
-    ctx.fillStyle = muted
-    ctx.font = '800 11px Inter, system-ui, sans-serif'
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'top'
-    ctx.fillText(`each outcome = 1/${N}`, leafX - 12, 6)
 
     // Root node.
     ctx.fillStyle = ink
@@ -142,7 +141,7 @@ export default function SampleSpaceTree() {
 
     // Stage 1 nodes.
     for (let j = 0; j < a; j += 1) {
-      const o = exp.s1[j]
+      const o = s1[j]
       if ([...selected].some((k) => Math.floor(k / b) === j)) {
         ctx.strokeStyle = selBlue
         ctx.lineWidth = 3
@@ -166,8 +165,8 @@ export default function SampleSpaceTree() {
     for (let k = 0; k < N; k += 1) {
       const j = Math.floor(k / b)
       const i = k % b
-      const o1 = exp.s1[j]
-      const o2 = exp.s2[i]
+      const o1 = s1[j]
+      const o2 = s2[i]
       const y = leafY(k)
       const on = selected.has(k)
       ctx.fillStyle = colorOf(o2)
@@ -192,7 +191,7 @@ export default function SampleSpaceTree() {
       ctx.textAlign = 'left'
       ctx.fillText(`${o1}${o2}`, leafX + r + 8, y)
     }
-  }, [size, geo, exp, a, b, N, selected])
+  }, [size, geo, s1, s2, a, b, N, selected, show])
 
   useEffect(() => {
     draw()
@@ -216,23 +215,32 @@ export default function SampleSpaceTree() {
     }
   }
 
-  const changeExp = (key) => {
-    setExpKey(key)
+  const loadStarter = (key) => {
+    const p = EXPERIMENTS[key]
+    if (!p) return
+    setS1Text(p.s1.join(','))
+    setS2Text(p.s2.join(','))
     setSelected(new Set())
   }
 
   return (
     <div className="flex h-full flex-col gap-2 overflow-hidden p-4 font-['Inter']" style={{ background: cream, color: ink }}>
       <div className="flex items-center justify-center gap-3 text-2xl font-black tabular-nums">
-        <span style={{ color: totalPurple }}>{N} outcomes</span>
-        <span className="text-base font-bold" style={{ color: muted }}>= {a} × {b}</span>
-        {selected.size > 0 && (
+        <span style={{ color: totalPurple }}>{show.count ? N : '?'} outcomes</span>
+        {show.count && <span className="text-base font-bold" style={{ color: muted }}>= {a} × {b}</span>}
+        {show.prob && selected.size > 0 && (
           <span className="text-base font-black" style={{ color: selBlue }}>· P(selected) = {selected.size}/{N}</span>
         )}
       </div>
 
-      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
-        <canvas ref={canvasRef} className="h-full w-full cursor-pointer" onClick={handleClick} />
+      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
+        <canvas
+          ref={canvasRef}
+          role="img"
+          aria-label={summary}
+          className="h-full w-full cursor-pointer"
+          onClick={handleClick}
+        />
       </div>
 
       <p className="text-center text-sm font-semibold" style={{ color: muted }}>
@@ -240,22 +248,44 @@ export default function SampleSpaceTree() {
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <label className="flex items-center gap-2 text-sm font-semibold" style={{ color: muted }}>
-          Experiment:
+        <label className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: muted }}>
+          Starter:
           <select
-            value={expKey}
-            onChange={(e) => changeExp(e.target.value)}
-            className="rounded-lg border border-[#E0DDD6] bg-white px-3 py-2 text-sm font-black outline-none"
+            value={matchKey}
+            onChange={(e) => loadStarter(e.target.value)}
+            className="rounded-lg border border-[#E0DDD6] bg-white px-2 py-1.5 text-sm font-black outline-none"
             style={{ color: totalPurple }}
           >
             {Object.entries(EXPERIMENTS).map(([k, v]) => (
               <option key={k} value={k}>{v.name}</option>
             ))}
+            <option value="custom">Custom</option>
           </select>
         </label>
-        <button type="button" onClick={() => setSelected(new Set())} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+        {/* Any experiment: type the outcomes for each stage. */}
+        <label className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: muted }}>
+          Stage 1:
+          <input
+            value={s1Text}
+            onChange={(e) => { setS1Text(e.target.value); setSelected(new Set()) }}
+            className="w-28 rounded-lg border border-[#E0DDD6] bg-white px-2 py-1.5 text-sm font-black outline-none"
+            style={{ color: ink }}
+          />
+        </label>
+        <label className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: muted }}>
+          Stage 2:
+          <input
+            value={s2Text}
+            onChange={(e) => { setS2Text(e.target.value); setSelected(new Set()) }}
+            className="w-28 rounded-lg border border-[#E0DDD6] bg-white px-2 py-1.5 text-sm font-black outline-none"
+            style={{ color: ink }}
+          />
+        </label>
+        <GhostButton compact onClick={() => setSelected(new Set())}>
           Clear selection
-        </button>
+        </GhostButton>
+        <ToggleChip compact label="Show count" color={totalPurple} on={show.count} onClick={() => toggle('count')} />
+        <ToggleChip compact label="Show probabilities" color={selBlue} on={show.prob} onClick={() => toggle('prob')} />
       </div>
     </div>
   )

@@ -1,11 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-
-const cream = '#F8F6F0'
-const ink = '#1A1A2E'
-const muted = '#5F5E5A'
-const blue = '#2563EB'
-const orange = '#D97706'
-const green = '#1D9E75'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cream, ink, muted, border, blue, amber as orange, green } from './shared/palette'
+import { useCanvasBox } from './shared/useCanvasBox'
+import ToggleChip from './shared/ToggleChip'
 
 const MIN_DEN = 2
 const MAX_DEN = 8
@@ -61,7 +57,7 @@ function hLabel(ctx, x, y, text, color) {
 export default function MultiplyingFractionsArea() {
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
-  const [size, setSize] = useState({ w: 460, h: 360 })
+  const size = useCanvasBox(wrapRef, { minW: 300, minH: 260 })
   const [num1, setNum1] = useState(1)
   const [den1, setDen1] = useState(2)
   const [num2, setNum2] = useState(1)
@@ -75,28 +71,9 @@ export default function MultiplyingFractionsArea() {
   const simpD = prodD / divisor
   const reduces = divisor > 1
 
-  useLayoutEffect(() => {
-    const node = wrapRef.current
-    if (!node) return undefined
-    let raf = 0
-    const commit = (box) => {
-      const w = Math.max(300, Math.round(box.width))
-      const h = Math.max(260, Math.round(box.height))
-      setSize((prev) => (Math.abs(prev.w - w) >= 1 || Math.abs(prev.h - h) >= 1 ? { w, h } : prev))
-    }
-    commit(node.getBoundingClientRect())
-    const observer = new ResizeObserver((entries) => {
-      const cr = entries[0]?.contentRect
-      if (!cr) return
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => commit(cr))
-    })
-    observer.observe(node)
-    return () => {
-      cancelAnimationFrame(raf)
-      observer.disconnect()
-    }
-  }, [])
+  // The canvas is the whole point of this manipulative, so it needs a text
+  // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
+  const summary = `Area model: a square split into ${den1} rows and ${den2} columns, ${prodD} equal pieces total. ${num1}/${den1} of the height is shaded blue, ${num2}/${den2} of the width is shaded orange, and their green overlap of ${prodN} piece${prodN === 1 ? '' : 's'} shows the product ${num1}/${den1} times ${num2}/${den2}${reduces ? `, which simplifies to ${simpN}/${simpD}` : ''}.`
 
   const geometry = useMemo(() => {
     // Reserve margin on the left and top for the "1 whole" + fraction brackets.
@@ -212,20 +189,13 @@ export default function MultiplyingFractionsArea() {
             </div>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => setHideAnswer((h) => !h)}
-          className="rounded-full border px-3 py-1 text-xs font-bold"
-          style={{ borderColor: '#E0DDD6', color: muted }}
-        >
-          {hideAnswer ? 'Show answer' : 'Hide answer'}
-        </button>
+        <ToggleChip label="Show product" color={green} on={!hideAnswer} onClick={() => setHideAnswer((h) => !h)} compact />
       </div>
 
       {/* Square + legend */}
       <div className="flex min-h-0 flex-1 gap-3">
-        <div ref={wrapRef} className="relative min-w-0 flex-[3] overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
-          <canvas ref={canvasRef} className="h-full w-full" />
+        <div ref={wrapRef} className="relative min-w-0 flex-[3] overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
+          <canvas ref={canvasRef} role="img" aria-label={summary} className="h-full w-full" />
         </div>
         <div className="flex flex-[2] flex-col justify-center gap-3 rounded-xl border border-[#E0DDD6] bg-white p-4 text-sm">
           <LegendRow color={blue} label={`${num1}/${den1} of the height`} />
@@ -283,12 +253,12 @@ function LegendRow({ color, label, solid }) {
   )
 }
 
-function MiniStepper({ value, onDec, onInc, color }) {
+function MiniStepper({ value, onDec, onInc, color, decLabel, incLabel }) {
   return (
     <div className="grid grid-cols-[32px_32px_32px] items-center overflow-hidden rounded-full border border-[#E0DDD6] bg-white">
-      <button type="button" onClick={onDec} className="h-8 text-xl font-black" style={{ color: '#D85A30' }}>−</button>
+      <button type="button" onClick={onDec} className="h-8 text-xl font-black" style={{ color: '#D85A30' }} aria-label={decLabel}>−</button>
       <span className="border-x border-[#E0DDD6] py-1 text-center text-base font-black tabular-nums" style={{ color }}>{value}</span>
-      <button type="button" onClick={onInc} className="h-8 text-xl font-black" style={{ color: green }}>+</button>
+      <button type="button" onClick={onInc} className="h-8 text-xl font-black" style={{ color: green }} aria-label={incLabel}>+</button>
     </div>
   )
 }
@@ -298,9 +268,23 @@ function FractionStepper({ label, color, num, den, onNum, onDen }) {
     <div className="flex items-center gap-3 rounded-xl border border-[#E0DDD6] bg-white px-4 py-2">
       <span className="text-sm font-bold" style={{ color }}>{label}</span>
       <div className="flex flex-col items-center gap-1">
-        <MiniStepper value={num} onDec={() => onNum(num - 1)} onInc={() => onNum(num + 1)} color={color} />
+        <MiniStepper
+          value={num}
+          onDec={() => onNum(num - 1)}
+          onInc={() => onNum(num + 1)}
+          color={color}
+          decLabel={`Decrease ${label} numerator`}
+          incLabel={`Increase ${label} numerator`}
+        />
         <span className="h-0.5 w-8" style={{ background: color }} />
-        <MiniStepper value={den} onDec={() => onDen(den - 1)} onInc={() => onDen(den + 1)} color={color} />
+        <MiniStepper
+          value={den}
+          onDec={() => onDen(den - 1)}
+          onInc={() => onDen(den + 1)}
+          color={color}
+          decLabel={`Decrease ${label} denominator`}
+          incLabel={`Increase ${label} denominator`}
+        />
       </div>
     </div>
   )

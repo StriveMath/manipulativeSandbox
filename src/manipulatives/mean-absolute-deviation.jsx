@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cream, ink, muted, border, purple as pointPurple, green as meanGreen, orange as distOrange } from './shared/palette'
+import { useCanvasBox } from './shared/useCanvasBox'
+import ToggleChip from './shared/ToggleChip'
+import GhostButton from './shared/GhostButton'
 
-const cream = '#F8F6F0'
-const ink = '#1A1A2E'
-const muted = '#5F5E5A'
-const pointPurple = '#7C3AED'
-const meanGreen = '#1D9E75'
-const distOrange = '#D85A30'
-const axisColor = '#1A1A2E'
+const axisColor = ink
 
 const MIN = 0
 const MAX = 20
@@ -17,9 +15,12 @@ let seq = 0
 export default function MeanAbsoluteDeviation() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const [canvasWidth, setCanvasWidth] = useState(720)
+  const { w: canvasWidth } = useCanvasBox(wrapRef, { minW: 420 })
   const [points, setPoints] = useState(() => [4, 7, 9, 16].map((v) => ({ id: (seq += 1), value: v })))
   const [drag, setDrag] = useState(null) // { id, startX, moved }
+  // Layered reveals: the teacher peels back one idea at a time.
+  const [show, setShow] = useState({ distances: true, mad: true })
+  const toggle = (k) => setShow((s) => ({ ...s, [k]: !s[k] }))
 
   const canvasHeight = 272
 
@@ -28,27 +29,12 @@ export default function MeanAbsoluteDeviation() {
   const distances = values.map((v) => Math.abs(v - mean))
   const mad = distances.length ? distances.reduce((a, b) => a + b, 0) / distances.length : 0
 
-  useLayoutEffect(() => {
-    const node = wrapRef.current
-    if (!node) return undefined
-    let raf = 0
-    const commit = (w) => {
-      const next = Math.max(420, Math.round(w))
-      setCanvasWidth((prev) => (Math.abs(prev - next) >= 1 ? next : prev))
-    }
-    commit(node.getBoundingClientRect().width)
-    const observer = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect?.width
-      if (!w) return
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => commit(w))
-    })
-    observer.observe(node)
-    return () => {
-      cancelAnimationFrame(raf)
-      observer.disconnect()
-    }
-  }, [])
+  // The canvas is the whole point of this manipulative, so it needs a text
+  // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
+  const summary = points.length
+    ? `Dot plot from ${MIN} to ${MAX}. ${points.length} points at ${values.join(', ')}. ` +
+      `Mean ${round1(mean)}.${show.mad ? ` Mean absolute deviation ${round1(mad)}.` : ''}`
+    : `Empty dot plot from ${MIN} to ${MAX}. Click the number line to add a data point.`
 
   const geo = useMemo(() => {
     const PAD = 46
@@ -77,7 +63,7 @@ export default function MeanAbsoluteDeviation() {
     const meanX = xFor(mean)
 
     // Shaded "typical" band: mean ± MAD (most points fall roughly this close).
-    if (points.length && mad > 0.05) {
+    if (show.mad && points.length && mad > 0.05) {
       const bx0 = xFor(Math.max(MIN, mean - mad))
       const bx1 = xFor(Math.min(MAX, mean + mad))
       ctx.fillStyle = 'rgba(29,158,117,0.12)'
@@ -129,6 +115,7 @@ export default function MeanAbsoluteDeviation() {
       .map((p, i) => ({ ...p, i }))
       .sort((a, b) => Math.abs(b.value - mean) - Math.abs(a.value - mean))
     ordered.forEach((p, row) => {
+      if (!show.distances) return
       if (drag && drag.id === p.id) return
       const px = xFor(p.value)
       const y = axisY - 22 - row * 20
@@ -157,7 +144,7 @@ export default function MeanAbsoluteDeviation() {
     })
 
     // MAD shown as a two-sided span (mean − MAD .. mean + MAD) below the axis.
-    if (points.length && mad > 0.05) {
+    if (show.mad && points.length && mad > 0.05) {
       const y2 = axisY + 34
       const lx = xFor(Math.max(MIN, mean - mad))
       const rx = xFor(Math.min(MAX, mean + mad))
@@ -223,7 +210,7 @@ export default function MeanAbsoluteDeviation() {
         ctx.globalAlpha = 1
       }
     }
-  }, [canvasWidth, geo, points, mean, mad, drag])
+  }, [canvasWidth, geo, points, mean, mad, drag, show])
 
   useEffect(() => {
     draw()
@@ -270,17 +257,21 @@ export default function MeanAbsoluteDeviation() {
           <span className="text-lg font-bold" style={{ color: muted }}>Click the line to add data points</span>
         ) : (
           <>
-            <span style={{ color: meanGreen }}>MAD = {round1(mad)}</span>
-            <span className="text-base font-bold" style={{ color: muted }}>
-              = average distance from the mean ({distances.map((d) => round1(d)).join(' + ')} ÷ {distances.length})
-            </span>
+            <span style={{ color: meanGreen }}>MAD = {show.mad ? round1(mad) : '?'}</span>
+            {show.distances && (
+              <span className="text-base font-bold" style={{ color: muted }}>
+                = average distance from the mean ({distances.map((d) => round1(d)).join(' + ')} ÷ {distances.length})
+              </span>
+            )}
           </>
         )}
       </div>
 
-      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
+      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
         <canvas
           ref={canvasRef}
+          role="img"
+          aria-label={summary}
           className="h-full w-full touch-none cursor-grab active:cursor-grabbing"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -294,15 +285,15 @@ export default function MeanAbsoluteDeviation() {
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <button type="button" onClick={() => setPoints([8, 10, 12].map((v) => ({ id: (seq += 1), value: v })))} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+        <GhostButton onClick={() => setPoints([8, 10, 12].map((v) => ({ id: (seq += 1), value: v })))} ariaLabel="Starter: bunched data">
           Bunched
-        </button>
-        <button type="button" onClick={() => setPoints([1, 6, 14, 19].map((v) => ({ id: (seq += 1), value: v })))} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
+        </GhostButton>
+        <GhostButton onClick={() => setPoints([1, 6, 14, 19].map((v) => ({ id: (seq += 1), value: v })))} ariaLabel="Starter: spread out data">
           Spread out
-        </button>
-        <button type="button" onClick={() => setPoints([])} className="rounded-full border px-4 py-2 text-sm font-bold" style={{ borderColor: '#E0DDD6', color: muted }}>
-          Clear
-        </button>
+        </GhostButton>
+        <GhostButton onClick={() => setPoints([])} ariaLabel="Clear all data points">Clear</GhostButton>
+        <ToggleChip label="Show distances" color={distOrange} on={show.distances} onClick={() => toggle('distances')} />
+        <ToggleChip label="Show MAD" color={meanGreen} on={show.mad} onClick={() => toggle('mad')} />
       </div>
     </div>
   )

@@ -1,32 +1,32 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { cream, ink, muted, border, green as solGreen, purple as boundPurple, blue as testBlue, red as noRed } from './shared/palette'
+import { useCanvasBox } from './shared/useCanvasBox'
+import ToggleChip from './shared/ToggleChip'
+import Stepper from './shared/Stepper'
 
-const cream = '#F8F6F0'
-const ink = '#1A1A2E'
-const muted = '#5F5E5A'
-const solGreen = '#1D9E75'
-const boundPurple = '#7C3AED'
-const testBlue = '#2563EB'
-const noRed = '#D8402F'
-const axisColor = '#1A1A2E'
+const axisColor = ink
 
 const MIN = -10
 const MAX = 10
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
 
 const OPS = [
-  { key: 'lt', sym: '<', inclusive: false, right: false },
-  { key: 'le', sym: '≤', inclusive: true, right: false },
-  { key: 'gt', sym: '>', inclusive: false, right: true },
-  { key: 'ge', sym: '≥', inclusive: true, right: true },
+  { key: 'lt', sym: '<', inclusive: false, right: false, label: 'Less than' },
+  { key: 'le', sym: '≤', inclusive: true, right: false, label: 'Less than or equal to' },
+  { key: 'gt', sym: '>', inclusive: false, right: true, label: 'Greater than' },
+  { key: 'ge', sym: '≥', inclusive: true, right: true, label: 'Greater than or equal to' },
 ]
 
 export default function InequalitiesNumberLine() {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const [canvasWidth, setCanvasWidth] = useState(720)
+  const { w: canvasWidth } = useCanvasBox(wrapRef, { minW: 420 })
   const [opKey, setOpKey] = useState('gt')
   const [bound, setBound] = useState(3)
   const [test, setTest] = useState(6)
+  // Layered reveals: the teacher peels back one idea at a time.
+  const [show, setShow] = useState({ ray: true, check: true })
+  const toggle = (k) => setShow((s) => ({ ...s, [k]: !s[k] }))
   const dragRef = useRef(null) // 'bound' | 'test'
 
   const canvasHeight = 260
@@ -34,27 +34,13 @@ export default function InequalitiesNumberLine() {
 
   const testOk = op.right ? (op.inclusive ? test >= bound : test > bound) : op.inclusive ? test <= bound : test < bound
 
-  useLayoutEffect(() => {
-    const node = wrapRef.current
-    if (!node) return undefined
-    let raf = 0
-    const commit = (w) => {
-      const next = Math.max(420, Math.round(w))
-      setCanvasWidth((prev) => (Math.abs(prev - next) >= 1 ? next : prev))
-    }
-    commit(node.getBoundingClientRect().width)
-    const observer = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect?.width
-      if (!w) return
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => commit(w))
-    })
-    observer.observe(node)
-    return () => {
-      cancelAnimationFrame(raf)
-      observer.disconnect()
-    }
-  }, [])
+  // The canvas is the whole point of this manipulative, so it needs a text
+  // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
+  const summary =
+    `Number line from ${MIN} to ${MAX} showing x ${op.sym} ${bound}, meaning x is ${op.label.toLowerCase()} ${bound}. ` +
+    `The boundary at ${bound} is ${op.inclusive ? 'a closed dot, so it is included' : 'an open dot, so it is not included'}.` +
+    `${show.ray ? ` The solution ray is shaded ${op.right ? 'to the right' : 'to the left'} of the boundary.` : ''} ` +
+    `The test point at ${test} ${testOk ? 'satisfies' : 'does not satisfy'} the inequality${show.check ? ` and is marked with a ${testOk ? 'check' : 'cross'}` : ' (the check mark is hidden)'}.`
 
   const geo = useMemo(() => {
     const PAD = 54
@@ -118,22 +104,24 @@ export default function InequalitiesNumberLine() {
     }
 
     // Solution ray (shaded direction) + arrowhead.
-    const endX = op.right ? canvasWidth - PAD + 8 : PAD - 8
-    ctx.strokeStyle = solGreen
-    ctx.lineWidth = 6
-    ctx.lineCap = 'round'
-    ctx.beginPath()
-    ctx.moveTo(bx, axisY)
-    ctx.lineTo(endX, axisY)
-    ctx.stroke()
-    const dir = op.right ? 1 : -1
-    ctx.fillStyle = solGreen
-    ctx.beginPath()
-    ctx.moveTo(endX + dir * 8, axisY)
-    ctx.lineTo(endX - dir * 6, axisY - 8)
-    ctx.lineTo(endX - dir * 6, axisY + 8)
-    ctx.closePath()
-    ctx.fill()
+    if (show.ray) {
+      const endX = op.right ? canvasWidth - PAD + 8 : PAD - 8
+      ctx.strokeStyle = solGreen
+      ctx.lineWidth = 6
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(bx, axisY)
+      ctx.lineTo(endX, axisY)
+      ctx.stroke()
+      const dir = op.right ? 1 : -1
+      ctx.fillStyle = solGreen
+      ctx.beginPath()
+      ctx.moveTo(endX + dir * 8, axisY)
+      ctx.lineTo(endX - dir * 6, axisY - 8)
+      ctx.lineTo(endX - dir * 6, axisY + 8)
+      ctx.closePath()
+      ctx.fill()
+    }
 
     // Boundary dot: open (strict) or closed (inclusive).
     ctx.lineWidth = 3.5
@@ -174,11 +162,13 @@ export default function InequalitiesNumberLine() {
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(String(test), tx, ty)
-    // verdict badge
-    ctx.fillStyle = testOk ? solGreen : noRed
-    ctx.font = '900 18px Inter, system-ui, sans-serif'
-    ctx.fillText(testOk ? '✓' : '✗', tx + 22, ty)
-  }, [canvasWidth, geo, op, bound, test, testOk])
+    // verdict badge (hideable, so the teacher can ask "is this a solution?")
+    if (show.check) {
+      ctx.fillStyle = testOk ? solGreen : noRed
+      ctx.font = '900 18px Inter, system-ui, sans-serif'
+      ctx.fillText(testOk ? '✓' : '✗', tx + 22, ty)
+    }
+  }, [canvasWidth, geo, op, bound, test, testOk, show])
 
   useEffect(() => {
     draw()
@@ -223,9 +213,11 @@ export default function InequalitiesNumberLine() {
         <span style={{ color: boundPurple }}>{bound}</span>
       </div>
 
-      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
+      <div ref={wrapRef} className="relative flex-1 overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
         <canvas
           ref={canvasRef}
+          role="img"
+          aria-label={summary}
           className="h-full w-full touch-none cursor-grab active:cursor-grabbing"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -245,6 +237,8 @@ export default function InequalitiesNumberLine() {
               key={o.key}
               type="button"
               onClick={() => setOpKey(o.key)}
+              aria-label={o.label}
+              aria-pressed={opKey === o.key}
               className="px-4 py-2 text-lg font-black"
               style={{ background: opKey === o.key ? boundPurple : '#ffffff', color: opKey === o.key ? '#ffffff' : muted }}
             >
@@ -254,19 +248,8 @@ export default function InequalitiesNumberLine() {
         </div>
         <Stepper label="Boundary" color={boundPurple} value={bound} onDec={() => setBound((v) => clamp(v - 1, MIN, MAX))} onInc={() => setBound((v) => clamp(v + 1, MIN, MAX))} />
         <Stepper label="Test" color={testBlue} value={test} onDec={() => setTest((v) => clamp(v - 1, MIN, MAX))} onInc={() => setTest((v) => clamp(v + 1, MIN, MAX))} />
-      </div>
-    </div>
-  )
-}
-
-function Stepper({ label, value, color, onDec, onInc }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm font-bold" style={{ color }}>{label}</span>
-      <div className="grid grid-cols-[36px_46px_36px] items-center overflow-hidden rounded-full border border-[#E0DDD6] bg-white">
-        <button type="button" onClick={onDec} className="h-10 text-2xl font-black" style={{ color: '#D85A30' }} aria-label={`Decrease ${label}`}>−</button>
-        <span className="border-x border-[#E0DDD6] py-2 text-center text-lg font-black tabular-nums">{value}</span>
-        <button type="button" onClick={onInc} className="h-10 text-2xl font-black" style={{ color: solGreen }} aria-label={`Increase ${label}`}>+</button>
+        <ToggleChip label="Show solution ray" color={solGreen} on={show.ray} onClick={() => toggle('ray')} />
+        <ToggleChip label="Show check" color={testBlue} on={show.check} onClick={() => toggle('check')} />
       </div>
     </div>
   )
