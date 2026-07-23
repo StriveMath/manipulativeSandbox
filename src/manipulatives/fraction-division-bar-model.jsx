@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 const denominators = [2, 3, 4, 6, 8, 12]
 
@@ -6,13 +6,6 @@ const defaultProblem = {
   dividend: { numerator: 3, denominator: 4 },
   divisor: { numerator: 1, denominator: 3 },
 }
-
-const fullGroupColor = 'bg-sky-400'
-const fullGroupAnswerColor = 'text-sky-600'
-const step4GroupStepMs = 1300
-const step4GroupFillOffsetMs = 960
-const step4RemainderStartOffsetMs = 220
-const step4RemainderFillOffsetMs = 950
 
 const gcd = (a, b) => {
   let x = Math.abs(a)
@@ -29,37 +22,35 @@ const gcd = (a, b) => {
 
 const lcm = (a, b) => (a * b) / gcd(a, b)
 
-const multiplesTo = (base, target) =>
-  Array.from({ length: target / base }, (_, index) => base * (index + 1))
-
-const initialCommonDenominator = lcm(
-  defaultProblem.dividend.denominator,
-  defaultProblem.divisor.denominator
-)
-
 const simplify = (numerator, denominator) => {
-  const divisor = gcd(numerator, denominator)
+  const commonFactor = gcd(numerator, denominator)
 
   return {
-    numerator: numerator / divisor,
-    denominator: denominator / divisor,
+    numerator: numerator / commonFactor,
+    denominator: denominator / commonFactor,
   }
 }
 
 const formatFraction = ({ numerator, denominator }) => {
   if (numerator === 0) return '0'
   if (denominator === 1) return `${numerator}`
-  if (numerator < denominator) return `${numerator}/${denominator}`
 
   const whole = Math.floor(numerator / denominator)
   const remainder = numerator % denominator
 
+  if (whole === 0) return `${numerator}/${denominator}`
   return remainder === 0 ? `${whole}` : `${whole} ${remainder}/${denominator}`
 }
 
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
 function FractionText({ fraction, className = '' }) {
   return (
-    <span className={`inline-grid translate-y-0.5 grid-rows-2 text-center leading-none ${className}`}>
+    <span
+      className={`inline-grid translate-y-0.5 grid-rows-2 text-center leading-none ${className}`}
+    >
       <span className="border-b-2 border-current px-0.5">
         {fraction.numerator}
       </span>
@@ -68,146 +59,11 @@ function FractionText({ fraction, className = '' }) {
   )
 }
 
-function AnswerText({ fullGroups, remainderGroup, remainderUnits }) {
-  if (fullGroups === 0 && remainderUnits === 0) {
-    return <span className="text-slate-700">0</span>
-  }
-
-  return (
-    <span
-      aria-label={`Answer: ${fullGroups > 0 ? fullGroups : ''}${
-        remainderUnits > 0
-          ? `${fullGroups > 0 ? ' ' : ''}${remainderGroup.numerator}/${remainderGroup.denominator}`
-          : ''
-      }`}
-      className="inline-flex items-end justify-end gap-1.5"
-    >
-      {fullGroups > 0 && (
-        <span className={fullGroupAnswerColor}>
-          {fullGroups}
-        </span>
-      )}
-      {remainderUnits > 0 && (
-        <FractionText
-          className="text-xl font-black text-orange-500"
-          fraction={remainderGroup}
-        />
-      )}
-    </span>
-  )
-}
-
-function CommonDenominatorMatch({ commonDenominator, dividend, divisor }) {
-  const dividendMultiples = multiplesTo(
-    dividend.denominator,
-    commonDenominator
-  )
-  const divisorMultiples = multiplesTo(divisor.denominator, commonDenominator)
-
-  const renderMultiples = (multiples, tone) => (
-    <div className="flex min-w-0 items-center gap-1">
-      {multiples.map((multiple, index) => {
-        const isMatch = multiple === commonDenominator
-
-        return (
-          <span className="flex min-w-0 items-center gap-1" key={multiple}>
-            {index > 0 && (
-              <span className="text-[9px] font-black text-slate-400">
-                &rarr;
-              </span>
-            )}
-            <span
-              className={`rounded px-1.5 py-0.5 text-[10px] font-black leading-none ${
-                isMatch
-                  ? `${tone.matchBg} ${tone.matchText} common-denominator-match`
-                  : 'bg-slate-100 text-slate-600'
-              }`}
-            >
-              {multiple}
-            </span>
-          </span>
-        )
-      })}
-    </div>
-  )
-
-  return (
-    <div className="mb-1 grid grid-cols-[42px_1fr_34px_1fr_auto] items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-1">
-      <span className="text-[9px] font-black uppercase text-slate-500">
-        LCD
-      </span>
-      {renderMultiples(dividendMultiples, {
-        matchBg: 'bg-emerald-100',
-        matchText: 'text-emerald-700',
-      })}
-      <span className="justify-self-center rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-700">
-        same
-      </span>
-      {renderMultiples(divisorMultiples, {
-        matchBg: 'bg-purple-100',
-        matchText: 'text-purple-700',
-      })}
-      <span className="text-[10px] font-black text-slate-700">
-        {commonDenominator} parts
-      </span>
-    </div>
-  )
-}
-
-function ConversionGhost({
-  commonDenominator,
-  originalDenominator,
-  originalNumerator,
-  shadedColor,
-  splitLabel,
-}) {
-  const brickTone = shadedColor.includes('purple')
-    ? 'lcd-brick-segment-purple'
-    : 'lcd-brick-segment-emerald'
-
-  return (
-    <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden rounded">
-      <div
-        className="lcd-source-bar absolute left-2 top-1 grid h-4 w-24 overflow-hidden rounded border border-slate-700 bg-white shadow-sm"
-        style={{
-          gridTemplateColumns: `repeat(${originalDenominator}, minmax(0, 1fr))`,
-        }}
-      >
-        {Array.from({ length: originalDenominator }, (_, index) => (
-          <span
-            className={`border-r-2 border-white/95 last:border-r-0 ${
-              index < originalNumerator ? shadedColor : 'bg-white'
-            }`}
-            key={`source-${index}`}
-          />
-        ))}
-      </div>
-      <span className="lcd-multiplier-badge absolute left-[132px] top-0.5 rounded bg-amber-100 px-1.5 text-[10px] font-black leading-5 text-amber-700 shadow-sm">
-        {splitLabel}
-      </span>
-      <div
-        className="lcd-target-preview absolute inset-0 grid rounded"
-        style={{
-          gridTemplateColumns: `repeat(${commonDenominator}, minmax(0, 1fr))`,
-        }}
-      >
-        {Array.from({ length: commonDenominator }, (_, index) => (
-          <span
-            className={`lcd-brick-segment ${brickTone} border-r-2 border-white/95 last:border-r-0`}
-            key={`target-${index}`}
-            style={{ '--lcd-brick-delay': `${1180 + index * 70}ms` }}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function FractionSetter({ fraction, label, onChange, tone }) {
-  const setNumerator = (nextNumerator) => {
+function FractionSetter({ disabled, fraction, label, onChange, tone }) {
+  const setNumerator = (numerator) => {
     onChange({
       ...fraction,
-      numerator: Math.max(1, Math.min(fraction.denominator, nextNumerator)),
+      numerator: Math.max(1, Math.min(fraction.denominator, numerator)),
     })
   }
 
@@ -219,41 +75,42 @@ function FractionSetter({ fraction, label, onChange, tone }) {
   }
 
   return (
-    <div className={`rounded border ${tone.border} ${tone.bg} p-2`}>
-      <div className={`text-[10px] font-bold uppercase tracking-wide ${tone.text}`}>
+    <section className={`rounded border ${tone.border} ${tone.bg} p-1.5`}>
+      <div className={`text-[10px] font-black uppercase ${tone.text}`}>
         {label}
       </div>
-      <div className="mt-1 grid grid-cols-[52px_1fr] items-center gap-2">
+      <div className="mt-1 grid grid-cols-[58px_1fr] items-center gap-2">
         <div className="rounded bg-white px-2 py-1 text-center shadow-sm">
           <FractionText
-            className={`text-xl font-bold tabular-nums ${tone.text}`}
+            className={`text-xl font-black tabular-nums ${tone.text}`}
             fraction={fraction}
           />
         </div>
         <div className="grid grid-cols-2 gap-1">
           <button
-            type="button"
-            onClick={() => setNumerator(fraction.numerator + 1)}
-            disabled={fraction.numerator === fraction.denominator}
-            className="h-6 rounded border border-slate-300 bg-white text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-            aria-label={`Increase ${label} numerator`}
-          >
-            +
-          </button>
-          <button
-            type="button"
-            onClick={() => setNumerator(fraction.numerator - 1)}
-            disabled={fraction.numerator === 1}
-            className="h-6 rounded border border-slate-300 bg-white text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label={`Decrease ${label} numerator`}
+            className="h-6 rounded border border-slate-300 bg-white text-sm font-black text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={disabled || fraction.numerator === 1}
+            onClick={() => setNumerator(fraction.numerator - 1)}
+            type="button"
           >
             -
           </button>
+          <button
+            aria-label={`Increase ${label} numerator`}
+            className="h-6 rounded border border-slate-300 bg-white text-sm font-black text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={disabled || fraction.numerator === fraction.denominator}
+            onClick={() => setNumerator(fraction.numerator + 1)}
+            type="button"
+          >
+            +
+          </button>
           <select
-            value={fraction.denominator}
-            onChange={(event) => setDenominator(Number(event.target.value))}
-            className="col-span-2 h-6 rounded border border-slate-300 bg-white px-1 text-[11px] font-semibold text-slate-700"
             aria-label={`${label} denominator`}
+            className="col-span-2 h-6 rounded border border-slate-300 bg-white px-1 text-xs font-bold text-slate-700 disabled:opacity-50"
+            disabled={disabled}
+            onChange={(event) => setDenominator(Number(event.target.value))}
+            value={fraction.denominator}
           >
             {denominators.map((denominator) => (
               <option key={denominator} value={denominator}>
@@ -263,594 +120,680 @@ function FractionSetter({ fraction, label, onChange, tone }) {
           </select>
         </div>
       </div>
-    </div>
+    </section>
   )
 }
 
-function StepLabel({ children }) {
-  return (
-    <div className="flex h-full min-h-0 items-center justify-center rounded border-2 border-slate-900 bg-white px-2 text-base font-black text-slate-900 shadow-sm">
-      {children}
-    </div>
-  )
-}
-
-const makeEmptyShade = (length) => Array.from({ length }, () => false)
-
-const selectedCount = (segments) => segments.filter(Boolean).length
-
-function InteractiveFractionBar({
-  animateKey,
-  compact = false,
-  dataBarKey,
-  disabled = false,
+function SegmentedBar({
+  className = '',
+  dataSource,
   denominator,
-  label,
-  onToggle,
-  outlineColor,
-  sourceDenominator,
-  sourceNumerator,
-  selected,
-  shadedColor,
-  splitLabel,
-  target,
+  filledUnits,
+  tone,
 }) {
-  const selectedTotal = selectedCount(selected)
-  const isCorrect = selectedTotal === target
-  const revealAfterConversion = Boolean(sourceDenominator && splitLabel)
-  const finalFrameTone = outlineColor.includes('purple')
-    ? 'lcd-final-frame-purple'
-    : 'lcd-final-frame-emerald'
+  return (
+    <div
+      className={`grid h-full min-w-0 overflow-hidden rounded border-2 bg-white ${tone.border} ${className}`}
+      data-division-source={dataSource}
+      style={{ gridTemplateColumns: `repeat(${denominator}, minmax(0, 1fr))` }}
+    >
+      {Array.from({ length: denominator }, (_, index) => (
+        <span
+          className={`min-w-0 border-r border-white/95 last:border-r-0 ${
+            index < filledUnits ? tone.fill : 'bg-slate-100'
+          }`}
+          data-division-cell={dataSource ? index : undefined}
+          key={index}
+        />
+      ))}
+    </div>
+  )
+}
+
+function ConversionBar({
+  commonDenominator,
+  converting,
+  fraction,
+  label,
+  renamed,
+  run,
+  sourceKey,
+  tone,
+  units,
+}) {
+  const multiplier = commonDenominator / fraction.denominator
+  const displayFraction = renamed
+    ? { numerator: units, denominator: commonDenominator }
+    : fraction
 
   return (
-    <div>
-      <div
-        className={`flex items-center justify-between font-bold text-slate-500 ${
-          compact ? 'mb-0.5 text-[9px]' : 'mb-1 text-[10px]'
-        } ${revealAfterConversion ? 'lcd-final-content-reveal' : ''}`}
-      >
-        <span>{label}</span>
-        <span className="flex items-center gap-1">
-          {splitLabel && (
-            <span className="rounded bg-amber-100 px-1 text-[9px] font-black leading-3 text-amber-700 common-denominator-split">
-              {splitLabel}
-            </span>
-          )}
-          <span className={isCorrect ? 'text-emerald-600' : 'text-slate-500'}>
-            {selectedTotal}/{denominator} shaded
-          </span>
-        </span>
+    <div className="grid grid-cols-[70px_1fr] items-center gap-2">
+      <div>
+        <div className={`text-[10px] font-black uppercase ${tone.text}`}>
+          {label}
+        </div>
+        <FractionText
+          className={`mt-1 text-base font-black ${tone.text}`}
+          fraction={displayFraction}
+        />
       </div>
-      <div
-        className={`relative grid ${compact ? 'h-6' : 'h-7'} overflow-hidden rounded border-2 ${outlineColor} bg-white common-denominator-split ${
-          revealAfterConversion
-            ? `lcd-final-frame-reveal ${finalFrameTone}`
-            : ''
-        }`}
-        data-division-bar={dataBarKey}
-        style={{ gridTemplateColumns: `repeat(${denominator}, minmax(0, 1fr))` }}
-      >
-        {sourceDenominator && splitLabel && (
-          <ConversionGhost
-            commonDenominator={denominator}
-            originalDenominator={sourceDenominator}
-            originalNumerator={sourceNumerator}
-            shadedColor={shadedColor}
-            splitLabel={splitLabel}
+      <div className="relative h-9" key={`${run}-${label}`}>
+        {!renamed && (
+          <div
+            className={`absolute inset-0 ${
+              converting ? 'division-lab-conversion-source' : ''
+            }`}
+          >
+            <SegmentedBar
+              denominator={fraction.denominator}
+              filledUnits={fraction.numerator}
+              tone={tone}
+            />
+          </div>
+        )}
+
+        {converting && (
+          <>
+            <span className="division-lab-multiplier absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded bg-amber-100 px-2 py-1 text-xs font-black text-amber-700 shadow">
+              x{multiplier}
+            </span>
+            <div
+              className={`absolute inset-0 grid overflow-hidden rounded border-2 ${tone.border}`}
+              style={{
+                gridTemplateColumns: `repeat(${commonDenominator}, minmax(0, 1fr))`,
+              }}
+            >
+              {Array.from({ length: commonDenominator }, (_, index) => (
+                <span
+                  className={`division-lab-conversion-brick min-w-0 border-r border-white/95 last:border-r-0 ${
+                    index < units ? tone.fill : 'bg-slate-100'
+                  }`}
+                  key={index}
+                  style={{ '--division-lab-delay': `${650 + index * 42}ms` }}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {renamed && !converting && (
+          <SegmentedBar
+            className="division-lab-renamed-reveal"
+            dataSource={sourceKey}
+            denominator={commonDenominator}
+            filledUnits={units}
+            tone={tone}
           />
         )}
-        {Array.from({ length: denominator }, (_, index) => {
-          const isSelected = Boolean(selected[index])
-
-          return (
-            <button
-              aria-label={`${label} segment ${index + 1}`}
-              className={`min-w-0 transition last:border-r-0 ${
-                isSelected
-                  ? `${shadedColor} division-segment-pop border-r-2 border-white/95`
-                  : 'border-r border-slate-200 bg-white hover:bg-slate-100'
-              } ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${
-                revealAfterConversion ? 'lcd-final-content-reveal' : ''
-              }`}
-              disabled={disabled}
-              key={`${animateKey}-${index}`}
-              onClick={() => onToggle(index)}
-              style={{ '--division-delay': `${index * 38}ms` }}
-              type="button"
-            />
-          )
-        })}
       </div>
     </div>
   )
 }
 
-const rectToStyle = (rect) => ({
-  height: `${rect.height}px`,
-  left: `${rect.left}px`,
-  top: `${rect.top}px`,
-  width: `${rect.width}px`,
-})
-
-const segmentRect = (barRect, startUnit, unitCount, totalUnits) => {
-  const unitWidth = barRect.width / totalUnits
-
-  return {
-    height: barRect.height,
-    left: barRect.left + startUnit * unitWidth,
-    top: barRect.top,
-    width: unitCount * unitWidth,
-  }
-}
-
-const constrainRectToBounds = (rect, bounds) => {
-  const width = Math.min(rect.width, Math.max(bounds.width - 8, 1))
-  const height = Math.min(rect.height, Math.max(bounds.height - 8, 1))
-
-  return {
-    height,
-    left: Math.min(
-      Math.max(rect.left, bounds.left + 4),
-      bounds.right - width - 4
-    ),
-    top: Math.min(
-      Math.max(rect.top, bounds.top + 4),
-      bounds.bottom - height - 4
-    ),
-    width,
-  }
-}
-
-const rectRelativeTo = (rect, origin) => ({
-  ...rect,
-  left: rect.left - origin.left,
-  top: rect.top - origin.top,
-})
-
-const visibleBoundsFor = (rect) => ({
-  bottom: Math.min(window.innerHeight, rect.bottom),
-  height: Math.max(Math.min(window.innerHeight, rect.bottom) - Math.max(0, rect.top), 1),
-  left: Math.max(0, rect.left),
-  right: Math.min(window.innerWidth, rect.right),
-  top: Math.max(0, rect.top),
-  width: Math.max(Math.min(window.innerWidth, rect.right) - Math.max(0, rect.left), 1),
-})
-
-const makeFlightStyle = ({ delay, from, match, target }) => ({
-  ...rectToStyle(from),
-  '--flight-delay': `${delay}ms`,
-  '--from-height': `${from.height}px`,
-  '--from-left': `${from.left}px`,
-  '--from-top': `${from.top}px`,
-  '--from-width': `${from.width}px`,
-  '--match-height': `${match.height}px`,
-  '--match-left': `${match.left}px`,
-  '--match-top': `${match.top}px`,
-  '--match-width': `${match.width}px`,
-  '--target-height': `${target.height}px`,
-  '--target-left': `${target.left}px`,
-  '--target-top': `${target.top}px`,
-  '--target-width': `${target.width}px`,
-})
-
-function Step4SourceFlightOverlay({ commonDenominator, motionPlan }) {
-  if (!motionPlan) return null
+function FractionModels({ dividend, divisor, model, phase, run }) {
+  const converting = phase === 'converting'
+  const renamed = phase !== 'original' && phase !== 'converting'
 
   return (
-    <div aria-hidden="true" className="division-source-flight-layer">
-      {motionPlan.groups.map((group) => (
-        <div
-          className="division-source-group-flight"
-          key={`source-group-${group.index}`}
-          style={group.style}
+    <section
+      className="rounded border border-slate-200 bg-white p-2 shadow-sm"
+      data-division-models
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-xs font-black text-slate-800">Same whole length</h3>
+        <span
+          className={`rounded px-2 py-0.5 text-[10px] font-black ${
+            renamed || converting
+              ? 'bg-amber-100 text-amber-700'
+              : 'bg-slate-100 text-slate-500'
+          }`}
         >
-          <div
-            className="grid h-full overflow-hidden rounded"
-            style={{
-              gridTemplateColumns: `repeat(${group.units}, minmax(0, 1fr))`,
-            }}
-          >
-            {Array.from({ length: group.units }, (_, index) => (
-              <span
-                className="division-source-flight-cell border-r-2 border-white/95 last:border-r-0"
-                key={`source-group-cell-${group.index}-${index}`}
-              />
-            ))}
-          </div>
-          <span className="division-source-flight-label">
-            {group.units}/{commonDenominator} group
-          </span>
-        </div>
-      ))}
-      {motionPlan.remainder && (
-        <div
-          className="division-source-remainder-flight"
-          style={motionPlan.remainder.style}
-        >
-          <div
-            className="grid h-full overflow-hidden rounded"
-            style={{
-              gridTemplateColumns: `repeat(${motionPlan.remainder.units}, minmax(0, 1fr))`,
-            }}
-          >
-            {Array.from({ length: motionPlan.remainder.units }, (_, index) => (
-              <span
-                className="division-source-flight-cell border-r-2 border-white/95 last:border-r-0"
-                key={`source-remainder-cell-${index}`}
-              />
-            ))}
-          </div>
-          <span className="division-source-flight-label">
-            {motionPlan.remainder.label}
-          </span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function Step4GroupingAnimation({
-  animateKey,
-  commonDenominator,
-  dividendUnits,
-  divisorUnits,
-  fullGroups,
-  remainderGroup,
-  remainderUnits,
-}) {
-  const hasRemainder = remainderUnits > 0
-  const [motionPlan, setMotionPlan] = useState(null)
-  const remainderStart =
-    fullGroups * step4GroupStepMs + step4RemainderStartOffsetMs
-  const answerDelay =
-    fullGroups * step4GroupStepMs + (hasRemainder ? 1900 : 1500)
-  const groupTemplate = `${divisorUnits}/${commonDenominator} group`
-
-  useEffect(() => {
-    if (!fullGroups && !hasRemainder) {
-      const emptyFrame = window.requestAnimationFrame(() => {
-        setMotionPlan(null)
-      })
-
-      return () => {
-        window.cancelAnimationFrame(emptyFrame)
-      }
-    }
-
-    const measure = () => {
-      const dividendBar = document.querySelector(
-        '[data-division-bar="step3-dividend"]'
-      )
-      const divisorBar = document.querySelector(
-        '[data-division-bar="step3-divisor"]'
-      )
-      const step4Bar = document.querySelector(
-        '[data-division-bar="step4-target"]'
-      )
-      const workspace = document.querySelector('[data-division-workspace]')
-
-      if (!dividendBar || !divisorBar || !step4Bar || !workspace) {
-        setMotionPlan(null)
-        return
-      }
-
-      const workspaceRect = workspace.getBoundingClientRect()
-      const bounds = visibleBoundsFor(workspaceRect)
-      const dividendRect = dividendBar.getBoundingClientRect()
-      const divisorRect = divisorBar.getBoundingClientRect()
-      const targetRect = step4Bar.getBoundingClientRect()
-      const sourceDivisor = rectRelativeTo(
-        constrainRectToBounds(
-          segmentRect(divisorRect, 0, divisorUnits, commonDenominator),
-          bounds
-        ),
-        workspaceRect
-      )
-
-      const groups = Array.from({ length: fullGroups }, (_, index) => {
-        const startUnit = index * divisorUnits
-        const match = rectRelativeTo(
-          constrainRectToBounds(
-            segmentRect(
-              dividendRect,
-              startUnit,
-              divisorUnits,
-              commonDenominator
-            ),
-            bounds
-          ),
-          workspaceRect
-        )
-        const target = rectRelativeTo(
-          constrainRectToBounds(
-            segmentRect(targetRect, startUnit, divisorUnits, commonDenominator),
-            bounds
-          ),
-          workspaceRect
-        )
-
-        return {
-          index,
-          style: makeFlightStyle({
-            delay: index * step4GroupStepMs,
-            from: sourceDivisor,
-            match,
-            target,
-          }),
-          units: divisorUnits,
-        }
-      })
-
-      const remainder =
-        hasRemainder &&
-        (() => {
-          const startUnit = fullGroups * divisorUnits
-          const from = rectRelativeTo(
-            constrainRectToBounds(
-              segmentRect(
-                dividendRect,
-                startUnit,
-                remainderUnits,
-                commonDenominator
-              ),
-              bounds
-            ),
-            workspaceRect
-          )
-          const target = rectRelativeTo(
-            constrainRectToBounds(
-              segmentRect(
-                targetRect,
-                startUnit,
-                remainderUnits,
-                commonDenominator
-              ),
-              bounds
-            ),
-            workspaceRect
-          )
-
-          return {
-            label: `${formatFraction(remainderGroup)} group`,
-            style: makeFlightStyle({
-              delay: remainderStart,
-              from,
-              match: from,
-              target,
-            }),
-            units: remainderUnits,
-          }
-        })()
-
-      setMotionPlan({ groups, remainder })
-    }
-
-    const frame = window.requestAnimationFrame(measure)
-    window.addEventListener('resize', measure)
-
-    return () => {
-      window.cancelAnimationFrame(frame)
-      window.removeEventListener('resize', measure)
-    }
-  }, [
-    animateKey,
-    commonDenominator,
-    divisorUnits,
-    fullGroups,
-    hasRemainder,
-    remainderGroup,
-    remainderStart,
-    remainderUnits,
-  ])
-
-  return (
-    <div className="min-w-0">
-      <Step4SourceFlightOverlay
-        commonDenominator={commonDenominator}
-        motionPlan={motionPlan}
-      />
-      <div className="relative">
-        <div
-          className="grid h-9 overflow-hidden rounded border-2 border-slate-900 bg-white"
-          data-division-bar="step4-target"
-          style={{
-            gridTemplateColumns: `repeat(${commonDenominator}, minmax(0, 1fr))`,
+          {renamed || converting
+            ? `${model.commonDenominator} equal parts`
+            : 'Original parts'}
+        </span>
+      </div>
+      <div className="space-y-2">
+        <ConversionBar
+          commonDenominator={model.commonDenominator}
+          converting={converting}
+          fraction={dividend}
+          label="Dividend"
+          renamed={renamed}
+          run={run}
+          sourceKey="dividend"
+          tone={{
+            border: 'border-emerald-400',
+            fill: 'bg-emerald-500',
+            text: 'text-emerald-700',
           }}
-        >
-          {Array.from({ length: commonDenominator }, (_, index) => {
-            const isDividendUnit = index < dividendUnits
-            const isFullGroupUnit =
-              isDividendUnit && Math.floor(index / divisorUnits) < fullGroups
-            const isRemainderUnit =
-              isDividendUnit && !isFullGroupUnit && index < dividendUnits
-            const divider = isDividendUnit
-              ? 'border-r-2 border-r-white/95'
-              : 'border-r border-r-slate-200'
-
-            return (
-              <span
-                className={`relative min-w-0 bg-white ${divider} last:border-r-0`}
-                key={`${animateKey}-base-${index}`}
-              >
-                {isFullGroupUnit && (
-                  <span
-                    className={`absolute inset-0 ${fullGroupColor} division-full-group-fill`}
-                    style={{
-                      '--group-delay': `${
-                        Math.floor(index / divisorUnits) * step4GroupStepMs +
-                        step4GroupFillOffsetMs
-                      }ms`,
-                    }}
-                  />
-                )}
-                {isRemainderUnit && (
-                  <span
-                    className="absolute inset-0 bg-orange-400 division-remainder-fill"
-                    style={{
-                      '--remainder-delay': `${
-                        remainderStart + step4RemainderFillOffsetMs
-                      }ms`,
-                    }}
-                  />
-                )}
-              </span>
-            )
-          })}
-        </div>
-
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 grid"
-          style={{
-            gridTemplateColumns: `repeat(${commonDenominator}, minmax(0, 1fr))`,
+          units={model.dividendUnits}
+        />
+        <ConversionBar
+          commonDenominator={model.commonDenominator}
+          converting={converting}
+          fraction={divisor}
+          label="Divisor"
+          renamed={renamed}
+          run={run}
+          sourceKey="divisor"
+          tone={{
+            border: 'border-purple-400',
+            fill: 'bg-purple-500',
+            text: 'text-purple-700',
           }}
-        >
-          {Array.from({ length: fullGroups }, (_, index) => {
-            const start = index * divisorUnits + 1
-            const end = start + divisorUnits
-
-            return (
-              <span
-                className="division-group-template-sweep mx-0.5 rounded border-2 border-sky-500 bg-sky-100/30"
-                key={`${animateKey}-template-${index}`}
-                style={{
-                  '--group-delay': `${index * step4GroupStepMs + 420}ms`,
-                  gridColumn: `${start} / ${end}`,
-                }}
-              >
-                <span className="division-group-template-label">
-                  {groupTemplate}
-                </span>
-              </span>
-            )
-          })}
-          {hasRemainder && (
-            <span
-              className="division-remainder-template mx-0.5 rounded border-2 border-orange-400 bg-orange-100/40"
-              style={{
-                '--remainder-delay': `${remainderStart + 360}ms`,
-                gridColumn: `${fullGroups * divisorUnits + 1} / ${
-                  dividendUnits + 1
-                }`,
-              }}
-            >
-              <span className="division-remainder-template-label">
-                {remainderUnits}/{divisorUnits} group
-              </span>
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div
-        className="mt-0.5 grid h-4 items-start"
-        style={{
-          gridTemplateColumns: `repeat(${commonDenominator}, minmax(0, 1fr))`,
-        }}
-      >
-        {Array.from({ length: fullGroups }, (_, index) => {
-          const start = index * divisorUnits + 1
-          const end = start + divisorUnits
-
-          return (
-            <span
-              className="division-group-count-label mx-0.5 rounded border border-sky-200 bg-sky-50 px-1 text-center text-[8px] font-black leading-3 text-sky-700"
-              key={`${animateKey}-group-label-${index}`}
-              style={{
-                '--group-delay': `${
-                  index * step4GroupStepMs + step4GroupFillOffsetMs + 160
-                }ms`,
-                gridColumn: `${start} / ${end}`,
-              }}
-            >
-              {index + 1} group{index === 0 ? '' : 's'}
-            </span>
-          )
-        })}
-        {hasRemainder && (
-          <span
-            className="division-remainder-count-label mx-0.5 rounded border border-orange-200 bg-orange-50 px-1 text-center text-[8px] font-black leading-3 text-orange-700"
-            style={{
-              '--remainder-delay': `${
-                remainderStart + step4RemainderFillOffsetMs + 160
-              }ms`,
-              gridColumn: `${fullGroups * divisorUnits + 1} / ${
-                dividendUnits + 1
-              }`,
-            }}
-          >
-            {formatFraction(remainderGroup)} group
-          </span>
-        )}
-      </div>
-
-      <div className="mt-0.5 grid grid-cols-[1fr_auto] items-end gap-3">
-        <div
-          className="division-answer-reveal flex flex-wrap gap-1 text-[10px] font-bold text-slate-600"
-          style={{ '--answer-delay': `${answerDelay}ms` }}
-        >
-          <span className="rounded border border-sky-200 bg-sky-50 px-2 py-0.5 text-sky-700">
-            {fullGroups} full group{fullGroups === 1 ? '' : 's'}
-          </span>
-          {hasRemainder && (
-            <span className="rounded border border-orange-200 bg-orange-50 px-2 py-0.5 text-orange-700">
-              {formatFraction(remainderGroup)} of a group
-            </span>
-          )}
-        </div>
-        <div
-          className="division-answer-reveal text-right"
-          style={{ '--answer-delay': `${answerDelay}ms` }}
-        >
-          <div className="text-xs font-black uppercase text-slate-700">
-            Answer:
-          </div>
-          <div className="text-2xl font-black leading-none tabular-nums">
-            <AnswerText
-              fullGroups={fullGroups}
-              remainderGroup={remainderGroup}
-              remainderUnits={remainderUnits}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function StepCard({ children, locked = false, step }) {
-  return (
-    <section className="grid h-full min-w-0 grid-cols-[76px_minmax(0,1fr)] gap-2">
-      <StepLabel>Step {step}</StepLabel>
-      <div
-        className={`min-w-0 overflow-hidden rounded border-2 p-1.5 shadow-sm ${
-          locked
-            ? 'border-slate-300 bg-slate-100 text-slate-400'
-            : 'border-slate-900 bg-white text-slate-800'
-        }`}
-      >
-        {children}
+          units={model.divisorUnits}
+        />
       </div>
     </section>
   )
 }
 
+const localRect = (rect, rootRect, scaleX, scaleY) => ({
+  height: rect.height / scaleY,
+  left: (rect.left - rootRect.left) / scaleX,
+  top: (rect.top - rootRect.top) / scaleY,
+  width: rect.width / scaleX,
+})
+
+function EqualPartTransferOverlay({ model, phase, rootRef, run }) {
+  const [pieces, setPieces] = useState([])
+  const sourceKey = phase === 'transfer-dividend' ? 'dividend' : 'divisor'
+  const unitCount =
+    sourceKey === 'dividend' ? model.dividendUnits : model.divisorUnits
+
+  useLayoutEffect(() => {
+    if (phase !== 'transfer-dividend' && phase !== 'transfer-divisor') {
+      return undefined
+    }
+
+    const root = rootRef.current
+    const destination = root?.querySelector(
+      `[data-division-destination="${sourceKey}"]`
+    )
+    const source = root?.querySelector(`[data-division-source="${sourceKey}"]`)
+
+    if (!root || !destination || !source) return undefined
+
+    const frame = window.requestAnimationFrame(() => {
+      const rootRect = root.getBoundingClientRect()
+      const destinationRect = destination.getBoundingClientRect()
+      const scaleX = rootRect.width / root.offsetWidth || 1
+      const scaleY = rootRect.height / root.offsetHeight || 1
+      const target = localRect(destinationRect, rootRect, scaleX, scaleY)
+      const targetWidth = target.width / model.commonDenominator
+
+      const nextPieces = Array.from({ length: unitCount }, (_, index) => {
+        const cell = source.querySelector(`[data-division-cell="${index}"]`)
+        if (!cell) return null
+
+        const start = localRect(
+          cell.getBoundingClientRect(),
+          rootRect,
+          scaleX,
+          scaleY
+        )
+        const destinationLeft = target.left + index * targetWidth
+        const destinationTop = target.top
+        const deltaX = destinationLeft - start.left
+        const deltaY = destinationTop - start.top
+
+        return {
+          delay: 80 + index * 45,
+          deltaX,
+          deltaY,
+          height: start.height,
+          id: `${run}-${sourceKey}-${index}`,
+          left: start.left,
+          midX: deltaX * 0.5,
+          midY: deltaY * 0.5 - 20,
+          scaleX: targetWidth / start.width,
+          scaleY: target.height / start.height,
+          top: start.top,
+          width: start.width,
+        }
+      }).filter(Boolean)
+
+      setPieces(nextPieces)
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [model, phase, rootRef, run, sourceKey, unitCount])
+
+  if (phase !== 'transfer-dividend' && phase !== 'transfer-divisor') {
+    return null
+  }
+
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 z-[80] overflow-hidden"
+    >
+      {pieces.map((piece) => (
+        <span
+          className={`division-lab-transfer-piece absolute rounded-sm border border-white/90 shadow-md ${
+            sourceKey === 'dividend' ? 'bg-emerald-500' : 'bg-purple-500'
+          }`}
+          key={piece.id}
+          style={{
+            '--division-transfer-delay': `${piece.delay}ms`,
+            '--division-transfer-dx': `${piece.deltaX}px`,
+            '--division-transfer-dy': `${piece.deltaY}px`,
+            '--division-transfer-mid-x': `${piece.midX}px`,
+            '--division-transfer-mid-y': `${piece.midY}px`,
+            '--division-transfer-scale-x': piece.scaleX,
+            '--division-transfer-scale-y': piece.scaleY,
+            height: piece.height,
+            left: piece.left,
+            top: piece.top,
+            width: piece.width,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function DivisorStrip({ pieceCount, tone = 'purple' }) {
+  const fill = tone === 'orange' ? 'bg-orange-400' : 'bg-purple-500'
+  const border = tone === 'orange' ? 'border-orange-500' : 'border-purple-600'
+
+  return (
+    <div
+      className={`grid h-full overflow-hidden rounded border-2 ${border} ${fill} shadow-sm`}
+      style={{ gridTemplateColumns: `repeat(${pieceCount}, minmax(0, 1fr))` }}
+    >
+      {Array.from({ length: pieceCount }, (_, index) => (
+        <span
+          className="border-r-2 border-white/90 last:border-r-0"
+          key={index}
+        />
+      ))}
+    </div>
+  )
+}
+
+function quotientLabel(coveredUnits, divisorUnits) {
+  if (coveredUnits === 0) return 'No groups placed yet'
+
+  const groupFraction = simplify(coveredUnits, divisorUnits)
+  const amount = formatFraction(groupFraction)
+  return `${amount} ${amount === '1' ? 'group' : 'groups'}`
+}
+
+function DivisionMeasurementWorkspace({
+  divisor,
+  model,
+  onBusyChange,
+  onPlace,
+  phase,
+  placements,
+}) {
+  const rootRef = useRef(null)
+  const targetRef = useRef(null)
+  const dragRef = useRef(null)
+  const [drag, setDrag] = useState(null)
+  const ready = phase === 'ready'
+  const dividendPrepared = phase === 'transfer-divisor' || ready
+
+  const coveredUnits = placements.reduce(
+    (total, placement) => total + placement.coverageUnits,
+    0
+  )
+  const remainingUnits = Math.max(model.dividendUnits - coveredUnits, 0)
+  const complete = remainingUnits === 0
+  const nextCoverage = Math.min(model.divisorUnits, remainingUnits)
+  const nextIsPartial = nextCoverage > 0 && nextCoverage < model.divisorUnits
+  const stripPieceCount = model.divisorUnits
+
+  const localPoint = (clientX, clientY) => {
+    const root = rootRef.current
+    if (!root) return { x: 0, y: 0, scaleX: 1, scaleY: 1 }
+
+    const rect = root.getBoundingClientRect()
+    const scaleX = rect.width / root.offsetWidth || 1
+    const scaleY = rect.height / root.offsetHeight || 1
+
+    return {
+      x: (clientX - rect.left) / scaleX,
+      y: (clientY - rect.top) / scaleY,
+      scaleX,
+      scaleY,
+    }
+  }
+
+  const isOverTarget = (clientX, clientY) => {
+    const rect = targetRef.current?.getBoundingClientRect()
+    return Boolean(
+      rect &&
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top - 14 &&
+        clientY <= rect.bottom + 14
+    )
+  }
+
+  const beginDrag = (event) => {
+    if (!ready || complete || event.button !== 0) return
+
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    const point = localPoint(event.clientX, event.clientY)
+    const targetRect = targetRef.current?.getBoundingClientRect()
+    const targetWidth = targetRect
+      ? targetRect.width / point.scaleX
+      : 420
+
+    dragRef.current = { pointerId: event.pointerId }
+    onBusyChange(true)
+    setDrag({
+      over: isOverTarget(event.clientX, event.clientY),
+      width: targetWidth * (model.divisorUnits / model.commonDenominator),
+      x: point.x,
+      y: point.y,
+    })
+  }
+
+  const moveDrag = (event) => {
+    if (!dragRef.current || dragRef.current.pointerId !== event.pointerId) return
+
+    const point = localPoint(event.clientX, event.clientY)
+    setDrag((current) =>
+      current
+        ? {
+            ...current,
+            over: isOverTarget(event.clientX, event.clientY),
+            x: point.x,
+            y: point.y,
+          }
+        : current
+    )
+  }
+
+  const endDrag = (event) => {
+    if (!dragRef.current || dragRef.current.pointerId !== event.pointerId) return
+
+    const validDrop = isOverTarget(event.clientX, event.clientY)
+    dragRef.current = null
+    setDrag(null)
+    onBusyChange(false)
+    onPlace(validDrop)
+  }
+
+  const placeWithKeyboard = (event) => {
+    if ((event.key === 'Enter' || event.key === ' ') && ready && !complete) {
+      event.preventDefault()
+      onPlace(true)
+    }
+  }
+
+  return (
+    <section
+      className="relative min-h-0 rounded border border-sky-200 bg-sky-50/60 p-2 shadow-sm"
+      data-division-measurement
+      ref={rootRef}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-black text-slate-900">
+            Measure the dividend
+          </h3>
+          <p className="text-[11px] font-semibold text-slate-500">
+            {ready
+              ? 'Drag the purple divisor strip onto the next open space.'
+              : phase === 'transfer-dividend' || phase === 'transfer-divisor'
+                ? 'Watch the equal parts move into the measuring workspace.'
+                : 'Rename both fractions to equal parts first.'}
+          </p>
+        </div>
+        {ready ? (
+          <div className="rounded bg-white px-3 py-1 text-right shadow-sm">
+            <div className="text-[9px] font-black uppercase text-slate-400">
+              Measured
+            </div>
+            <div className="text-sm font-black text-sky-600">
+              {quotientLabel(coveredUnits, model.divisorUnits)}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded border border-slate-200 bg-slate-100 px-3 py-1 text-[10px] font-black uppercase text-slate-400">
+            Locked
+          </div>
+        )}
+      </div>
+
+      <div className="mt-2 grid grid-cols-[68px_1fr] items-center gap-2">
+        <div className="text-right">
+          <span className="text-[10px] font-black uppercase text-emerald-700">
+            Dividend
+          </span>
+        </div>
+        <div
+          aria-label="Dividend measurement bar"
+          className={`relative h-12 overflow-hidden rounded border-2 bg-white ${
+            dividendPrepared
+              ? 'division-lab-destination-ready border-slate-800'
+              : 'border-dashed border-slate-300'
+          }`}
+          data-division-destination="dividend"
+          ref={targetRef}
+        >
+          {dividendPrepared && (
+            <>
+              <div
+                className="absolute inset-y-0 left-0 bg-emerald-100"
+                style={{
+                  width: `${(model.dividendUnits / model.commonDenominator) * 100}%`,
+                }}
+              />
+              <div
+                className="absolute inset-0 grid"
+                style={{
+                  gridTemplateColumns: `repeat(${model.commonDenominator}, minmax(0, 1fr))`,
+                }}
+              >
+                {Array.from({ length: model.commonDenominator }, (_, index) => (
+                  <span
+                    className={`border-r last:border-r-0 ${
+                      index < model.dividendUnits
+                        ? 'border-emerald-300'
+                        : 'border-slate-200'
+                    }`}
+                    key={index}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
+          {ready && placements.map((placement, index) => (
+            <div
+              className={`division-lab-group-land absolute inset-y-0 z-10 border-r-2 border-white ${
+                placement.type === 'full' ? 'bg-sky-400' : 'bg-orange-400'
+              }`}
+              key={placement.id}
+              style={{
+                '--division-lab-land-delay': `${index * 40}ms`,
+                left: `${(placement.startUnits / model.commonDenominator) * 100}%`,
+                width: `${
+                  (placement.coverageUnits / model.commonDenominator) * 100
+                }%`,
+              }}
+            >
+              <div
+                className="absolute inset-0 grid"
+                style={{
+                  gridTemplateColumns: `repeat(${placement.coverageUnits}, minmax(0, 1fr))`,
+                }}
+              >
+                {Array.from({ length: placement.coverageUnits }, (_, unitIndex) => (
+                  <span
+                    className="border-r border-white/80 last:border-r-0"
+                    key={unitIndex}
+                  />
+                ))}
+              </div>
+              <span className="absolute inset-0 z-10 flex items-center justify-center text-[10px] font-black text-white">
+                {placement.type === 'full'
+                  ? `${index + 1}`
+                  : formatFraction(placement.groupFraction)}
+              </span>
+            </div>
+          ))}
+
+          {ready && drag?.over && nextCoverage > 0 && (
+            <div
+              className={`division-lab-drop-preview absolute inset-y-0 z-20 border-2 border-dashed ${
+                nextIsPartial
+                  ? 'border-orange-500 bg-orange-200/70'
+                  : 'border-purple-600 bg-purple-300/60'
+              }`}
+              style={{
+                left: `${(coveredUnits / model.commonDenominator) * 100}%`,
+                width: `${(nextCoverage / model.commonDenominator) * 100}%`,
+              }}
+            />
+          )}
+        </div>
+
+        <div className="text-right">
+          <span className="text-[10px] font-black uppercase text-purple-700">
+            Divisor
+          </span>
+        </div>
+        <div
+          className={`relative h-12 rounded border border-dashed bg-white/80 p-1 ${
+            ready
+              ? 'division-lab-destination-ready border-purple-300'
+              : 'border-slate-300'
+          }`}
+          data-division-destination="divisor"
+        >
+          {ready && (
+            <button
+              aria-label={`Drag another ${divisor.numerator}/${divisor.denominator} divisor group into the dividend`}
+              className="division-lab-source-strip absolute bottom-1 left-1 top-1 cursor-grab touch-none rounded active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={complete}
+              onKeyDown={placeWithKeyboard}
+              onPointerCancel={endDrag}
+              onPointerDown={beginDrag}
+              onPointerMove={moveDrag}
+              onPointerUp={endDrag}
+              style={{
+                width: `calc(${(model.divisorUnits / model.commonDenominator) * 100}% - 4px)`,
+              }}
+              type="button"
+            >
+              <DivisorStrip pieceCount={stripPieceCount} />
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-black text-white drop-shadow">
+                {divisor.numerator}/{divisor.denominator}
+              </span>
+            </button>
+          )}
+          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+            {ready ? 'Drag or press Enter' : 'Waiting for equal parts'}
+          </span>
+        </div>
+      </div>
+
+      {drag && (
+        <div
+          className={`pointer-events-none absolute z-50 h-10 -translate-x-1/2 -translate-y-1/2 ${
+            drag.over ? 'division-lab-drag-ready' : ''
+          }`}
+          style={{ left: drag.x, top: drag.y, width: drag.width }}
+        >
+          <DivisorStrip pieceCount={stripPieceCount} />
+        </div>
+      )}
+    </section>
+  )
+}
+
+function LiveEquation({ dividend, divisor, model, phase, placements }) {
+  const coveredUnits = placements.reduce(
+    (total, placement) => total + placement.coverageUnits,
+    0
+  )
+  const placedQuotient = simplify(coveredUnits, model.divisorUnits)
+  const complete = coveredUnits === model.dividendUnits
+  const lastPlacement = placements.at(-1)
+
+  let observation =
+    phase === 'ready'
+      ? 'Drag a divisor strip onto the dividend to begin measuring.'
+      : phase === 'original'
+        ? 'Prepare equal parts before measuring.'
+        : 'The equal parts are being prepared for measurement.'
+
+  if (phase === 'ready' && placements.length > 0 && !complete) {
+    observation = `${quotientLabel(
+      coveredUnits,
+      model.divisorUnits
+    )} fit so far. Measure the space that remains.`
+  }
+
+  if (phase === 'ready' && complete && lastPlacement?.type === 'partial') {
+    observation = `The orange part is ${formatFraction(
+      lastPlacement.groupFraction
+    )} of one divisor group.`
+  } else if (phase === 'ready' && complete) {
+    observation = 'The dividend is covered exactly by complete divisor groups.'
+  }
+
+  return (
+    <section
+      className="grid grid-cols-[1fr_240px] items-center gap-3 rounded border border-slate-200 bg-white px-4 py-2 shadow-sm"
+      data-division-equation
+    >
+      <div>
+        <div className="text-[9px] font-black uppercase text-slate-400">
+          Live quotient
+        </div>
+        <div className="mt-0.5 flex items-center gap-2 text-2xl font-black">
+          <FractionText className="text-emerald-600" fraction={dividend} />
+          <span className="text-slate-500">&divide;</span>
+          <FractionText className="text-purple-600" fraction={divisor} />
+          <span className="text-slate-400">=</span>
+          <span
+            className={
+              complete
+                ? 'division-lab-answer-reveal text-sky-600'
+                : placements.length > 0
+                  ? 'text-sky-600'
+                  : 'text-slate-300'
+            }
+          >
+            {phase === 'ready' && placements.length > 0
+              ? formatFraction(placedQuotient)
+              : '?'}
+          </span>
+        </div>
+      </div>
+      <p
+        className={`rounded px-3 py-2 text-xs font-bold leading-snug ${
+          complete
+            ? 'bg-sky-50 text-sky-700'
+            : 'bg-amber-50 text-amber-800'
+        }`}
+      >
+        {observation}
+      </p>
+    </section>
+  )
+}
+
 export default function FractionDivisionBarModel() {
+  const rootRef = useRef(null)
   const [dividend, setDividend] = useState(defaultProblem.dividend)
   const [divisor, setDivisor] = useState(defaultProblem.divisor)
-  const [step2DividendShade, setStep2DividendShade] = useState(
-    makeEmptyShade(defaultProblem.dividend.denominator)
+  const [phase, setPhase] = useState('original')
+  const [conversionRun, setConversionRun] = useState(0)
+  const [placements, setPlacements] = useState([])
+  const [feedback, setFeedback] = useState(
+    'Rename both fractions to equal parts before measuring.'
   )
-  const [step2DivisorShade, setStep2DivisorShade] = useState(
-    makeEmptyShade(defaultProblem.divisor.denominator)
-  )
-  const [step3DividendShade, setStep3DividendShade] = useState(
-    makeEmptyShade(initialCommonDenominator)
-  )
-  const [step3DivisorShade, setStep3DivisorShade] = useState(
-    makeEmptyShade(initialCommonDenominator)
-  )
-  const [interactionRun, setInteractionRun] = useState(0)
+  const [dragging, setDragging] = useState(false)
 
   const model = useMemo(() => {
     const commonDenominator = lcm(dividend.denominator, divisor.denominator)
@@ -858,84 +801,198 @@ export default function FractionDivisionBarModel() {
       dividend.numerator * (commonDenominator / dividend.denominator)
     const divisorUnits =
       divisor.numerator * (commonDenominator / divisor.denominator)
-    const quotient = simplify(dividendUnits, divisorUnits)
-    const fullGroups = Math.floor(dividendUnits / divisorUnits)
-    const remainderUnits = dividendUnits % divisorUnits
-    const remainderGroup = simplify(remainderUnits, divisorUnits)
 
     return {
       commonDenominator,
       dividendUnits,
       divisorUnits,
-      fullGroups,
-      quotient,
-      remainderGroup,
-      remainderUnits,
+      quotient: simplify(dividendUnits, divisorUnits),
     }
   }, [dividend, divisor])
 
-  const step2Complete =
-    selectedCount(step2DividendShade) === dividend.numerator &&
-    selectedCount(step2DivisorShade) === divisor.numerator
-  const step3Complete =
-    step2Complete &&
-    selectedCount(step3DividendShade) === model.dividendUnits &&
-    selectedCount(step3DivisorShade) === model.divisorUnits
+  useEffect(() => {
+    let duration
+    let nextPhase
+    let message
 
-  const resetShading = (nextDividend, nextDivisor) => {
-    const nextCommonDenominator = lcm(
-      nextDividend.denominator,
-      nextDivisor.denominator
-    )
+    if (phase === 'converting') {
+      duration = 2450
+      nextPhase = 'transfer-dividend'
+      message = 'The green dividend pieces are moving into the measuring bar.'
+    } else if (phase === 'transfer-dividend') {
+      duration = 780 + model.dividendUnits * 45
+      nextPhase = 'transfer-divisor'
+      message = 'Now the purple divisor pieces are moving into the strip tray.'
+    } else if (phase === 'transfer-divisor') {
+      duration = 780 + model.divisorUnits * 45
+      nextPhase = 'ready'
+      message = 'The equal parts are ready. Drag the divisor strip across the dividend.'
+    } else {
+      return undefined
+    }
 
-    setStep2DividendShade(makeEmptyShade(nextDividend.denominator))
-    setStep2DivisorShade(makeEmptyShade(nextDivisor.denominator))
-    setStep3DividendShade(makeEmptyShade(nextCommonDenominator))
-    setStep3DivisorShade(makeEmptyShade(nextCommonDenominator))
-    setInteractionRun((current) => current + 1)
+    const timer = window.setTimeout(() => {
+      setPhase(nextPhase)
+      setFeedback(message)
+    }, duration)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    conversionRun,
+    model.dividendUnits,
+    model.divisorUnits,
+    phase,
+  ])
+
+  const clearMeasurement = (message) => {
+    setPlacements([])
+    setFeedback(message)
   }
 
   const updateDividend = (nextDividend) => {
     setDividend(nextDividend)
-    resetShading(nextDividend, divisor)
+    setPhase('original')
+    clearMeasurement('The fraction changed. Prepare equal parts again.')
   }
 
   const updateDivisor = (nextDivisor) => {
     setDivisor(nextDivisor)
-    resetShading(dividend, nextDivisor)
+    setPhase('original')
+    clearMeasurement('The divisor changed. Prepare equal parts again.')
   }
 
-  const toggleShade = (setter) => (index) => {
-    setter((current) => current.map((isSelected, itemIndex) => (itemIndex === index ? !isSelected : isSelected)))
+  const renameFractions = () => {
+    if (phase !== 'original') return
+
+    setConversionRun((current) => current + 1)
+    if (prefersReducedMotion()) {
+      setPhase('ready')
+      setFeedback(
+        `The ${model.commonDenominator} equal parts are ready for measurement.`
+      )
+      return
+    }
+
+    if (dividend.denominator === divisor.denominator) {
+      setPhase('transfer-dividend')
+      setFeedback('The green dividend pieces are moving into the measuring bar.')
+    } else {
+      setPhase('converting')
+      setFeedback(
+        `Watch both fractions rename themselves using ${model.commonDenominator} equal parts.`
+      )
+    }
   }
+
+  const placeNextGroup = (validDrop) => {
+    if (phase !== 'ready') return
+
+    if (!validDrop) {
+      setFeedback('Drop the strip on the dividend bar. It will snap to the next open space.')
+      return
+    }
+
+    const coveredUnits = placements.reduce(
+      (total, placement) => total + placement.coverageUnits,
+      0
+    )
+    const remainingUnits = model.dividendUnits - coveredUnits
+
+    if (remainingUnits <= 0) return
+
+    const coverageUnits = Math.min(model.divisorUnits, remainingUnits)
+    const type = coverageUnits === model.divisorUnits ? 'full' : 'partial'
+    const groupFraction = simplify(coverageUnits, model.divisorUnits)
+    const nextPlacement = {
+      coverageUnits,
+      groupFraction,
+      id: `${conversionRun}-${placements.length}-${coverageUnits}`,
+      startUnits: coveredUnits,
+      type,
+    }
+    const nextPlacements = [...placements, nextPlacement]
+    const nextCovered = coveredUnits + coverageUnits
+
+    setPlacements(nextPlacements)
+
+    if (nextCovered === model.dividendUnits) {
+      setFeedback(
+        type === 'partial'
+          ? `The last space is ${formatFraction(groupFraction)} of one divisor group.`
+          : 'The divisor groups cover the dividend exactly.'
+      )
+    } else {
+      setFeedback(
+        `${quotientLabel(nextCovered, model.divisorUnits)} fit. Drag another copy.`
+      )
+    }
+  }
+
+  const undoPlacement = () => {
+    if (placements.length === 0) return
+    setPlacements((current) => current.slice(0, -1))
+    setFeedback('The last group was removed. Measure that space again.')
+  }
+
+  const reset = () => {
+    setDividend(defaultProblem.dividend)
+    setDivisor(defaultProblem.divisor)
+    setPhase('original')
+    setPlacements([])
+    setDragging(false)
+    setFeedback('Rename both fractions to equal parts before measuring.')
+    setConversionRun((current) => current + 1)
+  }
+
+  const animationBusy =
+    phase === 'converting' ||
+    phase === 'transfer-dividend' ||
+    phase === 'transfer-divisor'
+  const sameDenominator = dividend.denominator === divisor.denominator
 
   return (
     <div
-      className="relative box-border flex h-full w-full flex-col overflow-hidden bg-slate-50 px-4 py-0 text-slate-800"
-      data-division-workspace
+      className="relative box-border flex h-[500px] w-full flex-col overflow-hidden bg-slate-50 px-3 py-2 text-slate-800"
+      data-fraction-division-lab
+      data-division-phase={phase}
+      ref={rootRef}
     >
-      <div className="grid min-h-0 w-full flex-1 grid-cols-[165px_minmax(0,1fr)] gap-3">
-        <aside className="flex min-h-0 flex-col gap-2">
-          <div className="rounded border border-slate-200 bg-white p-2 shadow-sm">
-            <h2 className="text-sm font-black leading-tight text-slate-900">
-              Fraction bar model method
-            </h2>
-            <p className="mt-1 text-[11px] font-semibold leading-snug text-slate-500">
-              Divide by asking how many divisor groups fit in the first fraction.
-            </p>
-          </div>
+      <header className="mb-2 flex h-11 shrink-0 items-start justify-between">
+        <div>
+          <h2 className="text-lg font-black leading-tight text-slate-950">
+            Fraction Division Measuring Lab
+          </h2>
+          <p className="text-[11px] font-semibold text-slate-500">
+            Find how many copies of the divisor fit inside the dividend.
+          </p>
+        </div>
+        <button
+          className="h-8 rounded bg-slate-900 px-4 text-xs font-black text-white shadow hover:bg-slate-700 disabled:opacity-40"
+          disabled={animationBusy || dragging}
+          onClick={reset}
+          type="button"
+        >
+          Reset
+        </button>
+      </header>
 
-          <div className="rounded border-2 border-slate-900 bg-white p-3 text-center shadow-sm">
-            <div className="flex items-center justify-center gap-3 text-4xl font-black">
+      <div className="grid min-h-0 flex-1 grid-cols-[182px_minmax(0,1fr)] gap-2">
+        <aside className="flex min-h-0 flex-col gap-1.5">
+          <section className="rounded border-2 border-slate-900 bg-white px-2 py-1.5 text-center shadow-sm">
+            <div className="text-[9px] font-black uppercase text-slate-400">
+              How many divisor groups?
+            </div>
+            <div className="mt-0.5 flex items-center justify-center gap-3 text-2xl font-black">
               <FractionText className="text-emerald-600" fraction={dividend} />
-              <span className="text-slate-900">&divide;</span>
+              <span className="text-slate-700">&divide;</span>
               <FractionText className="text-purple-600" fraction={divisor} />
             </div>
-          </div>
+          </section>
 
           <FractionSetter
+            disabled={animationBusy || dragging}
             fraction={dividend}
-            label="First fraction"
+            label="Dividend"
             onChange={updateDividend}
             tone={{
               bg: 'bg-emerald-50',
@@ -944,6 +1001,7 @@ export default function FractionDivisionBarModel() {
             }}
           />
           <FractionSetter
+            disabled={animationBusy || dragging}
             fraction={divisor}
             label="Divisor"
             onChange={updateDivisor}
@@ -953,161 +1011,85 @@ export default function FractionDivisionBarModel() {
               text: 'text-purple-700',
             }}
           />
+
+          <button
+            className={`min-h-10 rounded border px-2 py-1 text-[11px] font-black leading-tight shadow-sm disabled:cursor-not-allowed ${
+              phase === 'original'
+                ? 'division-lab-ready border-amber-400 bg-amber-100 text-amber-800'
+                : 'border-slate-200 bg-slate-100 text-slate-400'
+            }`}
+            disabled={
+              animationBusy ||
+              dragging ||
+              phase !== 'original'
+            }
+            onClick={renameFractions}
+            type="button"
+          >
+            {phase === 'ready'
+              ? `Using ${model.commonDenominator} equal parts`
+              : phase === 'converting'
+                ? 'Renaming...'
+                : phase === 'transfer-dividend'
+                  ? 'Moving dividend...'
+                  : phase === 'transfer-divisor'
+                    ? 'Moving divisor...'
+                    : sameDenominator
+                      ? 'Prepare equal parts'
+                      : 'Rename to equal parts'}
+          </button>
+
+          <button
+            className="h-7 rounded border border-slate-300 bg-white text-xs font-black text-slate-700 shadow-sm hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={
+              placements.length === 0 || phase !== 'ready' || dragging
+            }
+            onClick={undoPlacement}
+            type="button"
+          >
+            Undo last group
+          </button>
+
+          <div className="min-h-0 flex-1 rounded border border-sky-200 bg-sky-50 p-2 text-[11px] font-bold leading-snug text-sky-800">
+            <div className="mb-1 text-[9px] font-black uppercase text-sky-600">
+              Observation
+            </div>
+            {feedback}
+          </div>
         </aside>
 
-        <div className="grid h-full min-h-0 min-w-0 grid-rows-[48px_118px_155px_163px] gap-1">
-          <StepCard step="1">
-            <div className="flex items-center justify-center gap-2 text-lg font-black">
-              <span>How many</span>
-              <FractionText className="text-purple-600" fraction={divisor} />
-              <span>are in</span>
-              <FractionText className="text-emerald-600" fraction={dividend} />
-              <span>?</span>
-            </div>
-          </StepCard>
-
-          <StepCard step="2">
-            <div className="mb-1 text-center text-[11px] font-bold text-slate-700">
-              {step2Complete
-                ? 'Correct. Step 3 is open.'
-                : 'Shade both models correctly to unlock Step 3.'}
-            </div>
-            <div className="grid grid-cols-[34px_1fr] items-center gap-2">
-              <FractionText className="text-sm font-black text-emerald-600" fraction={dividend} />
-              <InteractiveFractionBar
-                animateKey={`step2-a-${interactionRun}`}
-                denominator={dividend.denominator}
-                //label="First fraction"
-                compact
-                onToggle={toggleShade(setStep2DividendShade)}
-                outlineColor="border-emerald-300"
-                selected={step2DividendShade}
-                shadedColor="bg-emerald-500"
-                target={dividend.numerator}
-              />
-              <FractionText className="text-sm font-black text-purple-600" fraction={divisor} />
-              <InteractiveFractionBar
-                animateKey={`step2-b-${interactionRun}`}
-                denominator={divisor.denominator}
-                //label="Divisor"
-                compact
-                onToggle={toggleShade(setStep2DivisorShade)}
-                outlineColor="border-purple-300"
-                selected={step2DivisorShade}
-                shadedColor="bg-purple-500"
-                target={divisor.numerator}
-              />
-            </div>
-          </StepCard>
-
-          <StepCard locked={!step2Complete} step="3">
-            {step2Complete ? (
-              <>
-                <div className="mb-1 text-center text-[11px] font-bold text-slate-700">
-                  {step3Complete
-                    ? 'Correct. Step 4 is open.'
-                    : 'Find the common denominator, then shade the numerators.'}
-                </div>
-                <CommonDenominatorMatch
-                  commonDenominator={model.commonDenominator}
-                  dividend={dividend}
-                  divisor={divisor}
-                />
-                <div className="grid grid-cols-[42px_1fr] items-center gap-2">
-                  <FractionText
-                    className="text-sm font-black text-emerald-600 lcd-final-content-reveal"
-                    fraction={{
-                      numerator: model.dividendUnits,
-                      denominator: model.commonDenominator,
-                    }}
-                  />
-                  <InteractiveFractionBar
-                    animateKey={`step3-a-${interactionRun}`}
-                    compact
-                    dataBarKey="step3-dividend"
-                    denominator={model.commonDenominator}
-                    //label="First fraction with common denominator"
-                    onToggle={toggleShade(setStep3DividendShade)}
-                    outlineColor="border-emerald-300"
-                    selected={step3DividendShade}
-                    shadedColor="bg-emerald-500"
-                    sourceDenominator={dividend.denominator}
-                    sourceNumerator={dividend.numerator}
-                    splitLabel={`x${model.commonDenominator / dividend.denominator}`}
-                    target={model.dividendUnits}
-                  />
-                  <FractionText
-                    className="text-sm font-black text-purple-600 lcd-final-content-reveal"
-                    fraction={{
-                      numerator: model.divisorUnits,
-                      denominator: model.commonDenominator,
-                    }}
-                  />
-                  <InteractiveFractionBar
-                    animateKey={`step3-b-${interactionRun}`}
-                    compact
-                    dataBarKey="step3-divisor"
-                    denominator={model.commonDenominator}
-                    //label="Divisor with common denominator"
-                    onToggle={toggleShade(setStep3DivisorShade)}
-                    outlineColor="border-purple-300"
-                    selected={step3DivisorShade}
-                    shadedColor="bg-purple-500"
-                    sourceDenominator={divisor.denominator}
-                    sourceNumerator={divisor.numerator}
-                    splitLabel={`x${model.commonDenominator / divisor.denominator}`}
-                    target={model.divisorUnits}
-                  />
-                </div>
-              </>
-            ) : (
-              <div className="flex h-full items-center justify-center text-center text-xs font-bold">
-                Complete Step 2 to build common-denominator bars.
-              </div>
-            )}
-          </StepCard>
-
-          <StepCard locked={!step3Complete} step="4">
-            {step3Complete ? (
-              <>
-                <div className="mb-1 flex items-center justify-center gap-2 text-sm font-black">
-                  <span>How many</span>
-                  <FractionText
-                    className="text-purple-600"
-                    fraction={{
-                      numerator: model.divisorUnits,
-                      denominator: model.commonDenominator,
-                    }}
-                  />
-                  <span>are in</span>
-                  <FractionText
-                    className="text-emerald-600"
-                    fraction={{
-                      numerator: model.dividendUnits,
-                      denominator: model.commonDenominator,
-                    }}
-                  />
-                  <span>?</span>
-                </div>
-
-                <Step4GroupingAnimation
-                  animateKey={`step4-${interactionRun}`}
-                  commonDenominator={model.commonDenominator}
-                  dividendUnits={model.dividendUnits}
-                  divisorUnits={model.divisorUnits}
-                  fullGroups={model.fullGroups}
-                  remainderGroup={model.remainderGroup}
-                  remainderUnits={model.remainderUnits}
-                />
-              </>
-            ) : (
-              <div className="flex h-full items-center justify-center text-center text-xs font-bold">
-                Complete Step 3 to reveal the grouping animation.
-              </div>
-            )}
-          </StepCard>
-        </div>
+        <main className="grid min-h-0 grid-rows-[154px_minmax(0,1fr)_80px] gap-2">
+          <FractionModels
+            dividend={dividend}
+            divisor={divisor}
+            model={model}
+            phase={phase}
+            run={conversionRun}
+          />
+          <DivisionMeasurementWorkspace
+            divisor={divisor}
+            model={model}
+            onBusyChange={setDragging}
+            onPlace={placeNextGroup}
+            phase={phase}
+            placements={placements}
+          />
+          <LiveEquation
+            dividend={dividend}
+            divisor={divisor}
+            model={model}
+            phase={phase}
+            placements={placements}
+          />
+        </main>
       </div>
+      <EqualPartTransferOverlay
+        key={`${conversionRun}-${phase}`}
+        model={model}
+        phase={phase}
+        rootRef={rootRef}
+        run={conversionRun}
+      />
     </div>
   )
 }
