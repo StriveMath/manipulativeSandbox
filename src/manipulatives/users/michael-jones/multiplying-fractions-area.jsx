@@ -92,11 +92,6 @@ export default function MultiplyingFractionsArea() {
   const [den2, setDen2] = useState(4)
   const [toggled, setToggled] = useState(() => new Set())
 
-  // Reset per-cell toggles whenever the grid shape changes.
-  useEffect(() => {
-    setToggled(new Set())
-  }, [whole1, num1, den1, whole2, num2, den2])
-
   const t1 = whole1 * den1 + num1
   const t2 = whole2 * den2 + num2
   const prodN = t1 * t2
@@ -260,12 +255,17 @@ export default function MultiplyingFractionsArea() {
   const makeSetters = (whole, num, den, setWhole, setNum, setDen) => ({
     onWhole: (v) => {
       const w = clamp(v, 0, MAX_WHOLE)
+      setToggled(new Set())
       setWhole(w)
       if (w === 0 && num === 0) setNum(1)
     },
-    onNum: (v) => setNum(clamp(v, whole === 0 ? 1 : 0, den - 1)),
+    onNum: (v) => {
+      setToggled(new Set())
+      setNum(clamp(v, whole === 0 ? 1 : 0, den - 1))
+    },
     onDen: (v) => {
       const d = clamp(v, MIN_DEN, MAX_DEN)
+      setToggled(new Set())
       setDen(d)
       if (num > d - 1) setNum(d - 1)
     },

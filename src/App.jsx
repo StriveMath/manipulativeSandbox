@@ -1,10 +1,41 @@
-import { useState } from 'react'
+import { Link, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import ManipulativeCanvas from './ManipulativeCanvas.jsx'
 import { manipulativeGroups, manipulatives } from './manipulatives/index.js'
 
-export default function App() {
-  const [activeId, setActiveId] = useState('percent-park-designer')
-  const active = manipulatives.find((m) => m.id === activeId) ?? manipulatives[0]
+const defaultManipulative =
+  manipulatives.find((manipulative) => manipulative.id === 'percent-park-designer') ??
+  manipulatives[0]
+const defaultPath = `/${defaultManipulative.ownerSlug}/${defaultManipulative.id}`
+
+function OwnerRedirect() {
+  const { ownerSlug } = useParams()
+  const firstManipulative = manipulatives.find(
+    (manipulative) => manipulative.ownerSlug === ownerSlug,
+  )
+
+  return (
+    <Navigate
+      replace
+      to={
+        firstManipulative
+          ? `/${firstManipulative.ownerSlug}/${firstManipulative.id}`
+          : defaultPath
+      }
+    />
+  )
+}
+
+function ManipulativePage() {
+  const { ownerSlug, manipulativeId } = useParams()
+  const active = manipulatives.find(
+    (manipulative) =>
+      manipulative.ownerSlug === ownerSlug && manipulative.id === manipulativeId,
+  )
+
+  if (!active) {
+    return <Navigate replace to={defaultPath} />
+  }
+
   const ActiveComponent = active.component
 
   return (
@@ -15,25 +46,27 @@ export default function App() {
         </p>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {manipulativeGroups.map((group) => (
-            <section key={group.source}>
-              <h2 className="mb-1 rounded bg-slate-800 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-300">
+            <section key={group.ownerSlug}>
+              <Link
+                to={`/${group.ownerSlug}`}
+                className="mb-1 block rounded bg-slate-800 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-300 hover:bg-slate-700 hover:text-white"
+              >
                 {group.source}
-              </h2>
+              </Link>
               <ul className="grid grid-cols-2 gap-1">
                 {group.manipulatives.map((m) => (
                   <li className="min-w-0" key={m.id}>
-                    <button
-                      type="button"
-                      onClick={() => setActiveId(m.id)}
-                      title={`${m.name} (${m.source})`}
-                      className={`w-full truncate rounded px-1.5 py-1 text-left text-[10px] leading-tight ${
-                        m.id === activeId
+                    <Link
+                      to={`/${m.ownerSlug}/${m.id}`}
+                      title={`${m.name} (${m.ownerName})`}
+                      className={`block w-full truncate rounded px-1.5 py-1 text-left text-[10px] leading-tight ${
+                        m.id === active.id
                           ? 'bg-blue-500 text-white'
                           : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                       }`}
                     >
                       {m.name}
-                    </button>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -51,5 +84,15 @@ export default function App() {
         </ManipulativeCanvas>
       </main>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/:ownerSlug/:manipulativeId" element={<ManipulativePage />} />
+      <Route path="/:ownerSlug" element={<OwnerRedirect />} />
+      <Route path="*" element={<Navigate replace to={defaultPath} />} />
+    </Routes>
   )
 }

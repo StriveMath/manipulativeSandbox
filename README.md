@@ -1,6 +1,6 @@
-# manipulativeSandbox
+# Manipulative Sandbox
 
-A small React/Vite sandbox for prototyping Strive math manipulatives.
+A React/Vite sandbox for prototyping Strive Math manipulatives.
 
 ## Development
 
@@ -9,24 +9,50 @@ npm install
 npm run dev
 ```
 
-## Build
+Use `npm run build` for a production build and `npm run lint` to check the
+source.
 
-```bash
-npm run build
+## URLs
+
+Each owner has a short URL that redirects to their first manipulative:
+
+```text
+/ashakv1712
+/approved
 ```
-# React + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Every manipulative has a canonical owner and manipulative path:
 
-Currently, two official plugins are available:
+```text
+/ashakv1712/percent-park-designer
+/approved/factor-tree
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Unknown owners, manipulatives, and paths redirect to the default manipulative.
+Production hosts must serve `index.html` for unmatched paths so direct links
+reach the client-side router.
 
-## React Compiler
+## Manipulative structure
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Contributor work is grouped by user, without PR-specific folders:
 
-## Expanding the ESLint configuration
+```text
+src/manipulatives/
+  index.js
+  approved/
+    factor-tree.jsx
+  users/
+    ashakv1712/
+      percent-park-designer.jsx
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+To add a manipulative:
+
+1. Put its component directly in `src/manipulatives/users/<owner>/`, or in
+   `src/manipulatives/approved/` for approved work.
+2. Use the manipulative's kebab-case ID as its filename.
+3. Import it in `src/manipulatives/index.js` and add an entry with `id`, `name`,
+   `component`, `ownerSlug`, and `ownerName`.
+
+All manipulatives continue to render inside the shared 800×500
+`ManipulativeCanvas`.
