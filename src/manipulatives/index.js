@@ -1,85 +1,188 @@
-import AngleRelationships from './angle-relationships.jsx'
-import AddingUnlikeFractions from './adding-unlike-fractions.jsx'
-import BoxPlotBuilder from './box-plot-builder.jsx'
-import ComparingTwoPopulations from './comparing-two-populations.jsx'
-import CoordinateConnectDots from './coordinate-connect-dots.jsx'
-import AngleTargetChallenge from './angle-target-challenge.jsx'
-import AlgebraTiles from './algebra-tiles.jsx'
-import BalanceScaleEquations from './balance-scale-equations.jsx'
+import AngleRelationships from './pr-8-ashakv1712/angle-relationships.jsx'
+import AddingUnlikeFractions from './pr-8-ashakv1712/adding-unlike-fractions.jsx'
+import BoxPlotBuilder from './pr-8-ashakv1712/box-plot-builder.jsx'
+import ComparingTwoPopulations from './pr-8-ashakv1712/comparing-two-populations.jsx'
+import CoordinateConnectDots from './pr-8-ashakv1712/coordinate-connect-dots.jsx'
+import AngleTargetChallenge from './pr-9-laurenbee97/angle-target-challenge.jsx'
+import AlgebraTiles from './pr-11-michael-jones/algebra-tiles.jsx'
+import BalanceScaleEquations from './pr-11-michael-jones/balance-scale-equations.jsx'
 import CoordinateTreasureMap from './coordinate-treasure-map.jsx'
-import PercentageBarModel from './PercentageBarModel.tsx'
-import TriangleAreaApp from './TriangleAreaApp.tsx'
-import TrapezoidAreaApp from './TrapezoidAreaApp.tsx'
-import AreaModelMultiplication from './area-model-multiplication.jsx'
-import AddingSubtractingFractions from './adding-subtracting-fractions.jsx'
-import AddingSubtractingIntegers from './adding-subtracting-integers.jsx'
-import AreaCircumferenceCircle from './area-circumference-circle.jsx'
-import CompoundFiguresDecomposer from './compound-figures-decomposer.jsx'
-import DecimalHundredthsGrid from './decimal-hundredths-grid.jsx'
-import DecimalNumberLine from './decimal-number-line.jsx'
-import DecimalPlaceValueDisks from './decimal-place-value-disks.jsx'
-import DecimalPlaceValueStrips from './decimal-place-value-strips.jsx'
-import ComparingDecimals from './ComparingDecimals.tsx'
-import OrderingOfDecimals from './OrderingOfDecimals.tsx'
-import AbsoluteValueManipulative from './AbsoluteValueManipulative.tsx'
-import VolumeOfCylinders from './VolumeOfCylinders.tsx'
-import VolumeOfCone from './VolumeOfCone.tsx'
-import VolumeOfSphere from './VolumeOfSphere.tsx'
+import PercentageBarModel from './pr-6-vero1013/PercentageBarModel.tsx'
+import TriangleAreaApp from './pr-6-vero1013/TriangleAreaApp.tsx'
+import TrapezoidAreaApp from './pr-6-vero1013/TrapezoidAreaApp.tsx'
+import AreaModelMultiplication from './pr-7-uzumaki-dc/area-model-multiplication.jsx'
+import AddingSubtractingFractions from './pr-7-uzumaki-dc/adding-subtracting-fractions.jsx'
+import AddingSubtractingIntegers from './pr-7-uzumaki-dc/adding-subtracting-integers.jsx'
+import AreaCircumferenceCircle from './pr-7-uzumaki-dc/area-circumference-circle.jsx'
+import CompoundFiguresDecomposer from './pr-7-uzumaki-dc/compound-figures-decomposer.jsx'
+import DecimalHundredthsGrid from './pr-7-uzumaki-dc/decimal-hundredths-grid.jsx'
+import DecimalNumberLine from './pr-7-uzumaki-dc/decimal-number-line.jsx'
+import DecimalPlaceValueDisks from './pr-7-uzumaki-dc/decimal-place-value-disks.jsx'
+import DecimalPlaceValueStrips from './pr-7-uzumaki-dc/decimal-place-value-strips.jsx'
+import ComparingDecimals from './pr-6-vero1013/ComparingDecimals.tsx'
+import OrderingOfDecimals from './pr-6-vero1013/OrderingOfDecimals.tsx'
+import AbsoluteValueManipulative from './pr-6-vero1013/AbsoluteValueManipulative.tsx'
+import VolumeOfCylinders from './pr-6-vero1013/VolumeOfCylinders.tsx'
+import VolumeOfCone from './pr-6-vero1013/VolumeOfCone.tsx'
+import VolumeOfSphere from './pr-6-vero1013/VolumeOfSphere.tsx'
 import FactorTree from './factor-tree.jsx'
-import EquivalentFractionsVisual from './equivalent-fractions-visual.jsx'
-import FractionBars from './fraction-bars.jsx'
-import FractionDivisionBarModel from './fraction-division-bar-model.jsx'
-import FractionsNumberLine from './fractions-number-line.jsx'
-import FractionsNumberLineChallenge from './fractions-number-line-pr8.jsx'
-import DistributiveAreaModel from './distributive-area-model.jsx'
-import DistanceCoordinatePlane from './distance-coordinate-plane.jsx'
-import ElapsedTimeClock from './elapsed-time-clock.jsx'
-import ExploreRatios from './explore-ratios.jsx'
-import FactorRainbow from './factor-rainbow.jsx'
-import FunctionMachineDetective from './function-machine-detective.jsx'
-import HcfBuilder from './hcf-builder.jsx'
-import IntegerMultiplyDivide from './integer-multiply-divide.jsx'
-import LcmCirclingPairs from './lcm-circling-pairs.jsx'
-import LinearEquationGrapher from './linear-equation-grapher.jsx'
-import LongDivisionLab from './long-division-lab.jsx'
-import InequalitiesNumberLine from './inequalities-number-line.jsx'
-import MeanAbsoluteDeviation from './mean-absolute-deviation.jsx'
+import EquivalentFractionsVisual from './pr-7-uzumaki-dc/equivalent-fractions-visual.jsx'
+import FractionBars from './pr-7-uzumaki-dc/fraction-bars.jsx'
+import FractionDivisionBarModel from './pr-7-uzumaki-dc/fraction-division-bar-model.jsx'
+import FractionsNumberLine from './pr-7-uzumaki-dc/fractions-number-line.jsx'
+import FractionsNumberLineChallenge from './pr-8-ashakv1712/fractions-number-line-pr8.jsx'
+import DistributiveAreaModel from './pr-8-ashakv1712/distributive-area-model.jsx'
+import DistanceCoordinatePlane from './pr-8-ashakv1712/distance-coordinate-plane.jsx'
+import ElapsedTimeClock from './pr-8-ashakv1712/elapsed-time-clock.jsx'
+import ExploreRatios from './pr-8-ashakv1712/explore-ratios.jsx'
+import FactorRainbow from './pr-8-ashakv1712/factor-rainbow.jsx'
+import FunctionMachineDetective from './pr-8-ashakv1712/function-machine-detective.jsx'
+import HcfBuilder from './pr-8-ashakv1712/hcf-builder.jsx'
+import IntegerMultiplyDivide from './pr-8-ashakv1712/integer-multiply-divide.jsx'
+import LcmCirclingPairs from './pr-8-ashakv1712/lcm-circling-pairs.jsx'
+import LinearEquationGrapher from './pr-8-ashakv1712/linear-equation-grapher.jsx'
+import LongDivisionLab from './pr-10-laurenbee97/long-division-lab.jsx'
+import InequalitiesNumberLine from './pr-11-michael-jones/inequalities-number-line.jsx'
+import MeanAbsoluteDeviation from './pr-11-michael-jones/mean-absolute-deviation.jsx'
 import MeanBalancePoint from './mean-balance-point.jsx'
-import MixedNumbersImproper from './mixed-numbers-improper.jsx'
-import ProbabilityScale from './probability-scale.jsx'
-import SampleSpaceTree from './sample-space-tree.jsx'
-import MultiplyingFractionsArea from './multiplying-fractions-area.jsx'
+import MixedNumbersImproper from './pr-11-michael-jones/mixed-numbers-improper.jsx'
+import NetsSurfaceArea from './pr-8-ashakv1712/nets-surface-area.jsx'
+import ProbabilityScale from './pr-11-michael-jones/probability-scale.jsx'
+import SampleSpaceTree from './pr-11-michael-jones/sample-space-tree.jsx'
+import MultiplyingFractionsArea from './pr-11-michael-jones/multiplying-fractions-area.jsx'
+import NumberLineAddSubtract from './pr-8-ashakv1712/number-line-add-subtract.jsx'
 import NumberLineExplorer from './number-line-explorer.jsx'
 import ParallelogramArea from './parallelogram-area.jsx'
-import PizzaRemainder from './pizza-remainder.jsx'
-import RoundingNumberLine from './rounding-number-line.jsx'
-import PlaceValueDisks from './place-value-disks.jsx'
-import PowerOf10BlobExplorer from './power-of-10-blob-explorer.jsx'
-import PowersOf10PlaceValueShift from './powers-of-10-place-value-shift.jsx'
-import ProportionalVsNonProportionalGraphs from './proportional-vs-non-proportional-graphs.jsx'
-import RationalVsIrrationalNumbers from './rational-vs-irrational-numbers.jsx'
-import ScaleDrawingsMaps from './scale-drawings-maps.jsx'
-import PolygonInteriorAngles from './polygon-interior-angles.jsx'
-import ProbabilitySpinner from './probability-spinner.jsx'
-import RatioBalanceScale from './ratio-balance-scale.jsx'
-import ScatterLineFit from './scatter-line-fit.jsx'
-import SlopeExplorer from './slope-explorer.jsx'
-import SubstitutionMachine from './substitution-machine.jsx'
-import SystemsOfEquations from './systems-of-equations.jsx'
-import TwoWayTables from './two-way-tables.jsx'
+import PizzaRemainder from './pr-11-michael-jones/pizza-remainder.jsx'
+import RoundingNumberLine from './pr-11-michael-jones/rounding-number-line.jsx'
+import PlaceValueDisks from './pr-7-uzumaki-dc/place-value-disks.jsx'
+import PowerOf10BlobExplorer from './pr-7-uzumaki-dc/power-of-10-blob-explorer.jsx'
+import PowersOf10PlaceValueShift from './pr-7-uzumaki-dc/powers-of-10-place-value-shift.jsx'
+import ProportionalVsNonProportionalGraphs from './pr-7-uzumaki-dc/proportional-vs-non-proportional-graphs.jsx'
+import RationalVsIrrationalNumbers from './pr-7-uzumaki-dc/rational-vs-irrational-numbers.jsx'
+import ScaleDrawingsMaps from './pr-7-uzumaki-dc/scale-drawings-maps.jsx'
+import PolygonInteriorAngles from './pr-8-ashakv1712/polygon-interior-angles.jsx'
+import ProbabilitySpinner from './pr-8-ashakv1712/probability-spinner.jsx'
+import RatioBalanceScale from './pr-8-ashakv1712/ratio-balance-scale.jsx'
+import ScatterLineFit from './pr-8-ashakv1712/scatter-line-fit.jsx'
+import SlopeExplorer from './pr-8-ashakv1712/slope-explorer.jsx'
+import SubstitutionMachine from './pr-8-ashakv1712/substitution-machine.jsx'
+import SystemsOfEquations from './pr-8-ashakv1712/systems-of-equations.jsx'
+import TwoWayTables from './pr-8-ashakv1712/two-way-tables.jsx'
 import TwoFactorTrees from './two-factor-trees.jsx'
-import TwoStepEquationSolver from './two-step-equation-solver.jsx'
-import UnitRateExplorer from './unit-rate-better-buy.jsx'
-import VolumePrisms from './volume-prisms.jsx'
-import LinearVsNonlinear from './linear-vs-nonlinear.jsx'
-import RateOfChangeExplorer from './rate-of-change-explorer.jsx'
-import PercentParkDesigner from './percent-park-designer.jsx'
+import TwoStepEquationSolver from './pr-8-ashakv1712/two-step-equation-solver.jsx'
+import UnitRateExplorer from './pr-8-ashakv1712/unit-rate-better-buy.jsx'
+import VolumePrisms from './pr-8-ashakv1712/volume-prisms.jsx'
+import LinearVsNonlinear from './pr-8-ashakv1712/linear-vs-nonlinear.jsx'
+import RateOfChangeExplorer from './pr-8-ashakv1712/rate-of-change-explorer.jsx'
+import PercentParkDesigner from './pr-8-ashakv1712/percent-park-designer.jsx'
+import ColumnArithmeticGrid from './pr-8-ashakv1712/column-arithmetic-grid.jsx'
 
-export const manipulatives = [
+
+const sourceByComponent = new Map([
+  [PercentageBarModel, 'PR #6 - Vero1013'],
+  [TriangleAreaApp, 'PR #6 - Vero1013'],
+  [TrapezoidAreaApp, 'PR #6 - Vero1013'],
+  [ComparingDecimals, 'PR #6 - Vero1013'],
+  [OrderingOfDecimals, 'PR #6 - Vero1013'],
+  [AbsoluteValueManipulative, 'PR #6 - Vero1013'],
+  [VolumeOfCylinders, 'PR #6 - Vero1013'],
+  [VolumeOfCone, 'PR #6 - Vero1013'],
+  [VolumeOfSphere, 'PR #6 - Vero1013'],
+  [AreaModelMultiplication, 'PR #7 - Uzumaki-DC'],
+  [AddingSubtractingFractions, 'PR #7 - Uzumaki-DC'],
+  [AddingSubtractingIntegers, 'PR #7 - Uzumaki-DC'],
+  [AreaCircumferenceCircle, 'PR #7 - Uzumaki-DC'],
+  [CompoundFiguresDecomposer, 'PR #7 - Uzumaki-DC'],
+  [DecimalHundredthsGrid, 'PR #7 - Uzumaki-DC'],
+  [DecimalNumberLine, 'PR #7 - Uzumaki-DC'],
+  [DecimalPlaceValueDisks, 'PR #7 - Uzumaki-DC'],
+  [DecimalPlaceValueStrips, 'PR #7 - Uzumaki-DC'],
+  [EquivalentFractionsVisual, 'PR #7 - Uzumaki-DC'],
+  [FractionBars, 'PR #7 - Uzumaki-DC'],
+  [FractionDivisionBarModel, 'PR #7 - Uzumaki-DC'],
+  [FractionsNumberLine, 'PR #7 - Uzumaki-DC'],
+  [PlaceValueDisks, 'PR #7 - Uzumaki-DC'],
+  [PowerOf10BlobExplorer, 'PR #7 - Uzumaki-DC'],
+  [PowersOf10PlaceValueShift, 'PR #7 - Uzumaki-DC'],
+  [ProportionalVsNonProportionalGraphs, 'PR #7 - Uzumaki-DC'],
+  [RationalVsIrrationalNumbers, 'PR #7 - Uzumaki-DC'],
+  [ScaleDrawingsMaps, 'PR #7 - Uzumaki-DC'],
+  [AngleRelationships, 'PR #8 - ashakv1712'],
+  [AddingUnlikeFractions, 'PR #8 - ashakv1712'],
+  [BoxPlotBuilder, 'PR #8 - ashakv1712'],
+  [ComparingTwoPopulations, 'PR #8 - ashakv1712'],
+  [CoordinateConnectDots, 'PR #8 - ashakv1712'],
+  [DistributiveAreaModel, 'PR #8 - ashakv1712'],
+  [DistanceCoordinatePlane, 'PR #8 - ashakv1712'],
+  [ElapsedTimeClock, 'PR #8 - ashakv1712'],
+  [ExploreRatios, 'PR #8 - ashakv1712'],
+  [FactorRainbow, 'PR #8 - ashakv1712'],
+  [FractionsNumberLineChallenge, 'PR #8 - ashakv1712'],
+  [FunctionMachineDetective, 'PR #8 - ashakv1712'],
+  [HcfBuilder, 'PR #8 - ashakv1712'],
+  [IntegerMultiplyDivide, 'PR #8 - ashakv1712'],
+  [LcmCirclingPairs, 'PR #8 - ashakv1712'],
+  [LinearEquationGrapher, 'PR #8 - ashakv1712'],
+  [LinearVsNonlinear, 'PR #8 - ashakv1712'],
+  [NetsSurfaceArea, 'PR #8 - ashakv1712'],
+  [NumberLineAddSubtract, 'PR #8 - ashakv1712'],
+  [PercentParkDesigner, 'PR #8 - ashakv1712'],
+  [ColumnArithmeticGrid, 'PR #8 - ashakv1712'],
+  [PolygonInteriorAngles, 'PR #8 - ashakv1712'],
+  [ProbabilitySpinner, 'PR #8 - ashakv1712'],
+  [RateOfChangeExplorer, 'PR #8 - ashakv1712'],
+  [RatioBalanceScale, 'PR #8 - ashakv1712'],
+  [ScatterLineFit, 'PR #8 - ashakv1712'],
+  [SlopeExplorer, 'PR #8 - ashakv1712'],
+  [SubstitutionMachine, 'PR #8 - ashakv1712'],
+  [SystemsOfEquations, 'PR #8 - ashakv1712'],
+  [TwoStepEquationSolver, 'PR #8 - ashakv1712'],
+  [TwoWayTables, 'PR #8 - ashakv1712'],
+  [UnitRateExplorer, 'PR #8 - ashakv1712'],
+  [VolumePrisms, 'PR #8 - ashakv1712'],
+  [AngleTargetChallenge, 'PR #9 - laurenbee97'],
+  [LongDivisionLab, 'PR #10 - laurenbee97'],
+  [AlgebraTiles, 'PR #11 - Michael / M Jones'],
+  [BalanceScaleEquations, 'PR #11 - Michael / M Jones'],
+  [InequalitiesNumberLine, 'PR #11 - Michael / M Jones'],
+  [MeanAbsoluteDeviation, 'PR #11 - Michael / M Jones'],
+  [MixedNumbersImproper, 'PR #11 - Michael / M Jones'],
+  [MultiplyingFractionsArea, 'PR #11 - Michael / M Jones'],
+  [PizzaRemainder, 'PR #11 - Michael / M Jones'],
+  [ProbabilityScale, 'PR #11 - Michael / M Jones'],
+  [RoundingNumberLine, 'PR #11 - Michael / M Jones'],
+  [SampleSpaceTree, 'PR #11 - Michael / M Jones'],
+])
+
+const personBySource = new Map([
+  ['PR #6 - Vero1013', 'Vero1013'],
+  ['PR #7 - Uzumaki-DC', 'Uzumaki-DC'],
+  ['PR #8 - ashakv1712', 'ashakv1712'],
+  ['PR #9 - laurenbee97', 'laurenbee97'],
+  ['PR #10 - laurenbee97', 'laurenbee97'],
+  ['PR #11 - Michael / M Jones', 'Michael / M Jones'],
+])
+
+const groupOrder = [
+  'Vero1013',
+  'Uzumaki-DC',
+  'ashakv1712',
+  'laurenbee97',
+  'Michael / M Jones',
+  'Approved Manipulatives',
+]
+
+const allManipulatives = [
   {
     id: 'percent-park-designer',
     name: 'Percent Park Designer',
     component: PercentParkDesigner,
+  },
+  {
+    id: 'column-arithmetic-grid',
+    name: 'Column Arithmetic Grid',
+    component: ColumnArithmeticGrid,
   },
   {
     id: 'rate-of-change-explorer',
@@ -467,3 +570,18 @@ export const manipulatives = [
     component: VolumePrisms,
   },
 ]
+
+export const manipulatives = allManipulatives.map((manipulative) => ({
+  ...manipulative,
+  source:
+    personBySource.get(sourceByComponent.get(manipulative.component)) ??
+    'Approved Manipulatives',
+}))
+
+export const manipulativeGroups = groupOrder
+  .map((source) => ({
+    source,
+    manipulatives: manipulatives.filter((manipulative) => manipulative.source === source),
+  }))
+  .filter((group) => group.manipulatives.length > 0)
+
