@@ -1,15 +1,24 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { cream, ink, muted, border, blue, amber as orange, green } from './shared/palette'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { cream, ink, muted, border, blue, amber as orange, green, purple } from './shared/palette'
 import { useCanvasBox } from './shared/useCanvasBox'
-import ToggleChip from './shared/ToggleChip'
 
 const MIN_DEN = 2
 const MAX_DEN = 8
+const MAX_WHOLE = 3
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
-const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b))
 
-// Dimension brackets (a line with two end caps) + labels.
+// Partial-product region fills. Green = the main whole x whole block; the other
+// three are lighter so it reads as "extra" pieces.
+const FILL = {
+  ww: 'rgba(29, 158, 117, 0.60)',
+  wf: 'rgba(37, 99, 235, 0.26)',
+  fw: 'rgba(216, 90, 48, 0.26)',
+  ff: 'rgba(124, 58, 237, 0.26)',
+}
+const regionKey = (wholeRow, wholeCol) =>
+  wholeRow ? (wholeCol ? 'ww' : 'wf') : wholeCol ? 'fw' : 'ff'
+
 function vBracket(ctx, x, yTop, yBot, color) {
   ctx.strokeStyle = color
   ctx.lineWidth = 2
@@ -54,38 +63,48 @@ function hLabel(ctx, x, y, text, color) {
   ctx.fillText(text, x, y)
 }
 
+// Full 1-unit boxes along an axis so the whole stays visible; each entry is how
+// many of the `den` cells are active (shaded) by default.
+function axisBoxes(whole, num, den) {
+  const boxes = []
+  for (let i = 0; i < whole; i += 1) boxes.push(den)
+  if (num > 0) boxes.push(num)
+  return boxes
+}
+
+const mixedText = (whole, num, den) => {
+  if (whole > 0 && num > 0) return `${whole} ${num}/${den}`
+  if (whole > 0) return `${whole}`
+  return `${num}/${den}`
+}
+
 export default function MultiplyingFractionsArea() {
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
+  const geoRef = useRef(null)
   const size = useCanvasBox(wrapRef, { minW: 300, minH: 260 })
+
+  const [whole1, setWhole1] = useState(1)
   const [num1, setNum1] = useState(1)
   const [den1, setDen1] = useState(2)
+  const [whole2, setWhole2] = useState(1)
   const [num2, setNum2] = useState(1)
-  const [den2, setDen2] = useState(3)
-  const [hideAnswer, setHideAnswer] = useState(false)
+  const [den2, setDen2] = useState(4)
+  const [toggled, setToggled] = useState(() => new Set())
 
-  const prodN = num1 * num2
+  // Reset per-cell toggles whenever the grid shape changes.
+  useEffect(() => {
+    setToggled(new Set())
+  }, [whole1, num1, den1, whole2, num2, den2])
+
+  const t1 = whole1 * den1 + num1
+  const t2 = whole2 * den2 + num2
+  const prodN = t1 * t2
   const prodD = den1 * den2
-  const divisor = gcd(prodN, prodD)
-  const simpN = prodN / divisor
-  const simpD = prodD / divisor
-  const reduces = divisor > 1
+  const prodWhole = Math.floor(prodN / prodD)
+  const prodRem = prodN % prodD
 
-  // The canvas is the whole point of this manipulative, so it needs a text
-  // equivalent — otherwise a screen-reader user gets an unlabelled rectangle.
-  const summary = `Area model: a square split into ${den1} rows and ${den2} columns, ${prodD} equal pieces total. ${num1}/${den1} of the height is shaded blue, ${num2}/${den2} of the width is shaded orange, and their green overlap of ${prodN} piece${prodN === 1 ? '' : 's'} shows the product ${num1}/${den1} times ${num2}/${den2}${reduces ? `, which simplifies to ${simpN}/${simpD}` : ''}.`
-
-  const geometry = useMemo(() => {
-    // Reserve margin on the left and top for the "1 whole" + fraction brackets.
-    const marginL = 56
-    const marginT = 56
-    const marginR = 16
-    const marginB = 16
-    const square = Math.max(80, Math.min(size.w - marginL - marginR, size.h - marginT - marginB))
-    const x0 = marginL
-    const y0 = marginT + Math.max(0, (size.h - marginT - marginB - square) / 2)
-    return { square, x0, y0, cellH: square / den1, cellW: square / den2 }
-  }, [size, den1, den2])
+  const summary = `Grid multiplication area model for ${mixedText(whole1, num1, den1)} times ${mixedText(whole2, num2, den2)}. The rectangle is split into partial products: whole times whole in green, plus lighter whole-by-fraction, fraction-by-whole and fraction-by-fraction pieces. Together they equal ${prodN}/${prodD}.`
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -99,135 +118,213 @@ export default function MultiplyingFractionsArea() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, size.w, size.h)
 
-    const { square, x0, y0, cellH, cellW } = geometry
+    const marginL = 64
+    const marginT = 60
+    const marginR = 16
+    const marginB = 16
+    const availW = Math.max(40, size.w - marginL - marginR)
+    const availH = Math.max(40, size.h - marginT - marginB)
 
-    // White unit square.
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(x0, y0, square, square)
+    const colBoxes = axisBoxes(whole2, num2, den2)
+    const rowBoxes = axisBoxes(whole1, num1, den1)
+    const nCols = colBoxes.length
+    const nRows = rowBoxes.length
+    if (nCols === 0 || nRows === 0) return
 
-    // Fraction 1 — horizontal bands (top num1 of den1 rows).
-    ctx.fillStyle = 'rgba(37, 99, 235, 0.28)'
-    ctx.fillRect(x0, y0, square, num1 * cellH)
-    // Fraction 2 — vertical bands (left num2 of den2 columns).
-    ctx.fillStyle = 'rgba(217, 119, 6, 0.30)'
-    ctx.fillRect(x0, y0, num2 * cellW, square)
-    // Overlap = product.
-    ctx.fillStyle = 'rgba(29, 158, 117, 0.80)'
-    ctx.fillRect(x0, y0, num2 * cellW, num1 * cellH)
+    const gap = 14
+    const uW = (availW - (nCols - 1) * gap) / nCols
+    const uH = (availH - (nRows - 1) * gap) / nRows
+    const U = Math.max(24, Math.min(uW, uH))
+    const cellW = U / den2
+    const cellH = U / den1
 
-    // Grid lines.
-    ctx.strokeStyle = 'rgba(26, 26, 46, 0.22)'
-    ctx.lineWidth = 1
-    for (let r = 1; r < den1; r += 1) {
-      ctx.beginPath()
-      ctx.moveTo(x0, y0 + r * cellH)
-      ctx.lineTo(x0 + square, y0 + r * cellH)
-      ctx.stroke()
+    const drawnW = nCols * U + (nCols - 1) * gap
+    const drawnH = nRows * U + (nRows - 1) * gap
+    const x0 = marginL + Math.max(0, (availW - drawnW) / 2)
+    const y0 = marginT + Math.max(0, (availH - drawnH) / 2)
+
+    const colX = colBoxes.map((_, i) => x0 + i * (U + gap))
+    const rowY = rowBoxes.map((_, i) => y0 + i * (U + gap))
+    geoRef.current = { colX, rowY, U, cellW, cellH, den1, den2 }
+
+    for (let ri = 0; ri < nRows; ri += 1) {
+      const wholeRow = ri < whole1
+      const rowActive = rowBoxes[ri]
+      for (let ci = 0; ci < nCols; ci += 1) {
+        const wholeCol = ci < whole2
+        const colActive = colBoxes[ci]
+        const bx = colX[ci]
+        const by = rowY[ri]
+        const fill = FILL[regionKey(wholeRow, wholeCol)]
+
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(bx, by, U, U)
+
+        for (let r = 0; r < den1; r += 1) {
+          for (let c = 0; c < den2; c += 1) {
+            const def = r < rowActive && c < colActive
+            const on = toggled.has(`${ri}:${r}:${ci}:${c}`) ? !def : def
+            if (on) {
+              ctx.fillStyle = fill
+              ctx.fillRect(bx + c * cellW, by + r * cellH, cellW, cellH)
+            }
+          }
+        }
+
+        ctx.strokeStyle = 'rgba(26, 26, 46, 0.22)'
+        ctx.lineWidth = 1
+        for (let c = 1; c < den2; c += 1) {
+          ctx.beginPath()
+          ctx.moveTo(bx + c * cellW, by)
+          ctx.lineTo(bx + c * cellW, by + U)
+          ctx.stroke()
+        }
+        for (let r = 1; r < den1; r += 1) {
+          ctx.beginPath()
+          ctx.moveTo(bx, by + r * cellH)
+          ctx.lineTo(bx + U, by + r * cellH)
+          ctx.stroke()
+        }
+
+        ctx.strokeStyle = ink
+        ctx.lineWidth = 2
+        ctx.strokeRect(bx, by, U, U)
+      }
     }
-    for (let c = 1; c < den2; c += 1) {
-      ctx.beginPath()
-      ctx.moveTo(x0 + c * cellW, y0)
-      ctx.lineTo(x0 + c * cellW, y0 + square)
-      ctx.stroke()
-    }
 
-    // Outer border.
-    ctx.strokeStyle = ink
-    ctx.lineWidth = 2.5
-    ctx.strokeRect(x0, y0, square, square)
-
-    // Dimension brackets: show each fraction as a PART OF the whole side length.
-    const gray = '#9AA0AA'
-
-    // Brackets: gray = the whole side (1), colored = the shaded fraction.
-    vBracket(ctx, x0 - 42, y0, y0 + square, gray)
-    vBracket(ctx, x0 - 20, y0, y0 + num1 * cellH, blue)
-    hBracket(ctx, y0 - 38, x0, x0 + square, gray)
-    hBracket(ctx, y0 - 16, x0, x0 + num2 * cellW, orange)
-
-    // Fraction labels.
+    // Dimension bars: whole bar separate from the fraction bar on each side.
     ctx.font = '800 13px Inter, system-ui, sans-serif'
-    vLabel(ctx, x0 - 22, y0 + (num1 * cellH) / 2, `${num1}/${den1}`, blue)
-    hLabel(ctx, x0 + (num2 * cellW) / 2, y0 - 18, `${num2}/${den2}`, orange)
+    if (whole1 > 0) {
+      const yB = rowY[whole1 - 1] + U
+      vBracket(ctx, x0 - 24, y0, yB, blue)
+      vLabel(ctx, x0 - 26, (y0 + yB) / 2, `${whole1}`, blue)
+    }
+    if (num1 > 0) {
+      const yT = rowY[whole1]
+      const yB = yT + num1 * cellH
+      vBracket(ctx, x0 - 24, yT, yB, blue)
+      vLabel(ctx, x0 - 26, (yT + yB) / 2, `${num1}/${den1}`, blue)
+    }
+    if (whole2 > 0) {
+      const xR = colX[whole2 - 1] + U
+      hBracket(ctx, y0 - 22, x0, xR, orange)
+      hLabel(ctx, (x0 + xR) / 2, y0 - 24, `${whole2}`, orange)
+    }
+    if (num2 > 0) {
+      const xL = colX[whole2]
+      const xR = xL + num2 * cellW
+      hBracket(ctx, y0 - 22, xL, xR, orange)
+      hLabel(ctx, (xL + xR) / 2, y0 - 24, `${num2}/${den2}`, orange)
+    }
 
-    // Whole-side labels: just "1", slightly smaller so they stay readable.
+    // Gray "1" scale reference over the first unit box on each axis.
+    const gray = '#9AA0AA'
     ctx.font = '800 11px Inter, system-ui, sans-serif'
-    vLabel(ctx, x0 - 44, y0 + square / 2, '1', gray)
-    hLabel(ctx, x0 + square / 2, y0 - 40, '1', gray)
-  }, [size, geometry, num1, den1, num2, den2])
+    vBracket(ctx, x0 - 48, y0, y0 + U, gray)
+    vLabel(ctx, x0 - 50, y0 + U / 2, '1', gray)
+    hBracket(ctx, y0 - 44, x0, x0 + U, gray)
+    hLabel(ctx, x0 + U / 2, y0 - 46, '1', gray)
+  }, [size, whole1, num1, den1, whole2, num2, den2, toggled])
 
   useEffect(() => {
     draw()
   }, [draw])
 
-  const setDenClamped = (setNum, setDen, num) => (nextDen) => {
-    const d = clamp(nextDen, MIN_DEN, MAX_DEN)
-    setDen(d)
-    if (num > d) setNum(d)
+  const handleCanvasClick = (e) => {
+    const g = geoRef.current
+    const canvas = canvasRef.current
+    if (!g || !canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const px = e.clientX - rect.left
+    const py = e.clientY - rect.top
+    let ci = -1
+    for (let i = 0; i < g.colX.length; i += 1) {
+      if (px >= g.colX[i] && px <= g.colX[i] + g.U) { ci = i; break }
+    }
+    let ri = -1
+    for (let i = 0; i < g.rowY.length; i += 1) {
+      if (py >= g.rowY[i] && py <= g.rowY[i] + g.U) { ri = i; break }
+    }
+    if (ci < 0 || ri < 0) return
+    const c = clamp(Math.floor((px - g.colX[ci]) / g.cellW), 0, g.den2 - 1)
+    const r = clamp(Math.floor((py - g.rowY[ri]) / g.cellH), 0, g.den1 - 1)
+    const key = `${ri}:${r}:${ci}:${c}`
+    setToggled((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
+  const makeSetters = (whole, num, den, setWhole, setNum, setDen) => ({
+    onWhole: (v) => {
+      const w = clamp(v, 0, MAX_WHOLE)
+      setWhole(w)
+      if (w === 0 && num === 0) setNum(1)
+    },
+    onNum: (v) => setNum(clamp(v, whole === 0 ? 1 : 0, den - 1)),
+    onDen: (v) => {
+      const d = clamp(v, MIN_DEN, MAX_DEN)
+      setDen(d)
+      if (num > d - 1) setNum(d - 1)
+    },
+  })
+
+  const s1 = makeSetters(whole1, num1, den1, setWhole1, setNum1, setDen1)
+  const s2 = makeSetters(whole2, num2, den2, setWhole2, setNum2, setDen2)
+
   return (
-    <div className="flex h-full flex-col gap-2 overflow-hidden p-4 font-['Inter']" style={{ background: cream, color: ink }}>
-      {/* Equation */}
-      <div className="flex items-center justify-center gap-3">
-        <div className="flex items-center gap-3 text-3xl font-black">
-          <Frac n={num1} d={den1} color={blue} />
+    <div className="flex h-[500px] flex-col gap-2 overflow-hidden p-4 font-['Inter']" style={{ background: cream, color: ink }}>
+      {/* Equation + editors in one row */}
+      <div className="flex flex-nowrap items-center justify-center gap-x-3">
+        <div className="flex items-center gap-1.5 text-xl font-black">
+          <MixedFrac whole={whole1} n={num1} d={den1} color={blue} />
           <span style={{ color: muted }}>×</span>
-          <Frac n={num2} d={den2} color={orange} />
+          <MixedFrac whole={whole2} n={num2} d={den2} color={orange} />
           <span style={{ color: muted }}>=</span>
-          {hideAnswer ? (
-            <span style={{ color: green }}>?</span>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Frac n={prodN} d={prodD} color={green} />
-              {reduces && (
-                <>
-                  <span style={{ color: muted }}>=</span>
-                  <Frac n={simpN} d={simpD} color={green} />
-                </>
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <Frac n={prodN} d={prodD} color={green} />
+            {prodN > prodD && (
+              <>
+                <span style={{ color: muted }}>=</span>
+                <MixedFrac whole={prodWhole} n={prodRem} d={prodD} color={green} />
+              </>
+            )}
+          </div>
         </div>
-        <ToggleChip label="Show product" color={green} on={!hideAnswer} onClick={() => setHideAnswer((h) => !h)} compact />
+        <FractionStepper label="Fraction 1" color={blue} whole={whole1} num={num1} den={den1} {...s1} />
+        <FractionStepper label="Fraction 2" color={orange} whole={whole2} num={num2} den={den2} {...s2} />
       </div>
 
-      {/* Square + legend */}
-      <div className="flex min-h-0 flex-1 gap-3">
-        <div ref={wrapRef} className="relative min-w-0 flex-[3] overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
-          <canvas ref={canvasRef} role="img" aria-label={summary} className="h-full w-full" />
+      {/* Grid + thin area key */}
+      <div className="flex min-h-0 flex-1 gap-2">
+        <div ref={wrapRef} className="relative min-w-0 flex-1 overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
+          <canvas ref={canvasRef} role="img" aria-label={summary} onClick={handleCanvasClick} className="h-full w-full cursor-pointer" />
         </div>
-        <div className="flex flex-[2] flex-col justify-center gap-3 rounded-xl border border-[#E0DDD6] bg-white p-4 text-sm">
-          <LegendRow color={blue} label={`${num1}/${den1} of the height`} />
-          <LegendRow color={orange} label={`${num2}/${den2} of the width`} />
-          <LegendRow color={green} label="Overlap = the product" solid />
-          <p className="mt-1 leading-relaxed" style={{ color: muted }}>
-            The whole is cut into <b style={{ color: ink }}>{den1} × {den2} = {prodD}</b> equal
-            pieces. The green overlap is{' '}
-            <b style={{ color: green }}>{hideAnswer ? '?' : `${num1} × ${num2} = ${prodN}`}</b> of them.
-          </p>
+        <div className="flex w-14 flex-none flex-col gap-1.5 rounded-xl border border-[#E0DDD6] bg-white p-1.5">
+          {whole1 * whole2 > 0 && <AreaSwatch color={green} n={whole1 * whole2} d={1} />}
+          {whole1 * num2 > 0 && <AreaSwatch color={blue} n={whole1 * num2} d={den2} />}
+          {num1 * whole2 > 0 && <AreaSwatch color={orange} n={num1 * whole2} d={den1} />}
+          {num1 * num2 > 0 && <AreaSwatch color={purple} n={num1 * num2} d={prodD} />}
         </div>
       </div>
+    </div>
+  )
+}
 
-      {/* Controls */}
-      <div className="flex flex-wrap items-center justify-center gap-5">
-        <FractionStepper
-          label="Fraction 1"
-          color={blue}
-          num={num1}
-          den={den1}
-          onNum={(v) => setNum1(clamp(v, 1, den1))}
-          onDen={setDenClamped(setNum1, setDen1, num1)}
-        />
-        <FractionStepper
-          label="Fraction 2"
-          color={orange}
-          num={num2}
-          den={den2}
-          onNum={(v) => setNum2(clamp(v, 1, den2))}
-          onDen={setDenClamped(setNum2, setDen2, num2)}
-        />
-      </div>
+function AreaSwatch({ color, n, d }) {
+  const whole = n % d === 0
+  return (
+    <div
+      className="flex flex-1 items-center justify-center rounded-lg border"
+      style={{ background: `${color}22`, borderColor: color }}
+    >
+      {whole ? (
+        <span className="text-lg font-black leading-none" style={{ color }}>{n / d}</span>
+      ) : (
+        <Frac n={n} d={d} color={color} />
+      )}
     </div>
   )
 }
@@ -241,50 +338,63 @@ function Frac({ n, d, color }) {
   )
 }
 
-function LegendRow({ color, label, solid }) {
+function MixedFrac({ whole, n, d, color }) {
+  const showWhole = whole > 0
+  const showFrac = n > 0
+  if (!showWhole && !showFrac) return <span style={{ color }}>0</span>
   return (
-    <div className="flex items-center gap-2">
-      <span
-        className="inline-block h-4 w-4 rounded"
-        style={{ background: solid ? color : `${color}55`, border: `1.5px solid ${color}` }}
-      />
-      <span className="font-semibold">{label}</span>
-    </div>
+    <span className="inline-flex items-center gap-1" style={{ color }}>
+      {showWhole && <span>{whole}</span>}
+      {showFrac && <Frac n={n} d={d} color={color} />}
+    </span>
   )
 }
 
 function MiniStepper({ value, onDec, onInc, color, decLabel, incLabel }) {
   return (
-    <div className="grid grid-cols-[32px_32px_32px] items-center overflow-hidden rounded-full border border-[#E0DDD6] bg-white">
-      <button type="button" onClick={onDec} className="h-8 text-xl font-black" style={{ color: '#D85A30' }} aria-label={decLabel}>−</button>
-      <span className="border-x border-[#E0DDD6] py-1 text-center text-base font-black tabular-nums" style={{ color }}>{value}</span>
-      <button type="button" onClick={onInc} className="h-8 text-xl font-black" style={{ color: green }} aria-label={incLabel}>+</button>
+    <div className="flex items-center gap-1">
+      <button type="button" onClick={onDec} className="h-6 w-5 text-base font-black" style={{ color: ink }} aria-label={decLabel}>−</button>
+      <span className="min-w-[26px] rounded-md border border-[#E0DDD6] px-1 py-0.5 text-center text-sm font-black tabular-nums" style={{ color }}>{value}</span>
+      <button type="button" onClick={onInc} className="h-6 w-5 text-base font-black" style={{ color: ink }} aria-label={incLabel}>+</button>
     </div>
   )
 }
 
-function FractionStepper({ label, color, num, den, onNum, onDen }) {
+function FractionStepper({ label, color, whole, num, den, onWhole, onNum, onDen }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-[#E0DDD6] bg-white px-4 py-2">
-      <span className="text-sm font-bold" style={{ color }}>{label}</span>
-      <div className="flex flex-col items-center gap-1">
-        <MiniStepper
-          value={num}
-          onDec={() => onNum(num - 1)}
-          onInc={() => onNum(num + 1)}
-          color={color}
-          decLabel={`Decrease ${label} numerator`}
-          incLabel={`Increase ${label} numerator`}
-        />
-        <span className="h-0.5 w-8" style={{ background: color }} />
-        <MiniStepper
-          value={den}
-          onDec={() => onDen(den - 1)}
-          onInc={() => onDen(den + 1)}
-          color={color}
-          decLabel={`Decrease ${label} denominator`}
-          incLabel={`Increase ${label} denominator`}
-        />
+    <div className="flex flex-col overflow-hidden rounded-xl border border-[#E0DDD6] bg-white">
+      <div className="px-3 py-0.5 text-center text-[11px] font-semibold" style={{ color }}>{label}</div>
+      <div className="flex items-center gap-2 px-2.5 py-1.5">
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: muted }}>whole</span>
+          <MiniStepper
+            value={whole}
+            onDec={() => onWhole(whole - 1)}
+            onInc={() => onWhole(whole + 1)}
+            color={color}
+            decLabel={`Decrease ${label} whole number`}
+            incLabel={`Increase ${label} whole number`}
+          />
+        </div>
+        <div className="flex flex-col items-center gap-0.5">
+          <MiniStepper
+            value={num}
+            onDec={() => onNum(num - 1)}
+            onInc={() => onNum(num + 1)}
+            color={color}
+            decLabel={`Decrease ${label} numerator`}
+            incLabel={`Increase ${label} numerator`}
+          />
+          <span className="h-0.5 w-7" style={{ background: color }} />
+          <MiniStepper
+            value={den}
+            onDec={() => onDen(den - 1)}
+            onInc={() => onDen(den + 1)}
+            color={color}
+            decLabel={`Decrease ${label} denominator`}
+            incLabel={`Increase ${label} denominator`}
+          />
+        </div>
       </div>
     </div>
   )
