@@ -1,5 +1,6 @@
 import { Link, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import ManipulativeCanvas from './ManipulativeCanvas.jsx'
+import LiveViewer from './live/LiveViewer.jsx'
 import { manipulativeGroups, manipulatives } from './manipulatives/index.js'
 
 const defaultManipulative =
@@ -44,6 +45,12 @@ function ManipulativePage() {
         <p className="mb-2 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">
           Manipulatives
         </p>
+        <Link
+          to="/live"
+          className="mb-3 rounded border border-blue-500/60 bg-blue-500/10 px-2 py-1.5 text-xs font-semibold text-blue-300 hover:bg-blue-500/20 hover:text-white"
+        >
+          Open Live Viewer
+        </Link>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {manipulativeGroups.map((group) => (
             <section key={group.ownerSlug}>
@@ -90,6 +97,8 @@ function ManipulativePage() {
 export default function App() {
   return (
     <Routes>
+      <Route path="/live" element={<LiveViewer />} />
+      <Route path="/live/:liveId" element={<LiveViewer />} />
       <Route path="/:ownerSlug/:manipulativeId" element={<ManipulativePage />} />
       <Route path="/:ownerSlug" element={<OwnerRedirect />} />
       <Route path="*" element={<Navigate replace to={defaultPath} />} />

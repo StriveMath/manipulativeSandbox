@@ -9,8 +9,11 @@ npm install
 npm run dev
 ```
 
+The development server always uses `http://127.0.0.1:5173`. The command stays
+running while you use the app.
+
 Use `npm run build` for a production build and `npm run lint` to check the
-source.
+source. Building creates files in `dist/` but does not start a server.
 
 ## URLs
 
