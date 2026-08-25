@@ -50,6 +50,7 @@ import NetsSurfaceArea from './users/ashakv1712/nets-surface-area.jsx'
 import ProbabilityScale from './users/michael-jones/probability-scale.jsx'
 import SampleSpaceTree from './users/michael-jones/sample-space-tree.jsx'
 import MultiplyingFractionsArea from './users/michael-jones/multiplying-fractions-area.jsx'
+import AddingFractionsArea from './users/michael-jones/adding-fractions-area.jsx'
 import NumberLineAddSubtract from './users/ashakv1712/number-line-add-subtract.jsx'
 import NumberLineExplorer from './approved/number-line-explorer.jsx'
 import ParallelogramArea from './approved/parallelogram-area.jsx'
@@ -177,6 +178,13 @@ const allManipulatives = [
     id: 'multiplying-fractions-area',
     name: 'Multiplying Fractions (Area)',
     component: MultiplyingFractionsArea,
+    ownerSlug: 'michael-jones',
+    ownerName: 'Michael / M Jones',
+  },
+  {
+    id: 'adding-fractions-area',
+    name: 'Adding Fractions (Area)',
+    component: AddingFractionsArea,
     ownerSlug: 'michael-jones',
     ownerName: 'Michael / M Jones',
   },

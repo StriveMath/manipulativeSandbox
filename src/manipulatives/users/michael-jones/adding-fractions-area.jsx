@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { cream, ink, muted, border, blue, amber as orange, green, purple } from './shared/palette'
+import { cream, ink, muted, border, blue, amber as orange, green } from './shared/palette'
 import { useCanvasBox } from './shared/useCanvasBox'
 
 const MIN_DEN = 2
@@ -8,29 +8,11 @@ const MAX_WHOLE = 3
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
 
-// Partial-product region fills. Green = the main whole x whole block; the other
-// three are lighter so it reads as "extra" pieces.
-const FILL = {
-  ww: 'rgba(29, 158, 117, 0.60)',
-  wf: 'rgba(37, 99, 235, 0.26)',
-  fw: 'rgba(216, 90, 48, 0.26)',
-  ff: 'rgba(124, 58, 237, 0.26)',
-}
-const regionKey = (wholeRow, wholeCol) =>
-  wholeRow ? (wholeCol ? 'ww' : 'wf') : wholeCol ? 'fw' : 'ff'
+const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b))
+const lcm = (a, b) => (a / gcd(a, b)) * b
 
-function vBracket(ctx, x, yTop, yBot, color) {
-  ctx.strokeStyle = color
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(x, yTop)
-  ctx.lineTo(x, yBot)
-  ctx.moveTo(x, yTop)
-  ctx.lineTo(x + 7, yTop)
-  ctx.moveTo(x, yBot)
-  ctx.lineTo(x + 7, yBot)
-  ctx.stroke()
-}
+const BLUE_FILL = 'rgba(37, 99, 235, 0.30)'
+const ORANGE_FILL = 'rgba(216, 90, 48, 0.30)'
 
 function hBracket(ctx, y, xL, xR, color) {
   ctx.strokeStyle = color
@@ -45,17 +27,6 @@ function hBracket(ctx, y, xL, xR, color) {
   ctx.stroke()
 }
 
-function vLabel(ctx, x, y, text, color) {
-  ctx.save()
-  ctx.translate(x, y)
-  ctx.rotate(-Math.PI / 2)
-  ctx.fillStyle = color
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'bottom'
-  ctx.fillText(text, 0, 0)
-  ctx.restore()
-}
-
 function hLabel(ctx, x, y, text, color) {
   ctx.fillStyle = color
   ctx.textAlign = 'center'
@@ -63,8 +34,8 @@ function hLabel(ctx, x, y, text, color) {
   ctx.fillText(text, x, y)
 }
 
-// Full 1-unit boxes along an axis so the whole stays visible; each entry is how
-// many of the `den` cells are active (shaded) by default.
+// Full 1-unit boxes along the bar so the whole stays visible; each entry is how
+// many of the `den` slices are shaded in that box.
 function axisBoxes(whole, num, den) {
   const boxes = []
   for (let i = 0; i < whole; i += 1) boxes.push(den)
@@ -78,29 +49,30 @@ const mixedText = (whole, num, den) => {
   return `${num}/${den}`
 }
 
-export default function MultiplyingFractionsArea() {
+export default function AddingFractionsArea() {
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
-  const geoRef = useRef(null)
   const size = useCanvasBox(wrapRef, { minW: 300, minH: 260 })
 
   const [whole1, setWhole1] = useState(1)
   const [num1, setNum1] = useState(1)
   const [den1, setDen1] = useState(2)
-  const [whole2, setWhole2] = useState(1)
+  const [whole2, setWhole2] = useState(0)
   const [num2, setNum2] = useState(1)
   const [den2, setDen2] = useState(4)
-  const [toggled, setToggled] = useState(() => new Set())
   const [showAnswer, setShowAnswer] = useState(true)
 
   const t1 = whole1 * den1 + num1
   const t2 = whole2 * den2 + num2
-  const prodN = t1 * t2
-  const prodD = den1 * den2
-  const prodWhole = Math.floor(prodN / prodD)
-  const prodRem = prodN % prodD
+  const commonD = lcm(den1, den2)
+  const sumN = t1 * (commonD / den1) + t2 * (commonD / den2)
+  const g = gcd(sumN, commonD)
+  const simpN = sumN / g
+  const simpD = commonD / g
+  const sumWhole = Math.floor(simpN / simpD)
+  const sumRem = simpN % simpD
 
-  const summary = `Grid multiplication area model for ${mixedText(whole1, num1, den1)} horizontally times ${mixedText(whole2, num2, den2)} vertically. The rectangle is split into partial products: whole times whole in green, plus lighter whole-by-fraction, fraction-by-whole and fraction-by-fraction pieces. Together they equal ${prodN}/${prodD}.`
+  const summary = `Area model for adding ${mixedText(whole1, num1, den1)} plus ${mixedText(whole2, num2, den2)}. The blue addend and the orange addend are each stacked as unit boxes, at most two wholes per column, with any fractional box continuing in the next column. The bottom sum row places both amounts end to end using the common denominator ${commonD}, giving ${sumN}/${commonD}.`
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -114,163 +86,146 @@ export default function MultiplyingFractionsArea() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, size.w, size.h)
 
-    const marginL = 64
-    const marginT = 60
-    const marginR = 16
-    const marginB = 16
+    const marginL = 96
+    const marginT = 40
+    const marginR = 20
+    const marginB = 20
     const availW = Math.max(40, size.w - marginL - marginR)
     const availH = Math.max(40, size.h - marginT - marginB)
 
-    const colBoxes = axisBoxes(whole1, num1, den1)
-    const rowBoxes = axisBoxes(whole2, num2, den2)
-    const nCols = colBoxes.length
-    const nRows = rowBoxes.length
-    if (nCols === 0 || nRows === 0) return
+    const boxes1 = axisBoxes(whole1, num1, den1)
+    const boxes2 = axisBoxes(whole2, num2, den2)
+    const sumBoxCount = Math.max(1, Math.ceil(sumN / commonD))
 
-    const gap = 14
-    // Keep each unit box a true 1x1 square; its cells subdivide into den1
-    // columns by den2 rows (rectangular whenever the denominators differ).
-    const uW = (availW - (nCols - 1) * gap) / nCols
-    const uH = (availH - (nRows - 1) * gap) / nRows
-    const boxSize = Math.max(24, Math.min(uW, uH))
-    const boxW = boxSize
-    const boxH = boxSize
-    const cellW = boxSize / den1
-    const cellH = boxSize / den2
+    // Each addend stacks column-major with at most two wholes per column,
+    // wrapping into more columns (the partial box continues the sequence).
+    // The sum stays a single horizontal row.
+    const rows1 = boxes1.length >= 2 ? 2 : 1
+    const rows2 = boxes2.length >= 2 ? 2 : 1
+    const cols1 = Math.ceil(boxes1.length / 2)
+    const cols2 = Math.ceil(boxes2.length / 2)
+    const maxCols = Math.max(cols1, cols2, sumBoxCount)
+    if (maxCols === 0) return
 
-    const drawnW = nCols * boxW + (nCols - 1) * gap
-    const drawnH = nRows * boxH + (nRows - 1) * gap
-    const x0 = marginL + Math.max(0, (availW - drawnW) / 2)
-    const y0 = marginT + Math.max(0, (availH - drawnH) / 2)
+    const gap = 12
+    const innerGap = 8
+    const rowGap = 30
+    const unitRows = rows1 + rows2 + (showAnswer ? 1 : 0)
+    const gapsCount = showAnswer ? 2 : 1
+    const uW = (availW - (maxCols - 1) * gap) / maxCols
+    const uH =
+      (availH - gapsCount * rowGap - (rows1 - 1) * innerGap - (rows2 - 1) * innerGap) / unitRows
+    const boxSize = Math.max(24, Math.min(uW, uH, 130))
 
-    const colX = colBoxes.map((_, i) => x0 + i * (boxW + gap))
-    const rowY = rowBoxes.map((_, i) => y0 + i * (boxH + gap))
-    geoRef.current = { colX, rowY, boxW, boxH, cellW, cellH, colDen: den1, rowDen: den2 }
-
-    for (let ri = 0; ri < nRows; ri += 1) {
-      const whole2Region = ri < whole2
-      const rowActive = rowBoxes[ri]
-      for (let ci = 0; ci < nCols; ci += 1) {
-        const whole1Region = ci < whole1
-        const colActive = colBoxes[ci]
-        const bx = colX[ci]
-        const by = rowY[ri]
-        const fill = FILL[regionKey(whole1Region, whole2Region)]
+    const drawBlock = (boxes, den, topY, color, fill, label) => {
+      const cellW = boxSize / den
+      for (let i = 0; i < boxes.length; i += 1) {
+        const col = Math.floor(i / 2)
+        const row = i % 2
+        const bx = marginL + col * (boxSize + gap)
+        const by = topY + row * (boxSize + innerGap)
+        const active = boxes[i]
 
         ctx.fillStyle = '#ffffff'
-        ctx.fillRect(bx, by, boxW, boxH)
+        ctx.fillRect(bx, by, boxSize, boxSize)
 
-        for (let r = 0; r < den2; r += 1) {
-          for (let c = 0; c < den1; c += 1) {
-            const def = r < rowActive && c < colActive
-            const on = toggled.has(`${ri}:${r}:${ci}:${c}`) ? !def : def
-            if (on) {
-              ctx.fillStyle = fill
-              ctx.fillRect(bx + c * cellW, by + r * cellH, cellW, cellH)
-            }
+        for (let c = 0; c < den; c += 1) {
+          if (c < active) {
+            ctx.fillStyle = fill
+            ctx.fillRect(bx + c * cellW, by, cellW, boxSize)
           }
         }
 
         ctx.strokeStyle = 'rgba(26, 26, 46, 0.22)'
         ctx.lineWidth = 1
-        for (let c = 1; c < den1; c += 1) {
+        for (let c = 1; c < den; c += 1) {
           ctx.beginPath()
           ctx.moveTo(bx + c * cellW, by)
-          ctx.lineTo(bx + c * cellW, by + boxH)
-          ctx.stroke()
-        }
-        for (let r = 1; r < den2; r += 1) {
-          ctx.beginPath()
-          ctx.moveTo(bx, by + r * cellH)
-          ctx.lineTo(bx + boxW, by + r * cellH)
+          ctx.lineTo(bx + c * cellW, by + boxSize)
           ctx.stroke()
         }
 
         ctx.strokeStyle = ink
         ctx.lineWidth = 2
-        ctx.strokeRect(bx, by, boxW, boxH)
+        ctx.strokeRect(bx, by, boxSize, boxSize)
       }
+      const rows = boxes.length >= 2 ? 2 : 1
+      const blockH = rows * boxSize + (rows - 1) * innerGap
+      ctx.font = '800 15px Inter, system-ui, sans-serif'
+      ctx.fillStyle = color
+      ctx.textAlign = 'right'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(label, marginL - 12, topY + blockH / 2)
+      return blockH
     }
 
-    // Dimension bars: whole bar separate from the fraction bar on each side.
-    ctx.font = '800 13px Inter, system-ui, sans-serif'
-    if (whole1 > 0) {
-      const xR = colX[whole1 - 1] + boxW
-      hBracket(ctx, y0 - 22, x0, xR, blue)
-      hLabel(ctx, (x0 + xR) / 2, y0 - 24, `${whole1}`, blue)
-    }
-    if (num1 > 0) {
-      const xL = colX[whole1]
-      const xR = xL + num1 * cellW
-      hBracket(ctx, y0 - 22, xL, xR, blue)
-      hLabel(ctx, (xL + xR) / 2, y0 - 24, `${num1}/${den1}`, blue)
-    }
-    if (whole2 > 0) {
-      const yB = rowY[whole2 - 1] + boxH
-      vBracket(ctx, x0 - 24, y0, yB, orange)
-      vLabel(ctx, x0 - 26, (y0 + yB) / 2, `${whole2}`, orange)
-    }
-    if (num2 > 0) {
-      const yT = rowY[whole2]
-      const yB = yT + num2 * cellH
-      vBracket(ctx, x0 - 24, yT, yB, orange)
-      vLabel(ctx, x0 - 26, (yT + yB) / 2, `${num2}/${den2}`, orange)
-    }
+    const topY1 = marginT
+    const blockH1 = drawBlock(boxes1, den1, topY1, blue, BLUE_FILL, mixedText(whole1, num1, den1))
 
-    // Gray "1" scale reference over the first unit box on each axis.
+    // Gray "1" reference over the first unit box of the first addend.
     const gray = '#9AA0AA'
     ctx.font = '800 11px Inter, system-ui, sans-serif'
-    vBracket(ctx, x0 - 48, y0, y0 + boxH, gray)
-    vLabel(ctx, x0 - 50, y0 + boxH / 2, '1', gray)
-    hBracket(ctx, y0 - 44, x0, x0 + boxW, gray)
-    hLabel(ctx, x0 + boxW / 2, y0 - 46, '1', gray)
-  }, [size, whole1, num1, den1, whole2, num2, den2, toggled])
+    hBracket(ctx, topY1 - 16, marginL, marginL + boxSize, gray)
+    hLabel(ctx, marginL + boxSize / 2, topY1 - 18, '1', gray)
+
+    const topY2 = topY1 + blockH1 + rowGap
+    const blockH2 = drawBlock(boxes2, den2, topY2, orange, ORANGE_FILL, mixedText(whole2, num2, den2))
+
+    if (!showAnswer) return
+
+    // Sum: single horizontal row, blue length then orange length end to end,
+    // subdivided into the common denominator so both fractions share the same cell size.
+    const y = topY2 + blockH2 + rowGap
+    const cellW = boxSize / commonD
+    const blueCells = t1 * (commonD / den1)
+    for (let bi = 0; bi < sumBoxCount; bi += 1) {
+      const bx = marginL + bi * (boxSize + gap)
+
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(bx, y, boxSize, boxSize)
+
+      for (let c = 0; c < commonD; c += 1) {
+        const globalCell = bi * commonD + c
+        if (globalCell < sumN) {
+          ctx.fillStyle = globalCell < blueCells ? BLUE_FILL : ORANGE_FILL
+          ctx.fillRect(bx + c * cellW, y, cellW, boxSize)
+        }
+      }
+
+      ctx.strokeStyle = 'rgba(26, 26, 46, 0.22)'
+      ctx.lineWidth = 1
+      for (let c = 1; c < commonD; c += 1) {
+        ctx.beginPath()
+        ctx.moveTo(bx + c * cellW, y)
+        ctx.lineTo(bx + c * cellW, y + boxSize)
+        ctx.stroke()
+      }
+
+      ctx.strokeStyle = ink
+      ctx.lineWidth = 2
+      ctx.strokeRect(bx, y, boxSize, boxSize)
+    }
+
+    ctx.font = '800 15px Inter, system-ui, sans-serif'
+    ctx.fillStyle = green
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(mixedText(sumWhole, sumRem, simpD), marginL - 12, y + boxSize / 2)
+  }, [size, whole1, num1, den1, whole2, num2, den2, t1, sumN, commonD, sumWhole, sumRem, simpD, showAnswer])
 
   useEffect(() => {
     draw()
   }, [draw])
 
-  const handleCanvasClick = (e) => {
-    const g = geoRef.current
-    const canvas = canvasRef.current
-    if (!g || !canvas) return
-    const rect = canvas.getBoundingClientRect()
-    const px = e.clientX - rect.left
-    const py = e.clientY - rect.top
-    let ci = -1
-    for (let i = 0; i < g.colX.length; i += 1) {
-      if (px >= g.colX[i] && px <= g.colX[i] + g.boxW) { ci = i; break }
-    }
-    let ri = -1
-    for (let i = 0; i < g.rowY.length; i += 1) {
-      if (py >= g.rowY[i] && py <= g.rowY[i] + g.boxH) { ri = i; break }
-    }
-    if (ci < 0 || ri < 0) return
-    const c = clamp(Math.floor((px - g.colX[ci]) / g.cellW), 0, g.colDen - 1)
-    const r = clamp(Math.floor((py - g.rowY[ri]) / g.cellH), 0, g.rowDen - 1)
-    const key = `${ri}:${r}:${ci}:${c}`
-    setToggled((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
-
   const makeSetters = (whole, num, den, setWhole, setNum, setDen) => ({
     onWhole: (v) => {
       const w = clamp(v, 0, MAX_WHOLE)
-      setToggled(new Set())
       setWhole(w)
       if (w === 0 && num === 0) setNum(1)
     },
-    onNum: (v) => {
-      setToggled(new Set())
-      setNum(clamp(v, whole === 0 ? 1 : 0, den - 1))
-    },
+    onNum: (v) => setNum(clamp(v, whole === 0 ? 1 : 0, den - 1)),
     onDen: (v) => {
       const d = clamp(v, MIN_DEN, MAX_DEN)
-      setToggled(new Set())
       setDen(d)
       if (num > d - 1) setNum(d - 1)
     },
@@ -281,7 +236,6 @@ export default function MultiplyingFractionsArea() {
 
   return (
     <div className="flex h-[500px] flex-col gap-2 overflow-hidden p-4 font-['Inter']" style={{ background: cream, color: ink }}>
-      {/* Editors, a divider, the equation, then the answer toggle. */}
       <div className="flex flex-nowrap items-center justify-center gap-4">
         <div className="flex items-center gap-2">
           <FractionStepper label="Fraction 1" color={blue} whole={whole1} num={num1} den={den1} {...s1} />
@@ -292,16 +246,16 @@ export default function MultiplyingFractionsArea() {
 
         <div className="flex items-center gap-1.5 text-lg font-black">
           <MixedFrac whole={whole1} n={num1} d={den1} color={blue} />
-          <span style={{ color: muted }}>×</span>
+          <span style={{ color: muted }}>+</span>
           <MixedFrac whole={whole2} n={num2} d={den2} color={orange} />
           <span style={{ color: muted }}>=</span>
           {showAnswer ? (
             <div className="flex items-center gap-1.5">
-              <Frac n={prodN} d={prodD} color={green} />
-              {prodWhole > 0 && (
+              <Frac n={sumN} d={commonD} color={green} />
+              {(sumWhole > 0 || sumRem !== sumN || commonD !== simpD) && (
                 <>
                   <span style={{ color: muted }}>=</span>
-                  <MixedFrac whole={prodWhole} n={prodRem} d={prodD} color={green} />
+                  <MixedFrac whole={sumWhole} n={sumRem} d={simpD} color={green} />
                 </>
               )}
             </div>
@@ -327,42 +281,11 @@ export default function MultiplyingFractionsArea() {
         </button>
       </div>
 
-      {/* Grid + thin area key */}
       <div className="flex min-h-0 flex-1 gap-2">
         <div ref={wrapRef} className="relative min-w-0 flex-1 overflow-hidden rounded-xl border bg-white" style={{ borderColor: border }}>
-          <canvas ref={canvasRef} role="img" aria-label={summary} onClick={handleCanvasClick} className="h-full w-full cursor-pointer" />
-        </div>
-        <div className="flex w-14 flex-none flex-col gap-1.5 rounded-xl border border-[#E0DDD6] bg-white p-1.5">
-          {showAnswer ? (
-            <>
-              {whole1 * whole2 > 0 && <AreaSwatch color={green} n={whole1 * whole2} d={1} />}
-              {whole1 * num2 > 0 && <AreaSwatch color={blue} n={whole1 * num2} d={den2} />}
-              {num1 * whole2 > 0 && <AreaSwatch color={orange} n={num1 * whole2} d={den1} />}
-              {num1 * num2 > 0 && <AreaSwatch color={purple} n={num1 * num2} d={prodD} />}
-            </>
-          ) : (
-            <div className="flex flex-1 items-center justify-center text-xl font-black" style={{ color: muted }}>
-              ?
-            </div>
-          )}
+          <canvas ref={canvasRef} role="img" aria-label={summary} className="h-full w-full" />
         </div>
       </div>
-    </div>
-  )
-}
-
-function AreaSwatch({ color, n, d }) {
-  const whole = n % d === 0
-  return (
-    <div
-      className="flex flex-1 items-center justify-center rounded-lg border"
-      style={{ background: `${color}22`, borderColor: color }}
-    >
-      {whole ? (
-        <span className="text-lg font-black leading-none" style={{ color }}>{n / d}</span>
-      ) : (
-        <Frac n={n} d={d} color={color} />
-      )}
     </div>
   )
 }
