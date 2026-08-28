@@ -1,5 +1,6 @@
 import { loadEnv } from 'vite'
 
+import { ConversionError, convertManipulative } from './convert.js'
 import { readManipulativeSource, SourceError } from './manipulative-source.js'
 import {
   availableProviders,
@@ -98,9 +99,20 @@ async function handleConvert(req, res, { root, env }) {
     id,
   })
 
-  sendJson(res, 501, {
-    error: 'Conversion is not implemented yet',
-    resolved: { relativePath, bytes: Buffer.byteLength(source, 'utf8') },
+  const startedAt = Date.now()
+  const { conversion, meta } = await convertManipulative({
+    root,
+    env,
+    model,
+    id,
+    relativePath,
+    source,
+  })
+
+  sendJson(res, 200, {
+    source: { ownerSlug, id, relativePath },
+    conversion,
+    meta: { ...meta, durationMs: Date.now() - startedAt },
   })
 }
 
@@ -149,8 +161,10 @@ export function conversionApiPlugin() {
         try {
           await handleConvert(req, res, { root, env: readEnv() })
         } catch (error) {
-          const status = error instanceof SourceError ? error.status : 500
-          if (status === 500) server.config.logger.error(String(error?.stack))
+          const known =
+            error instanceof SourceError || error instanceof ConversionError
+          const status = known ? error.status : 500
+          if (!known) server.config.logger.error(String(error?.stack))
           sendJson(res, status, { error: error?.message ?? 'Unknown error' })
         }
       })
