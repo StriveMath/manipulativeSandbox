@@ -2,6 +2,7 @@ import { loadEnv } from 'vite'
 
 import { ConversionError, convertManipulative } from './convert.js'
 import { readManipulativeSource, SourceError } from './manipulative-source.js'
+import { preflight, PreflightError } from './preflight.js'
 import {
   availableProviders,
   CONVERSION_MODELS,
@@ -93,11 +94,15 @@ async function handleConvert(req, res, { root, env }) {
     )
   }
 
-  const { source, relativePath } = await readManipulativeSource({
+  const { source, filePath, relativePath } = await readManipulativeSource({
     root,
     ownerSlug,
     id,
   })
+
+  // Before spending a model call: refuse what cannot be converted, and
+  // gather the local helpers the component would otherwise be missing.
+  const { helpers } = await preflight({ root, filePath, source })
 
   const startedAt = Date.now()
   const { conversion, meta } = await convertManipulative({
@@ -107,10 +112,16 @@ async function handleConvert(req, res, { root, env }) {
     id,
     relativePath,
     source,
+    helpers,
   })
 
   sendJson(res, 200, {
-    source: { ownerSlug, id, relativePath },
+    source: {
+      ownerSlug,
+      id,
+      relativePath,
+      inlinedHelpers: helpers.map((helper) => helper.relativePath),
+    },
     conversion,
     meta: { ...meta, durationMs: Date.now() - startedAt },
   })
@@ -162,7 +173,9 @@ export function conversionApiPlugin() {
           await handleConvert(req, res, { root, env: readEnv() })
         } catch (error) {
           const known =
-            error instanceof SourceError || error instanceof ConversionError
+            error instanceof SourceError ||
+            error instanceof PreflightError ||
+            error instanceof ConversionError
           const status = known ? error.status : 500
           if (!known) server.config.logger.error(String(error?.stack))
           sendJson(res, status, { error: error?.message ?? 'Unknown error' })

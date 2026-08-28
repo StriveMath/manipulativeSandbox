@@ -211,11 +211,19 @@ function buildUserPrompt({ relativePath, source, helpers }) {
     '```jsx\n' + source + '\n```',
   ]
 
-  for (const helper of helpers ?? []) {
+  if (helpers?.length) {
     parts.push(
-      `It imports \`${helper.specifier}\` (\`${helper.relativePath}\`), shown below. Inline whatever it uses; the output must be one file.`,
-      '```jsx\n' + helper.source + '\n```',
+      'It depends on these local modules, directly or through each other. ' +
+        'Their real source is below — inline what is actually used, keeping the exact ' +
+        'colours, easing and behaviour. Do not substitute your own versions, and do not ' +
+        'carry the imports over: the output must be one self-contained file.',
     )
+    for (const helper of helpers) {
+      parts.push(
+        `### ${helper.relativePath} (imported as \`${helper.specifier}\`)`,
+        '```jsx\n' + helper.source + '\n```',
+      )
+    }
   }
 
   return parts.join('\n\n')
