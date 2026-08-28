@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 /**
@@ -63,4 +63,45 @@ export async function readManipulativeSource({ root, ownerSlug, id }) {
   }
 
   throw new SourceError(`No source file for ${ownerSlug}/${id}`, 404)
+}
+
+/**
+ * Every manipulative on disk, as `{ ownerSlug, id }` pairs.
+ *
+ * The inverse of the resolution above, and it relies on the same
+ * convention: one component per file, basename is the id. `shared/` is
+ * skipped because helper modules are not manipulatives.
+ */
+export async function listManipulatives(root) {
+  const manipulativesDir = path.join(root, 'src', 'manipulatives')
+
+  const readOwner = async (ownerSlug, directory) => {
+    const entries = await readdir(directory, { withFileTypes: true })
+    return entries
+      .filter(
+        (entry) =>
+          entry.isFile() && EXTENSIONS.includes(path.extname(entry.name)),
+      )
+      .map((entry) => ({
+        ownerSlug,
+        id: path.basename(entry.name, path.extname(entry.name)),
+        filePath: path.join(directory, entry.name),
+      }))
+  }
+
+  const found = await readOwner(
+    APPROVED_SLUG,
+    path.join(manipulativesDir, APPROVED_SLUG),
+  )
+
+  const usersDir = path.join(manipulativesDir, 'users')
+  const owners = await readdir(usersDir, { withFileTypes: true })
+  for (const owner of owners) {
+    if (!owner.isDirectory()) continue
+    found.push(...(await readOwner(owner.name, path.join(usersDir, owner.name))))
+  }
+
+  return found.sort(
+    (a, b) => a.ownerSlug.localeCompare(b.ownerSlug) || a.id.localeCompare(b.id),
+  )
 }

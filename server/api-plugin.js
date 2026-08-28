@@ -1,7 +1,13 @@
+import { readFile } from 'node:fs/promises'
+
 import { loadEnv } from 'vite'
 
 import { ConversionError, convertManipulative } from './convert.js'
-import { readManipulativeSource, SourceError } from './manipulative-source.js'
+import {
+  listManipulatives,
+  readManipulativeSource,
+  SourceError,
+} from './manipulative-source.js'
 import { preflight, PreflightError } from './preflight.js'
 import {
   availableProviders,
@@ -73,6 +79,35 @@ function handleModels(res, env) {
       available: providers[model.provider] === true,
     })),
   })
+}
+
+/**
+ * Which manipulatives can be converted, and what would be inlined into each.
+ * The panel uses this to disable the ones that will be refused, so a rejection
+ * shows up before you pick a model rather than after.
+ */
+async function handlePreflight(res, root) {
+  const entries = await listManipulatives(root)
+
+  const results = await Promise.all(
+    entries.map(async ({ ownerSlug, id, filePath }) => {
+      const source = await readFile(filePath, 'utf8')
+      try {
+        const { helpers } = await preflight({ root, filePath, source })
+        return {
+          ownerSlug,
+          id,
+          convertible: true,
+          inlinedHelpers: helpers.map((helper) => helper.relativePath),
+        }
+      } catch (error) {
+        if (!(error instanceof PreflightError)) throw error
+        return { ownerSlug, id, convertible: false, reason: error.message }
+      }
+    }),
+  )
+
+  sendJson(res, 200, { manipulatives: results })
 }
 
 async function handleConvert(req, res, { root, env }) {
@@ -159,18 +194,23 @@ export function conversionApiPlugin() {
           return
         }
 
-        if (url !== '/api/convert') {
+        if (url !== '/api/convert' && url !== '/api/preflight') {
           next()
           return
         }
 
-        if (req.method !== 'POST') {
-          sendJson(res, 405, { error: 'Use POST' })
+        const expectedMethod = url === '/api/preflight' ? 'GET' : 'POST'
+        if (req.method !== expectedMethod) {
+          sendJson(res, 405, { error: `Use ${expectedMethod}` })
           return
         }
 
         try {
-          await handleConvert(req, res, { root, env: readEnv() })
+          if (url === '/api/preflight') {
+            await handlePreflight(res, root)
+          } else {
+            await handleConvert(req, res, { root, env: readEnv() })
+          }
         } catch (error) {
           const known =
             error instanceof SourceError ||
