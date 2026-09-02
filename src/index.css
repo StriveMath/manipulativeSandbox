@@ -1128,14 +1128,14 @@ input[type="number"] {
   animation: power-zero-fill 300ms ease-out both;
 }
 
-@keyframes blob-digit-shift {
+@keyframes power-step-digit-move {
   0% {
-    opacity: 0.35;
-    transform: translateX(var(--blob-shift-from)) scale(0.86);
+    opacity: 0.65;
+    transform: translateX(var(--power-step-shift)) scale(0.9);
   }
-  62% {
+  78% {
     opacity: 1;
-    transform: translateX(0) scale(1.12);
+    transform: translateX(0) scale(1.06);
   }
   100% {
     opacity: 1;
@@ -1143,41 +1143,143 @@ input[type="number"] {
   }
 }
 
-@keyframes blob-zero-pop {
+@keyframes power-factor-zero-source {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    text-shadow: none;
+  }
+  24%,
+  82% {
+    opacity: 0.22;
+    transform: scale(0.82);
+    text-shadow: 0 0 8px rgb(245 158 11 / 0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    text-shadow: none;
+  }
+}
+
+@keyframes power-zero-transfer-flight {
+  0% {
+    background-color: #fef3c7;
+    color: #92400e;
+    opacity: 0;
+    transform: translate(0, 0) scale(0.45);
+  }
+  14% {
+    opacity: 1;
+    transform: translate(0, -12px) scale(0.78);
+  }
+  58% {
+    background-color: #fef3c7;
+    color: #92400e;
+    opacity: 1;
+    transform: translate(var(--power-zero-mid-x), var(--power-zero-mid-y)) scale(0.9);
+  }
+  88% {
+    background-color: #fef3c7;
+    color: #92400e;
+    opacity: 1;
+    transform: translate(var(--power-zero-delta-x), var(--power-zero-delta-y)) scale(1.12);
+  }
+  100% {
+    background-color: #fef3c7;
+    color: #92400e;
+    opacity: 0;
+    transform: translate(var(--power-zero-delta-x), var(--power-zero-delta-y)) scale(1);
+  }
+}
+
+@keyframes power-zero-transfer-target {
+  0%,
+  76% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  90% {
+    opacity: 1;
+    transform: scale(1.14);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes power-expression-enter {
   0% {
     opacity: 0;
-    transform: scale(0.2) rotate(-12deg);
-  }
-  70% {
-    opacity: 1;
-    transform: scale(1.18) rotate(6deg);
+    transform: translateY(8px) scale(0.96);
   }
   100% {
     opacity: 1;
-    transform: scale(1) rotate(0deg);
+    transform: translateY(0) scale(1);
   }
 }
 
-@keyframes blob-squish {
+@keyframes power-factor-active {
   0%,
   100% {
-    transform: scale(1, 1);
+    box-shadow: 0 0 0 0 rgb(245 158 11 / 0.15);
   }
   50% {
-    transform: scale(1.08, 0.94);
+    box-shadow: 0 0 0 5px rgb(245 158 11 / 0.18);
   }
 }
 
-.blob-digit-shift {
-  animation: blob-digit-shift 720ms cubic-bezier(0.2, 0.9, 0.2, 1.08);
+@keyframes power-final-result {
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.blob-zero-pop {
-  animation: blob-zero-pop 520ms ease-out both;
+.power-step-digit-move {
+  animation: power-step-digit-move 850ms cubic-bezier(0.2, 0.9, 0.2, 1.08) both;
 }
 
-.blob-character {
-  animation: blob-squish 1.8s ease-in-out infinite;
+.power-factor-zero-source {
+  display: inline-block;
+  animation: power-factor-zero-source 900ms ease-in-out both;
+}
+
+.power-factor-zero-source-reduced {
+  display: inline-block;
+  border-radius: 2px;
+  background: rgb(254 243 199);
+  color: rgb(146 64 14);
+}
+
+.power-zero-transfer-ghost {
+  animation: power-zero-transfer-flight 900ms cubic-bezier(0.22, 0.78, 0.24, 1) both;
+}
+
+.power-zero-transfer-target {
+  animation: power-zero-transfer-target 900ms ease-out both;
+}
+
+.power-expression-enter {
+  animation: power-expression-enter 420ms ease-out both;
+}
+
+.power-factor-active {
+  animation: power-factor-active 850ms ease-in-out infinite;
+}
+
+.power-step-value,
+.power-final-result {
+  animation: power-final-result 240ms ease-out both;
+}
+
+.power-zero-delayed-value {
+  animation: power-final-result 180ms ease-out 700ms both;
 }
 
 @keyframes proportion-grid-reveal {
@@ -3385,9 +3487,15 @@ input[type="number"] {
   .equivalent-result-label,
   .power-shift-card,
   .power-zero-fill,
-  .blob-digit-shift,
-  .blob-zero-pop,
-  .blob-character,
+  .power-step-digit-move,
+  .power-factor-zero-source,
+  .power-zero-transfer-ghost,
+  .power-zero-transfer-target,
+  .power-expression-enter,
+  .power-factor-active,
+  .power-step-value,
+  .power-zero-delayed-value,
+  .power-final-result,
   .proportion-grid-line,
   .proportion-point-snap,
   .proportion-hover-point,
