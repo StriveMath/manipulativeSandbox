@@ -27,10 +27,6 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
 
-function easeInOut(value) {
-  return value < 0.5 ? 2 * value * value : 1 - ((-2 * value + 2) ** 2) / 2
-}
-
 function modAngle(angle) {
   let next = angle
   while (next < -Math.PI) next += Math.PI * 2
@@ -142,17 +138,32 @@ function drawAngles(ctx, points, answerGlow = false) {
   })
 }
 
-function drawExterior(ctx, points, progress = 1) {
-  const lineProgress = clamp(progress / 0.34, 0, 1)
-  const calcProgress = clamp((progress - 0.26) / 0.46, 0, 1)
-  const arcProgress = clamp((progress - 0.48) / 0.42, 0, 1)
-  const finalProgress = clamp((progress - 0.86) / 0.12, 0, 1)
+function getExteriorAngles(points) {
+  return points.map((point, index) => {
+    const prev = points[(index - 1 + points.length) % points.length]
+    const next = points[(index + 1) % points.length]
+    const incoming = Math.atan2(point.y - prev.y, point.x - prev.x)
+    const outgoing = Math.atan2(next.y - point.y, next.x - point.x)
+    return Math.abs(modAngle(outgoing - incoming) * 180 / Math.PI)
+  })
+}
 
+function irregularPolygon(sides, width, height) {
+  return regularPolygon(sides, width, height).map((point, index) => {
+    const scale = 0.78 + (index % 3) * 0.1
+    return {
+      x: 0.5 + (point.x - 0.5) * scale,
+      y: 0.5 + (point.y - 0.5) * (index % 2 === 0 ? scale : scale + 0.08),
+    }
+  })
+}
+
+function drawExterior(ctx, points) {
+  const exteriorAngles = getExteriorAngles(points)
   points.forEach((point, index) => {
     const prev = points[(index - 1 + points.length) % points.length]
     const next = points[(index + 1) % points.length]
-    const angle = interiorAngle(prev, point, next)
-    const exterior = 180 - angle.degrees
+    const exterior = exteriorAngles[index]
     const dx = point.x - prev.x
     const dy = point.y - prev.y
     const length = Math.hypot(dx, dy) || 1
@@ -171,54 +182,102 @@ function drawExterior(ctx, points, progress = 1) {
     ctx.lineWidth = 2
     ctx.globalAlpha = 0.95
     ctx.beginPath()
-    ctx.moveTo(point.x - ux * 36 * lineProgress, point.y - uy * 36 * lineProgress)
-    ctx.lineTo(point.x + ux * 48 * lineProgress, point.y + uy * 48 * lineProgress)
+    ctx.moveTo(point.x - ux * 36, point.y - uy * 36)
+    ctx.lineTo(point.x + ux * 48, point.y + uy * 48)
     ctx.stroke()
 
     const labelAngle = nextAngle + sweep / 2
     const labelX = point.x + Math.cos(labelAngle) * 46
     const labelY = point.y + Math.sin(labelAngle) * 46
 
-    if (calcProgress > 0) {
-      ctx.globalAlpha = calcProgress * (1 - finalProgress)
-      ctx.fillStyle = colors.orange
-      const grow = 1 + 0.62 * easeInOut(calcProgress)
-      ctx.font = '900 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.save()
-      ctx.translate(labelX, labelY)
-      ctx.scale(grow, grow)
-      ctx.shadowColor = `${colors.orange}88`
-      ctx.shadowBlur = 8 * calcProgress
-      ctx.fillText(`180° - ${angle.degrees}°`, 0, 0)
-      ctx.restore()
-    }
-
     ctx.beginPath()
     ctx.moveTo(point.x, point.y)
-    ctx.arc(point.x, point.y, 24, nextAngle, nextAngle + sweep * arcProgress, sweep < 0)
+    ctx.arc(point.x, point.y, 24, nextAngle, nextAngle + sweep, sweep < 0)
     ctx.closePath()
-    ctx.globalAlpha = arcProgress
     ctx.fillStyle = `${colors.orange}24`
     ctx.strokeStyle = colors.orange
     ctx.lineWidth = 1.5
     ctx.fill()
     ctx.stroke()
 
-    if (finalProgress > 0) {
-      ctx.globalAlpha = finalProgress
-      ctx.fillStyle = colors.orange
-      ctx.font = '900 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(`${Math.round(exterior)}°`, labelX, labelY)
-    }
+    ctx.fillStyle = colors.orange
+    ctx.font = '900 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(`${formatAngleValue(exterior)}°`, labelX, labelY)
 
     ctx.globalAlpha = 1
     ctx.fillStyle = colors.orange
     ctx.restore()
   })
+}
+
+function drawExteriorCircle(ctx, points, canvasWidth, canvasHeight) {
+  const exteriorAngles = getExteriorAngles(points)
+  const total = exteriorAngles.reduce((acc, angle) => acc + angle, 0)
+  const closes = Math.abs(total - 360) < 0.5
+  const radius = canvasWidth < 620 ? 48 : 64
+  const centerX = canvasWidth - radius - 24
+  const centerY = canvasHeight / 2 + 22
+  let start = -Math.PI / 2
+
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
+  ctx.strokeStyle = '#C9C5BC'
+  ctx.lineWidth = 4
+  ctx.setLineDash([5, 5])
+  ctx.stroke()
+  ctx.restore()
+
+  exteriorAngles.forEach((angle, index) => {
+    const sweep = (angle / 360) * Math.PI * 2
+    const end = start + sweep
+    const color = triangleColors[index % triangleColors.length]
+
+    ctx.save()
+    ctx.beginPath()
+    ctx.moveTo(centerX, centerY)
+    ctx.arc(centerX, centerY, radius, start, end)
+    ctx.closePath()
+    ctx.fillStyle = `${color}40`
+    ctx.strokeStyle = color
+    ctx.lineWidth = 1.5
+    ctx.fill()
+    ctx.stroke()
+
+    const middle = start + sweep / 2
+    const labelRadius = radius * 0.62
+    ctx.fillStyle = colors.stroke
+    ctx.font = '800 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(`${formatAngleValue(angle)}°`, centerX + Math.cos(middle) * labelRadius, centerY + Math.sin(middle) * labelRadius)
+    ctx.restore()
+    start = end
+  })
+
+  if (total > 360.5) {
+    const overflowSweep = Math.min((total - 360) / 360, 1) * Math.PI * 2
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, radius + 6, -Math.PI / 2, -Math.PI / 2 + overflowSweep)
+    ctx.strokeStyle = '#C62828'
+    ctx.lineWidth = 5
+    ctx.lineCap = 'round'
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  ctx.save()
+  ctx.fillStyle = closes ? colors.orange : '#C62828'
+  ctx.font = '900 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'bottom'
+  ctx.fillText('Exterior angles', centerX, centerY - radius - 8)
+  ctx.textBaseline = 'top'
+  ctx.fillText(`Total = ${formatAngleValue(total)}°`, centerX, centerY + radius + 7)
+  ctx.restore()
 }
 
 function drawHandles(ctx, points) {
@@ -237,27 +296,24 @@ export default function PolygonInteriorAngles() {
   const rootRef = useRef(null)
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const exteriorFrameRef = useRef(null)
   const regularTimersRef = useRef([])
   const [canvasWidth, setCanvasWidth] = useState(720)
   const canvasHeight = 270
   const [sides, setSides] = useState(4)
   const [points, setPoints] = useState(() => regularPolygon(4, 720, canvasHeight))
   const [dragIndex, setDragIndex] = useState(null)
-  const [toggles, setToggles] = useState({
-    angles: true,
-    triangles: false,
-    exterior: false,
-  })
-  const [regularMode, setRegularMode] = useState(false)
-  const [regularPhase, setRegularPhase] = useState('idle')
-  const [exteriorProgress, setExteriorProgress] = useState(1)
+  const [selectedView, setSelectedView] = useState('angles')
+  const [regularMode, setRegularMode] = useState(true)
+  const [regularPhase, setRegularPhase] = useState('done')
 
   const triangleCount = sides - 2
   const sum = triangleCount * 180
   const regularAngle = sum / sides
 
   const canvasPoints = useMemo(() => toCanvasPoints(points, canvasWidth, canvasHeight), [canvasWidth, points])
+  const exteriorAngles = useMemo(() => getExteriorAngles(canvasPoints), [canvasPoints])
+  const exteriorTotal = exteriorAngles.reduce((acc, angle) => acc + angle, 0)
+  const exteriorCloses = Math.abs(exteriorTotal - 360) < 0.5
 
   const clearRegularTimers = useCallback(() => {
     regularTimersRef.current.forEach((timer) => clearTimeout(timer))
@@ -275,63 +331,26 @@ export default function PolygonInteriorAngles() {
   }, [clearRegularTimers])
 
   const resetPolygon = useCallback((nextSides) => {
+    clearRegularTimers()
     setSides(nextSides)
     setPoints(regularPolygon(nextSides, canvasWidth, canvasHeight))
     setDragIndex(null)
-    if (regularMode) playRegularGlow()
-  }, [canvasWidth, playRegularGlow, regularMode])
+    setRegularMode(true)
+    setRegularPhase('done')
+  }, [canvasWidth, clearRegularTimers])
 
-  const toggleRegularPolygon = () => {
-    if (!regularMode) {
+  const setPolygonMode = (mode) => {
+    if (mode === 'regular') {
       setPoints(regularPolygon(sides, canvasWidth, canvasHeight))
       setDragIndex(null)
       playRegularGlow()
     } else {
+      setPoints(irregularPolygon(sides, canvasWidth, canvasHeight))
+      setDragIndex(null)
       clearRegularTimers()
       setRegularPhase('idle')
     }
-    setRegularMode((current) => !current)
-  }
-
-  const cancelExteriorAnimation = useCallback(() => {
-    if (exteriorFrameRef.current) cancelAnimationFrame(exteriorFrameRef.current)
-    exteriorFrameRef.current = null
-  }, [])
-
-  const playExteriorAnimation = useCallback(() => {
-    cancelExteriorAnimation()
-    setExteriorProgress(0)
-    const start = performance.now()
-    const duration = 4600
-
-    const tick = (now) => {
-      const elapsed = Math.min(1, (now - start) / duration)
-      const eased = elapsed < 0.5 ? 2 * elapsed * elapsed : 1 - ((-2 * elapsed + 2) ** 2) / 2
-      setExteriorProgress(eased)
-      if (elapsed < 1) {
-        exteriorFrameRef.current = requestAnimationFrame(tick)
-      } else {
-        exteriorFrameRef.current = null
-      }
-    }
-
-    exteriorFrameRef.current = requestAnimationFrame(tick)
-  }, [cancelExteriorAnimation])
-
-  const toggleOption = (id) => {
-    if (id === 'exterior') {
-      setToggles((current) => {
-        const next = !current.exterior
-        if (next) playExteriorAnimation()
-        else {
-          cancelExteriorAnimation()
-          setExteriorProgress(0)
-        }
-        return { ...current, exterior: next }
-      })
-      return
-    }
-    setToggles((current) => ({ ...current, [id]: !current[id] }))
+    setRegularMode(mode === 'regular')
   }
 
   useEffect(() => {
@@ -346,9 +365,8 @@ export default function PolygonInteriorAngles() {
   }, [])
 
   useEffect(() => () => {
-    cancelExteriorAnimation()
     clearRegularTimers()
-  }, [cancelExteriorAnimation, clearRegularTimers])
+  }, [clearRegularTimers])
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -359,12 +377,15 @@ export default function PolygonInteriorAngles() {
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, canvasWidth, canvasHeight)
 
-    if (toggles.triangles) drawTriangles(ctx, canvasPoints)
+    if (selectedView === 'triangles') drawTriangles(ctx, canvasPoints)
     drawPolygon(ctx, canvasPoints)
-    if (toggles.exterior) drawExterior(ctx, canvasPoints, exteriorProgress)
-    if (toggles.angles) drawAngles(ctx, canvasPoints, regularMode && regularPhase === 'answer')
+    if (selectedView === 'exterior') {
+      drawExterior(ctx, canvasPoints)
+      drawExteriorCircle(ctx, canvasPoints, canvasWidth, canvasHeight)
+    }
+    if (selectedView === 'angles') drawAngles(ctx, canvasPoints, regularMode && regularPhase === 'answer')
     drawHandles(ctx, canvasPoints)
-  }, [canvasPoints, canvasWidth, exteriorProgress, regularMode, regularPhase, toggles])
+  }, [canvasPoints, canvasWidth, regularMode, regularPhase, selectedView])
 
   useEffect(() => {
     draw()
@@ -405,10 +426,10 @@ export default function PolygonInteriorAngles() {
   const stopDragging = () => setDragIndex(null)
 
   const insight = (() => {
-    if (toggles.exterior) return 'Exterior angles of any convex polygon always sum to exactly 360° — one full rotation.'
-    if (toggles.triangles && toggles.angles) return `No matter how you drag, ${triangleCount} triangles × 180° always equals ${sum}°.`
-    if (toggles.triangles) return `Diagonal lines split the polygon into ${triangleCount} triangles from one vertex. Each has 180°, so the total is ${triangleCount} × 180° = ${sum}°.`
-    return `Drag any vertex — the angles change but the total stays ${sum}°. Turn on Show triangles to see why.`
+    if (selectedView === 'exterior' && exteriorCloses) return 'The live exterior-angle pieces still make one complete turn: 360°.'
+    if (selectedView === 'exterior') return `The pieces no longer make one clean turn (${formatAngleValue(exteriorTotal)}°). The polygon has become concave or crossed.`
+    if (selectedView === 'triangles') return `Diagonal lines split the polygon into ${triangleCount} triangles. Each has 180°, so the total is ${triangleCount} × 180° = ${sum}°.`
+    return `For a regular ${sides}-sided polygon, each interior angle is ${sum}° ÷ ${sides} = ${formatAngleValue(regularAngle)}°.`
   })()
 
   const sumGlow = regularMode && regularPhase === 'sum'
@@ -416,6 +437,28 @@ export default function PolygonInteriorAngles() {
   const answerGlow = regularMode && regularPhase === 'answer'
   const showSidesStep = regularMode && ['sides', 'answer', 'done'].includes(regularPhase)
   const showAnswerStep = regularMode && ['answer', 'done'].includes(regularPhase)
+  const exteriorAngle = 360 / sides
+
+  const summaryCards = selectedView === 'exterior'
+    ? [
+      { label: 'Sides (N)', value: sides, color: '#0F6E56' },
+      { label: 'Live exterior angle sum', value: `${formatAngleValue(exteriorTotal)}°`, color: exteriorCloses ? colors.orange : '#C62828' },
+      { label: 'Formula', value: regularMode ? `360° ÷ ${sides}` : 'Add the vertex angles', color: '#5F5E5A' },
+      { label: regularMode ? 'Each exterior angle' : 'Shape check', value: regularMode ? `${formatAngleValue(exteriorAngle)}°` : exteriorCloses ? 'Still 360°' : 'Does not close', color: exteriorCloses ? colors.orange : '#C62828' },
+    ]
+    : selectedView === 'triangles'
+      ? [
+        { label: 'Sides (N)', value: sides, color: '#0F6E56' },
+        { label: 'Triangles', value: triangleCount, color: colors.teal },
+        { label: 'Formula', value: `(${sides}−2) × 180°`, color: '#5F5E5A' },
+        { label: 'Sum of interior angles', value: `${sum}°`, color: colors.purple },
+      ]
+      : [
+        { label: 'Sides (N)', value: sides, color: '#0F6E56' },
+        { label: 'Sum of interior angles', value: `${sum}°`, color: colors.purple },
+        { label: 'Formula', value: `${sum}° ÷ ${sides}`, color: '#5F5E5A' },
+        { label: 'Each interior angle', value: `${formatAngleValue(regularAngle)}°`, color: colors.purple },
+      ]
 
   return (
     <div ref={rootRef} className="relative flex h-full flex-col gap-2 overflow-auto bg-[#F8F6F0] p-3 font-['Inter'] text-[#1A1A2E]">
@@ -462,22 +505,33 @@ export default function PolygonInteriorAngles() {
       </div>
 
       <div ref={wrapRef} className="relative h-[270px] w-full overflow-visible rounded-xl border border-[#E0DDD6] bg-white">
-        <div className="absolute right-3 top-3 z-10 flex w-[220px] max-w-[calc(100%-1.5rem)] flex-col items-stretch gap-1.5">
-          <button
-            type="button"
-            onClick={toggleRegularPolygon}
-            className={`rounded-full border px-3 py-1.5 text-sm font-black shadow-sm transition-all ${
-              regularMode
-                ? 'border-[#534AB7] bg-[#534AB7] text-white'
-                : 'border-[#D8D4CE] bg-white/95 text-[#1A1A2E] hover:border-[#534AB7] hover:text-[#534AB7]'
-            }`}
-            aria-pressed={regularMode}
-          >
-            Regular Polygon
-          </button>
+        <div className="absolute right-3 top-3 z-10 flex w-[300px] max-w-[calc(100%-1.5rem)] flex-col items-stretch gap-1.5">
+          <div className="grid grid-cols-2 overflow-hidden rounded-full border border-[#D8D4CE] bg-white/95 shadow-sm">
+            {[
+              ['regular', 'Regular Polygon'],
+              ['irregular', 'Irregular Polygon'],
+            ].map(([mode, label]) => {
+              const selected = mode === 'regular' ? regularMode : !regularMode
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setPolygonMode(mode)}
+                  className={`px-3 py-1.5 text-sm font-black transition-all ${
+                    selected ? 'bg-[#534AB7] text-white' : 'text-[#1A1A2E] hover:text-[#534AB7]'
+                  }`}
+                  aria-pressed={selected}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
           <div
             className={`relative overflow-hidden rounded-xl border-2 border-[#D7D2F7] bg-[#F7F5FF]/95 px-4 py-3 text-center shadow-sm transition-all duration-300 ${
-              regularMode ? 'opacity-100 translate-y-0 scale-100' : 'pointer-events-none opacity-0 -translate-y-1 scale-95'
+              regularMode && selectedView === 'angles'
+                ? 'opacity-100 translate-y-0 scale-100'
+                : 'pointer-events-none opacity-0 -translate-y-1 scale-95'
             }`}
             style={regularMode && regularPhase !== 'idle' && regularPhase !== 'done' ? { animation: 'polygonEquationBoxStrobe 2000ms ease-in-out both' } : undefined}
           >
@@ -506,6 +560,18 @@ export default function PolygonInteriorAngles() {
             </p>
           </div>
         </div>
+        <div
+          className={`pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black shadow-sm ${
+            regularMode
+              ? 'border-[#9ED8C5] bg-[#E7F7F1] text-[#0F6E56]'
+              : 'border-[#F2B8A2] bg-[#FFF1EB] text-[#A43F1D]'
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          <span className={`h-2.5 w-2.5 rounded-full ${regularMode ? 'bg-[#1D9E75]' : 'bg-[#D85A30]'}`} />
+          {regularMode ? 'Regular polygon — equal sides and angles' : 'Irregular polygon — vertices have moved'}
+        </div>
         <canvas
           ref={canvasRef}
           width={canvasWidth}
@@ -519,47 +585,35 @@ export default function PolygonInteriorAngles() {
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2">
-        <div
-          className="rounded-xl border border-[#E0DDD6] bg-white p-3"
-          style={sidesGlow ? { animation: 'polygonCardGlow 2000ms ease-in-out both', borderColor: '#0F6E56' } : undefined}
-        >
-          <p className="text-[11px] font-black uppercase text-[#8A8780]">
-            Sides (<span className="text-[#0F6E56]">N</span>)
-          </p>
-          <p className="text-xl font-black text-[#0F6E56]">{sides}</p>
-        </div>
-        <div className="rounded-xl border border-[#E0DDD6] bg-white p-3">
-          <p className="text-[11px] font-black uppercase text-[#8A8780]">Triangles</p>
-          <p className="text-xl font-black text-[#1D9E75]">{triangleCount}</p>
-        </div>
-        <div className="rounded-xl border border-[#E0DDD6] bg-white p-3">
-          <p className="text-[11px] font-black uppercase text-[#8A8780]">Formula</p>
-          <p className="text-[13px] font-black text-[#5F5E5A]">
-            (<span className="text-[#0F6E56]">N</span>−2)×180°
-          </p>
-          <p className="mt-1 text-[13px] font-black text-[#1A1A2E]">({sides}−2)×180° = {sum}°</p>
-        </div>
-        <div
-          className="rounded-xl border border-[#E0DDD6] bg-white p-3"
-          style={sumGlow ? { animation: 'polygonCardGlow 2000ms ease-in-out both', borderColor: '#534AB7' } : undefined}
-        >
-          <p className="text-[11px] font-black uppercase text-[#8A8780]">Angle sum</p>
-          <p className="text-xl font-black text-[#534AB7]">{sum}°</p>
-        </div>
+        {summaryCards.map((card, index) => (
+          <div
+            key={card.label}
+            className="rounded-xl border border-[#E0DDD6] bg-white p-3"
+            style={index === 0 && sidesGlow
+              ? { animation: 'polygonCardGlow 2000ms ease-in-out both', borderColor: '#0F6E56' }
+              : index === 1 && sumGlow
+                ? { animation: 'polygonCardGlow 2000ms ease-in-out both', borderColor: colors.purple }
+                : undefined}
+          >
+            <p className="text-[11px] font-black uppercase text-[#8A8780]">{card.label}</p>
+            <p className="text-lg font-black" style={{ color: card.color }}>{card.value}</p>
+          </div>
+        ))}
       </div>
 
       <div className="flex flex-wrap gap-2">
         {[
-          ['angles', 'Show angles', colors.purple],
-          ['triangles', 'Show triangles', colors.teal],
           ['exterior', 'Exterior angles', colors.orange],
+          ['triangles', 'Sum of interior angles', colors.teal],
+          ['angles', 'Interior angle', colors.purple],
         ].map(([id, label, color]) => (
           <button
             key={id}
             type="button"
-            onClick={() => toggleOption(id)}
-            className={`rounded-full border px-3 py-2 text-sm font-semibold ${toggles[id] ? 'bg-white' : 'bg-white text-[#5F5E5A]'}`}
-            style={{ borderColor: toggles[id] ? color : colors.border, color: toggles[id] ? color : undefined }}
+            onClick={() => setSelectedView(id)}
+            className={`rounded-full border px-3 py-2 text-sm font-semibold ${selectedView === id ? 'bg-white' : 'bg-white text-[#5F5E5A]'}`}
+            style={{ borderColor: selectedView === id ? color : colors.border, color: selectedView === id ? color : undefined }}
+            aria-pressed={selectedView === id}
           >
             <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ backgroundColor: color }} />
             {label}
