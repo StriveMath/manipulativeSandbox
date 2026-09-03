@@ -1128,6 +1128,19 @@ input[type="number"] {
   animation: power-zero-fill 300ms ease-out both;
 }
 
+@keyframes power-zero-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.power-zero-fade {
+  animation: power-zero-fade 5s ease-out forwards;
+}
+
 @keyframes blob-digit-shift {
   0% {
     opacity: 0.35;
