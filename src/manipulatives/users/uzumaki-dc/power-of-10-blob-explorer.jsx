@@ -91,6 +91,14 @@ const buildShiftedCards = (originalCards, shift) => {
   return cards
 }
 
+const getShiftBounds = (cards) => {
+  const cardPlaces = cards.map((card) => card.place)
+  return {
+    max: chartMaxPlace - Math.max(...cardPlaces),
+    min: chartMinPlace - Math.min(...cardPlaces),
+  }
+}
+
 const formatResultFromCards = (cards) => {
   const placesUsed = cards.map((card) => card.place)
   const maxPlace = Math.max(...placesUsed, 0)
@@ -256,64 +264,85 @@ export default function PowerOf10BlobExplorer() {
   const [direction, setDirection] = useState('multiply')
   const [factorInput, setFactorInput] = useState('1')
   const [dragOffset, setDragOffset] = useState(0)
+  const [previewShift, setPreviewShift] = useState(null)
   const [fadingZeros, setFadingZeros] = useState([])
   const dragRef = useRef(null)
   const fadeIdRef = useRef(0)
   const originalCards = useMemo(() => parseDigitCards(startingNumber), [startingNumber])
   const resultCards = useMemo(() => buildShiftedCards(originalCards, shift), [originalCards, shift])
-  const bounds = useMemo(() => {
-    const cardPlaces = originalCards.map((card) => card.place)
-    return {
-      max: chartMaxPlace - Math.max(...cardPlaces),
-      min: chartMinPlace - Math.min(...cardPlaces),
-    }
-  }, [originalCards])
-  const result = formatResultFromCards(resultCards)
+  const bounds = useMemo(() => getShiftBounds(originalCards), [originalCards])
+  const displayShift = previewShift ?? shift
+  const displayCards = useMemo(
+    () => buildShiftedCards(originalCards, displayShift),
+    [displayShift, originalCards],
+  )
+  const displayDirection = displayShift > 0
+    ? 'multiply'
+    : displayShift < 0
+      ? 'divide'
+      : previewShift != null && dragOffset !== 0
+        ? dragOffset < 0 ? 'multiply' : 'divide'
+        : direction
+  const displayFactor = previewShift == null
+    ? factorInput
+    : String(10 ** Math.abs(displayShift))
+  const displayResult = formatResultFromCards(displayCards)
 
-  const applyShift = (requestedShift) => {
+  const applyShift = (requestedShift, { fadeZeros = false, nextDirection = null } = {}) => {
     const nextShift = clamp(requestedShift, bounds.min, bounds.max)
     if (nextShift === shift) {
       setFactorInput(String(10 ** Math.abs(nextShift)))
       setDragOffset(0)
+      if (!fadeZeros) setFadingZeros([])
+      if (nextDirection) setDirection(nextDirection)
       return
     }
 
-    const shiftDelta = nextShift - shift
-    const nextCards = buildShiftedCards(originalCards, nextShift)
-    const nextZeroPlaces = new Set(
-      nextCards.filter((card) => card.digit === '0').map((card) => card.place),
-    )
-    const removedZeros = resultCards
-      .filter((card) => card.digit === '0')
-      .map((card) => ({ ...card, place: card.place + shiftDelta }))
-      .filter((card) => (
-        card.place >= chartMinPlace &&
-        card.place <= chartMaxPlace &&
-        !nextZeroPlaces.has(card.place)
-      ))
-      .map((card) => {
-        fadeIdRef.current += 1
-        return {
-          id: `fade-${fadeIdRef.current}`,
-          place: card.place,
-        }
-      })
+    if (fadeZeros) {
+      const shiftDelta = nextShift - shift
+      const nextCards = buildShiftedCards(originalCards, nextShift)
+      const nextZeroPlaces = new Set(
+        nextCards.filter((card) => card.digit === '0').map((card) => card.place),
+      )
+      const removedZeros = resultCards
+        .filter((card) => card.digit === '0')
+        .map((card) => ({ ...card, place: card.place + shiftDelta }))
+        .filter((card) => (
+          card.place >= chartMinPlace &&
+          card.place <= chartMaxPlace &&
+          !nextZeroPlaces.has(card.place)
+        ))
+        .map((card) => {
+          fadeIdRef.current += 1
+          return {
+            id: `fade-${fadeIdRef.current}`,
+            place: card.place,
+          }
+        })
 
-    if (removedZeros.length > 0) {
-      setFadingZeros((current) => [...current, ...removedZeros])
+      setFadingZeros(removedZeros)
+    } else {
+      setFadingZeros([])
     }
     setShift(nextShift)
     setFactorInput(String(10 ** Math.abs(nextShift)))
     setDragOffset(0)
-    if (nextShift !== 0) setDirection(nextShift > 0 ? 'multiply' : 'divide')
+    if (nextDirection) {
+      setDirection(nextDirection)
+    } else if (nextShift !== 0) {
+      setDirection(nextShift > 0 ? 'multiply' : 'divide')
+    }
   }
 
   const changeStartingNumber = (value) => {
+    const nextCards = parseDigitCards(value)
+    const nextBounds = getShiftBounds(nextCards)
+    const nextShift = clamp(shift, nextBounds.min, nextBounds.max)
     setStartingNumber(value)
-    setShift(0)
-    setDirection('multiply')
-    setFactorInput('1')
+    setShift(nextShift)
+    setFactorInput(String(10 ** Math.abs(nextShift)))
     setDragOffset(0)
+    setPreviewShift(null)
     setFadingZeros([])
   }
 
@@ -326,11 +355,22 @@ export default function PowerOf10BlobExplorer() {
     applyShift(magnitude === 0 ? 0 : direction === 'divide' ? -magnitude : magnitude)
   }
 
+  const toggleDirection = () => {
+    const nextDirection = direction === 'multiply' ? 'divide' : 'multiply'
+    const magnitude = Math.abs(shift)
+    applyShift(
+      magnitude === 0 ? 0 : nextDirection === 'divide' ? -magnitude : magnitude,
+      { nextDirection },
+    )
+  }
+
   const handlePointerDown = (event) => {
     const chart = event.currentTarget
     const chartRect = chart.getBoundingClientRect()
     const cellWidth = (chartRect.width - 78) / places.length
     chart.setPointerCapture(event.pointerId)
+    setFadingZeros([])
+    setPreviewShift(shift)
     dragRef.current = {
       cellWidth,
       pointerId: event.pointerId,
@@ -344,14 +384,18 @@ export default function PowerOf10BlobExplorer() {
     if (!drag || drag.pointerId !== event.pointerId) return
     const minOffset = -(bounds.max - drag.startShift) * drag.cellWidth
     const maxOffset = (drag.startShift - bounds.min) * drag.cellWidth
-    setDragOffset(clamp(event.clientX - drag.startX, minOffset, maxOffset))
+    const nextOffset = clamp(event.clientX - drag.startX, minOffset, maxOffset)
+    const placeDelta = Math.round(nextOffset / drag.cellWidth)
+    setDragOffset(nextOffset)
+    setPreviewShift(clamp(drag.startShift - placeDelta, bounds.min, bounds.max))
   }
 
   const finishDrag = (event) => {
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
     const placeDelta = Math.round((event.clientX - drag.startX) / drag.cellWidth)
-    applyShift(drag.startShift - placeDelta)
+    applyShift(drag.startShift - placeDelta, { fadeZeros: true })
+    setPreviewShift(null)
     dragRef.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
@@ -361,6 +405,7 @@ export default function PowerOf10BlobExplorer() {
   const cancelDrag = (event) => {
     if (dragRef.current?.pointerId !== event.pointerId) return
     setDragOffset(0)
+    setPreviewShift(null)
     dragRef.current = null
   }
 
@@ -384,28 +429,35 @@ export default function PowerOf10BlobExplorer() {
   return (
     <div className="box-border h-[500px] w-[800px] overflow-hidden bg-slate-50 px-4 py-3 text-slate-700">
       <div className="mb-3 rounded border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <div className="mb-2 text-[10px] font-black uppercase tracking-wide text-slate-400">
+        <div className="mb-2 text-center text-[10px] font-black uppercase tracking-wide text-slate-400">
           Math operation
         </div>
-        <div className="flex items-center gap-3 text-2xl font-black tabular-nums text-slate-950">
+        <div className="flex items-center justify-center gap-3 text-2xl font-black tabular-nums text-slate-950">
           <input
             aria-label="Starting number"
             className="h-11 w-36 rounded border border-slate-300 bg-white px-2 text-center text-2xl font-black tabular-nums text-slate-950 outline-none focus:border-amber-500"
             onChange={(event) => changeStartingNumber(sanitizeNumberInput(event.target.value))}
             value={startingNumber}
           />
-          <span>{direction === 'multiply' ? '×' : '÷'}</span>
+          <button
+            aria-label={`Change to ${direction === 'multiply' ? 'division' : 'multiplication'}`}
+            className="flex h-11 w-11 items-center justify-center rounded border border-transparent text-2xl font-black hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
+            onClick={toggleDirection}
+            type="button"
+          >
+            {displayDirection === 'multiply' ? '×' : '÷'}
+          </button>
           <input
             aria-label="Power of ten"
             className="h-11 w-28 rounded border border-amber-300 bg-amber-50 px-2 text-center text-2xl font-black tabular-nums text-amber-700 outline-none focus:border-amber-500"
             inputMode="numeric"
             onBlur={() => setFactorInput(String(10 ** Math.abs(shift)))}
             onChange={(event) => changeFactor(event.target.value)}
-            value={factorInput}
+            value={displayFactor}
           />
           <span>=</span>
           <span className="min-w-0 truncate">
-            <FormattedResult cards={resultCards} />
+            <FormattedResult cards={displayCards} />
           </span>
         </div>
       </div>
@@ -424,7 +476,7 @@ export default function PowerOf10BlobExplorer() {
       />
 
       <div aria-live="polite" className="sr-only" role="status">
-        {normalizeNumberText(startingNumber)} {direction === 'multiply' ? 'times' : 'divided by'} {10 ** Math.abs(shift)} equals {result}.
+        {normalizeNumberText(startingNumber)} {displayDirection === 'multiply' ? 'times' : 'divided by'} {10 ** Math.abs(displayShift)} equals {displayResult}.
       </div>
     </div>
   )
