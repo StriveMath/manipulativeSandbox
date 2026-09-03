@@ -36,17 +36,21 @@ function modAngle(angle) {
 
 function regularPolygon(sides, width, height) {
   const radius = Math.min(width, height) * 0.36
-  return Array.from({ length: sides }, (_, index) => {
+  const raw = Array.from({ length: sides }, (_, index) => {
     const angle = -Math.PI / 2 + (Math.PI * 2 * index) / sides
-    return {
-      x: (width / 2 + Math.cos(angle) * radius) / width,
-      y: (height / 2 + Math.sin(angle) * radius) / height,
-    }
+    return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }
   })
+  const ys = raw.map((p) => p.y)
+  const offsetY = (Math.min(...ys) + Math.max(...ys)) / 2
+  return raw.map((p) => ({
+    x: (width / 2 + p.x) / width,
+    y: (height / 2 + p.y - offsetY) / height,
+  }))
 }
 
 function formatAngleValue(value) {
-  return Number.isInteger(value) ? `${value}` : value.toFixed(1)
+  const rounded = Math.round(value * 10) / 10
+  return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(1)
 }
 
 function toCanvasPoints(points, width, height) {
@@ -75,7 +79,7 @@ function drawPolygon(ctx, points) {
   ctx.stroke()
 }
 
-function drawTriangles(ctx, points) {
+function drawTriangles(ctx, points, showLabels = true) {
   if (points.length < 3) return
 
   for (let index = 1; index < points.length - 1; index += 1) {
@@ -100,15 +104,15 @@ function drawTriangles(ctx, points) {
       y: (triangle[0].y + triangle[1].y + triangle[2].y) / 3,
     }
     ctx.fillStyle = color
-    ctx.font = '800 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+    ctx.font = '800 15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText('180°', centroid.x, centroid.y)
+    if (showLabels) ctx.fillText('180°', centroid.x, centroid.y)
     ctx.restore()
   }
 }
 
-function drawAngles(ctx, points, answerGlow = false) {
+function drawAngles(ctx, points, answerGlow = false, showLabels = true) {
   points.forEach((point, index) => {
     const prev = points[(index - 1 + points.length) % points.length]
     const next = points[(index + 1) % points.length]
@@ -130,10 +134,10 @@ function drawAngles(ctx, points, answerGlow = false) {
     ctx.fillStyle = answerGlow ? colors.orange : colors.purple
     ctx.shadowColor = answerGlow ? `${colors.orange}aa` : 'transparent'
     ctx.shadowBlur = answerGlow ? 12 : 0
-    ctx.font = answerGlow ? '900 16px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' : '800 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+    ctx.font = answerGlow ? '900 22px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' : '800 20px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(`${angle.degrees}°`, point.x + Math.cos(labelAngle) * 38, point.y + Math.sin(labelAngle) * 38)
+    if (showLabels) ctx.fillText(`${angle.degrees}°`, point.x + Math.cos(labelAngle) * 46, point.y + Math.sin(labelAngle) * 46)
     ctx.restore()
   })
 }
@@ -148,17 +152,7 @@ function getExteriorAngles(points) {
   })
 }
 
-function irregularPolygon(sides, width, height) {
-  return regularPolygon(sides, width, height).map((point, index) => {
-    const scale = 0.78 + (index % 3) * 0.1
-    return {
-      x: 0.5 + (point.x - 0.5) * scale,
-      y: 0.5 + (point.y - 0.5) * (index % 2 === 0 ? scale : scale + 0.08),
-    }
-  })
-}
-
-function drawExterior(ctx, points) {
+function drawExterior(ctx, points, showLabels = true) {
   const exteriorAngles = getExteriorAngles(points)
   points.forEach((point, index) => {
     const prev = points[(index - 1 + points.length) % points.length]
@@ -175,9 +169,10 @@ function drawExterior(ctx, points) {
     if (sweep < 0) sweep += Math.PI * 2
     if (sweep > Math.PI) sweep -= Math.PI * 2
 
+    const color = triangleColors[index % triangleColors.length]
     ctx.save()
-    ctx.strokeStyle = colors.orange
-    ctx.fillStyle = colors.orange
+    ctx.strokeStyle = color
+    ctx.fillStyle = color
     ctx.lineCap = 'round'
     ctx.lineWidth = 2
     ctx.globalAlpha = 0.95
@@ -194,41 +189,32 @@ function drawExterior(ctx, points) {
     ctx.moveTo(point.x, point.y)
     ctx.arc(point.x, point.y, 24, nextAngle, nextAngle + sweep, sweep < 0)
     ctx.closePath()
-    ctx.fillStyle = `${colors.orange}24`
-    ctx.strokeStyle = colors.orange
+    ctx.fillStyle = `${color}40`
+    ctx.strokeStyle = color
     ctx.lineWidth = 1.5
     ctx.fill()
     ctx.stroke()
 
-    ctx.fillStyle = colors.orange
-    ctx.font = '900 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+    ctx.fillStyle = color
+    ctx.font = '900 18px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(`${formatAngleValue(exterior)}°`, labelX, labelY)
+    if (showLabels) ctx.fillText(`${formatAngleValue(exterior)}°`, labelX, labelY)
 
     ctx.globalAlpha = 1
-    ctx.fillStyle = colors.orange
+    ctx.fillStyle = color
     ctx.restore()
   })
 }
 
-function drawExteriorCircle(ctx, points, canvasWidth, canvasHeight) {
+function drawExteriorCircle(ctx, points, canvasWidth, canvasHeight, showLabels = true) {
   const exteriorAngles = getExteriorAngles(points)
   const total = exteriorAngles.reduce((acc, angle) => acc + angle, 0)
   const closes = Math.abs(total - 360) < 0.5
-  const radius = canvasWidth < 620 ? 48 : 64
-  const centerX = canvasWidth - radius - 24
-  const centerY = canvasHeight / 2 + 22
+  const radius = Math.min(canvasHeight * 0.3, 84)
+  const centerX = canvasWidth * 0.75
+  const centerY = canvasHeight / 2 + 12
   let start = -Math.PI / 2
-
-  ctx.save()
-  ctx.beginPath()
-  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
-  ctx.strokeStyle = '#C9C5BC'
-  ctx.lineWidth = 4
-  ctx.setLineDash([5, 5])
-  ctx.stroke()
-  ctx.restore()
 
   exteriorAngles.forEach((angle, index) => {
     const sweep = (angle / 360) * Math.PI * 2
@@ -249,10 +235,10 @@ function drawExteriorCircle(ctx, points, canvasWidth, canvasHeight) {
     const middle = start + sweep / 2
     const labelRadius = radius * 0.62
     ctx.fillStyle = colors.stroke
-    ctx.font = '800 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+    ctx.font = '800 15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(`${formatAngleValue(angle)}°`, centerX + Math.cos(middle) * labelRadius, centerY + Math.sin(middle) * labelRadius)
+    if (showLabels) ctx.fillText(`${formatAngleValue(angle)}°`, centerX + Math.cos(middle) * labelRadius, centerY + Math.sin(middle) * labelRadius)
     ctx.restore()
     start = end
   })
@@ -274,9 +260,7 @@ function drawExteriorCircle(ctx, points, canvasWidth, canvasHeight) {
   ctx.font = '900 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'
-  ctx.fillText('Exterior angles', centerX, centerY - radius - 8)
-  ctx.textBaseline = 'top'
-  ctx.fillText(`Total = ${formatAngleValue(total)}°`, centerX, centerY + radius + 7)
+  ctx.fillText('Sum of exterior angles', centerX, centerY - radius - 10)
   ctx.restore()
 }
 
@@ -296,77 +280,53 @@ export default function PolygonInteriorAngles() {
   const rootRef = useRef(null)
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const regularTimersRef = useRef([])
+  const shapeRef = useRef({ regularMode: true, sides: 4 })
   const [canvasWidth, setCanvasWidth] = useState(720)
-  const canvasHeight = 270
+  const canvasHeight = 300
   const [sides, setSides] = useState(4)
   const [points, setPoints] = useState(() => regularPolygon(4, 720, canvasHeight))
   const [dragIndex, setDragIndex] = useState(null)
-  const [selectedView, setSelectedView] = useState('angles')
+  const [selectedView, setSelectedView] = useState('exterior')
   const [regularMode, setRegularMode] = useState(true)
-  const [regularPhase, setRegularPhase] = useState('done')
+  const [showAnswers, setShowAnswers] = useState(true)
+
+  useEffect(() => {
+    shapeRef.current = { regularMode, sides }
+  }, [regularMode, sides])
 
   const triangleCount = sides - 2
   const sum = triangleCount * 180
   const regularAngle = sum / sides
 
-  const canvasPoints = useMemo(() => toCanvasPoints(points, canvasWidth, canvasHeight), [canvasWidth, points])
-  const exteriorAngles = useMemo(() => getExteriorAngles(canvasPoints), [canvasPoints])
-  const exteriorTotal = exteriorAngles.reduce((acc, angle) => acc + angle, 0)
-  const exteriorCloses = Math.abs(exteriorTotal - 360) < 0.5
-
-  const clearRegularTimers = useCallback(() => {
-    regularTimersRef.current.forEach((timer) => clearTimeout(timer))
-    regularTimersRef.current = []
-  }, [])
-
-  const playRegularGlow = useCallback(() => {
-    clearRegularTimers()
-    setRegularPhase('sum')
-    regularTimersRef.current = [
-      setTimeout(() => setRegularPhase('sides'), 2000),
-      setTimeout(() => setRegularPhase('answer'), 4000),
-      setTimeout(() => setRegularPhase('done'), 6000),
-    ]
-  }, [clearRegularTimers])
+  const isExterior = selectedView === 'exterior'
+  const shiftX = isExterior ? -canvasWidth / 4 : 0
+  const canvasPoints = useMemo(
+    () => toCanvasPoints(points, canvasWidth, canvasHeight).map((point) => ({ x: point.x + shiftX, y: point.y })),
+    [canvasWidth, points, shiftX],
+  )
 
   const resetPolygon = useCallback((nextSides) => {
-    clearRegularTimers()
     setSides(nextSides)
     setPoints(regularPolygon(nextSides, canvasWidth, canvasHeight))
     setDragIndex(null)
     setRegularMode(true)
-    setRegularPhase('done')
-  }, [canvasWidth, clearRegularTimers])
-
-  const setPolygonMode = (mode) => {
-    if (mode === 'regular') {
-      setPoints(regularPolygon(sides, canvasWidth, canvasHeight))
-      setDragIndex(null)
-      playRegularGlow()
-    } else {
-      setPoints(irregularPolygon(sides, canvasWidth, canvasHeight))
-      setDragIndex(null)
-      clearRegularTimers()
-      setRegularPhase('idle')
-    }
-    setRegularMode(mode === 'regular')
-  }
+  }, [canvasWidth])
 
   useEffect(() => {
     const wrapper = wrapRef.current
     if (!wrapper) return
 
-    const update = () => setCanvasWidth(Math.max(320, Math.round(wrapper.clientWidth)))
+    const update = () => {
+      const width = Math.max(320, Math.round(wrapper.clientWidth))
+      setCanvasWidth(width)
+      const { regularMode: isRegular, sides: sideCount } = shapeRef.current
+      if (isRegular) setPoints(regularPolygon(sideCount, width, canvasHeight))
+    }
     update()
     const observer = new ResizeObserver(update)
     observer.observe(wrapper)
     return () => observer.disconnect()
   }, [])
-
-  useEffect(() => () => {
-    clearRegularTimers()
-  }, [clearRegularTimers])
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -377,15 +337,15 @@ export default function PolygonInteriorAngles() {
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, canvasWidth, canvasHeight)
 
-    if (selectedView === 'triangles') drawTriangles(ctx, canvasPoints)
+    if (selectedView === 'triangles') drawTriangles(ctx, canvasPoints, showAnswers)
     drawPolygon(ctx, canvasPoints)
     if (selectedView === 'exterior') {
-      drawExterior(ctx, canvasPoints)
-      drawExteriorCircle(ctx, canvasPoints, canvasWidth, canvasHeight)
+      drawExterior(ctx, canvasPoints, showAnswers)
+      drawExteriorCircle(ctx, canvasPoints, canvasWidth, canvasHeight, showAnswers)
     }
-    if (selectedView === 'angles') drawAngles(ctx, canvasPoints, regularMode && regularPhase === 'answer')
+    if (selectedView === 'angles') drawAngles(ctx, canvasPoints, false, showAnswers)
     drawHandles(ctx, canvasPoints)
-  }, [canvasPoints, canvasWidth, regularMode, regularPhase, selectedView])
+  }, [canvasPoints, canvasWidth, selectedView, showAnswers])
 
   useEffect(() => {
     draw()
@@ -411,12 +371,12 @@ export default function PolygonInteriorAngles() {
     if (dragIndex === null) return
     const point = getCanvasPoint(event)
     setRegularMode(false)
-    clearRegularTimers()
-    setRegularPhase('idle')
+    const minX = isExterior ? 0.27 : 0.04
+    const maxX = isExterior ? 0.73 : 0.96
     setPoints((current) => current.map((vertex, index) => (
       index === dragIndex
         ? {
-          x: clamp(point.x / canvasWidth, 0.04, 0.96),
+          x: clamp((point.x - shiftX) / canvasWidth, minX, maxX),
           y: clamp(point.y / canvasHeight, 0.06, 0.94),
         }
         : vertex
@@ -425,67 +385,64 @@ export default function PolygonInteriorAngles() {
 
   const stopDragging = () => setDragIndex(null)
 
-  const insight = (() => {
-    if (selectedView === 'exterior' && exteriorCloses) return 'The live exterior-angle pieces still make one complete turn: 360°.'
-    if (selectedView === 'exterior') return `The pieces no longer make one clean turn (${formatAngleValue(exteriorTotal)}°). The polygon has become concave or crossed.`
-    if (selectedView === 'triangles') return `Diagonal lines split the polygon into ${triangleCount} triangles. Each has 180°, so the total is ${triangleCount} × 180° = ${sum}°.`
-    return `For a regular ${sides}-sided polygon, each interior angle is ${sum}° ÷ ${sides} = ${formatAngleValue(regularAngle)}°.`
-  })()
-
-  const sumGlow = regularMode && regularPhase === 'sum'
-  const sidesGlow = regularMode && regularPhase === 'sides'
-  const answerGlow = regularMode && regularPhase === 'answer'
-  const showSidesStep = regularMode && ['sides', 'answer', 'done'].includes(regularPhase)
-  const showAnswerStep = regularMode && ['answer', 'done'].includes(regularPhase)
   const exteriorAngle = 360 / sides
+  const blank = '—'
+  const N = '#0F6E56'
+  const TURN = colors.orange
+  const STRAIGHT = colors.teal
+  const SUM = colors.purple
+  const OP = '#5F5E5A'
+  const p = (t, c = OP) => ({ t, c })
+  const hidden = [p('?', '#8A8780')]
+  const answer = (value) => (showAnswers ? value : blank)
 
   const summaryCards = selectedView === 'exterior'
     ? [
-      { label: 'Sides (N)', value: sides, color: '#0F6E56' },
-      { label: 'Live exterior angle sum', value: `${formatAngleValue(exteriorTotal)}°`, color: exteriorCloses ? colors.orange : '#C62828' },
-      { label: 'Formula', value: regularMode ? `360° ÷ ${sides}` : 'Add the vertex angles', color: '#5F5E5A' },
-      { label: regularMode ? 'Each exterior angle' : 'Shape check', value: regularMode ? `${formatAngleValue(exteriorAngle)}°` : exteriorCloses ? 'Still 360°' : 'Does not close', color: exteriorCloses ? colors.orange : '#C62828' },
+      {
+        label: 'Formula',
+        pills: [
+          [p('360°', TURN), p(' ÷ '), p('n', N)],
+          showAnswers ? [p('360°', TURN), p(' ÷ '), p(sides, N)] : hidden,
+        ],
+      },
+      { label: 'Each exterior angle', value: regularMode ? answer(`${formatAngleValue(exteriorAngle)}°`) : blank, color: TURN },
     ]
     : selectedView === 'triangles'
       ? [
-        { label: 'Sides (N)', value: sides, color: '#0F6E56' },
-        { label: 'Triangles', value: triangleCount, color: colors.teal },
-        { label: 'Formula', value: `(${sides}−2) × 180°`, color: '#5F5E5A' },
-        { label: 'Sum of interior angles', value: `${sum}°`, color: colors.purple },
+        { label: 'Sides (n)', value: answer(sides), color: N, compact: true },
+        {
+          label: 'Triangles',
+          grow: 2,
+          pills: [
+            [p('n', N), p(' − 2')],
+            showAnswers ? [p(sides, N), p(' − 2 = '), p(triangleCount, STRAIGHT)] : hidden,
+          ],
+        },
+        {
+          label: 'Sum of angles',
+          grow: 3,
+          pills: [
+            [p('(', OP), p('n', N), p(' − 2) × '), p('180°', STRAIGHT)],
+            showAnswers ? [p(triangleCount, STRAIGHT), p(' × '), p('180°', STRAIGHT)] : hidden,
+          ],
+        },
+        { label: 'Sum', value: answer(`${sum}°`), color: SUM, compact: true },
       ]
       : [
-        { label: 'Sides (N)', value: sides, color: '#0F6E56' },
-        { label: 'Sum of interior angles', value: `${sum}°`, color: colors.purple },
-        { label: 'Formula', value: `${sum}° ÷ ${sides}`, color: '#5F5E5A' },
-        { label: 'Each interior angle', value: `${formatAngleValue(regularAngle)}°`, color: colors.purple },
+        { label: 'Sides (n)', value: answer(sides), color: N, compact: true },
+        { label: 'Sum', value: answer(`${sum}°`), color: SUM, compact: true },
+        {
+          label: 'Formula',
+          pills: [
+            [p('Sum', SUM), p(' ÷ '), p('n', N)],
+            showAnswers ? [p(`${sum}°`, SUM), p(' ÷ '), p(sides, N)] : hidden,
+          ],
+        },
+        { label: 'Each interior angle', value: regularMode ? answer(`${formatAngleValue(regularAngle)}°`) : blank, color: SUM },
       ]
 
   return (
     <div ref={rootRef} className="relative flex h-full flex-col gap-2 overflow-auto bg-[#F8F6F0] p-3 font-['Inter'] text-[#1A1A2E]">
-      <style>
-        {`
-          @keyframes polygonCardGlow {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(83, 74, 183, 0); outline: 0 solid rgba(83, 74, 183, 0); transform: scale(1); }
-            18%, 54%, 88% { box-shadow: 0 0 0 2px rgba(83, 74, 183, 0.12), 0 0 14px rgba(83, 74, 183, 0.28); outline: 2px solid rgba(83, 74, 183, 0.26); transform: scale(1.01); }
-            36%, 72% { box-shadow: 0 0 0 5px rgba(83, 74, 183, 0.2), 0 0 24px rgba(83, 74, 183, 0.42); outline: 5px solid rgba(83, 74, 183, 0.34); transform: scale(1.018); }
-          }
-          @keyframes polygonValueGlow {
-            0%, 100% { text-shadow: 0 0 0 rgba(216, 90, 48, 0); transform: scale(1); }
-            18%, 54%, 88% { text-shadow: 0 0 8px rgba(216, 90, 48, 0.55); transform: scale(1.08); }
-            36%, 72% { text-shadow: 0 0 14px rgba(216, 90, 48, 0.8); transform: scale(1.14); }
-          }
-          @keyframes polygonEquationBoxStrobe {
-            0%, 100% { box-shadow: 0 2px 8px rgba(83, 74, 183, 0.08); outline: 0 solid rgba(83, 74, 183, 0); transform: scale(1); }
-            18%, 54%, 88% { box-shadow: 0 0 0 2px rgba(83, 74, 183, 0.16), 0 0 16px rgba(83, 74, 183, 0.3); outline: 2px solid rgba(83, 74, 183, 0.28); transform: scale(1.01); }
-            36%, 72% { box-shadow: 0 0 0 5px rgba(83, 74, 183, 0.2), 0 0 26px rgba(83, 74, 183, 0.42); outline: 5px solid rgba(83, 74, 183, 0.36); transform: scale(1.018); }
-          }
-          @keyframes polygonEquationReveal {
-            0% { transform: scale(0.8); opacity: 0; }
-            70% { transform: scale(1.12); opacity: 1; }
-            100% { transform: scale(1); opacity: 1; }
-          }
-        `}
-      </style>
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-[#5F5E5A]">Sides:</span>
         {sideOptions.map((option) => (
@@ -502,76 +459,64 @@ export default function PolygonInteriorAngles() {
             {option.label}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setShowAnswers((value) => !value)}
+          className={`ml-auto rounded-lg border px-4 py-2 text-sm font-semibold ${
+            showAnswers
+              ? 'border-[#E0DDD6] bg-white text-[#5F5E5A] hover:border-[#1E2D5A]'
+              : 'border-[#D85A30] bg-[#FFF1EB] text-[#A43F1D]'
+          }`}
+          aria-pressed={!showAnswers}
+        >
+          {showAnswers ? 'Hide answers' : 'Show answers'}
+        </button>
       </div>
 
-      <div ref={wrapRef} className="relative h-[270px] w-full overflow-visible rounded-xl border border-[#E0DDD6] bg-white">
-        <div className="absolute right-3 top-3 z-10 flex w-[300px] max-w-[calc(100%-1.5rem)] flex-col items-stretch gap-1.5">
-          <div className="grid grid-cols-2 overflow-hidden rounded-full border border-[#D8D4CE] bg-white/95 shadow-sm">
-            {[
-              ['regular', 'Regular Polygon'],
-              ['irregular', 'Irregular Polygon'],
-            ].map(([mode, label]) => {
-              const selected = mode === 'regular' ? regularMode : !regularMode
-              return (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setPolygonMode(mode)}
-                  className={`px-3 py-1.5 text-sm font-black transition-all ${
-                    selected ? 'bg-[#534AB7] text-white' : 'text-[#1A1A2E] hover:text-[#534AB7]'
-                  }`}
-                  aria-pressed={selected}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-          <div
-            className={`relative overflow-hidden rounded-xl border-2 border-[#D7D2F7] bg-[#F7F5FF]/95 px-4 py-3 text-center shadow-sm transition-all duration-300 ${
-              regularMode && selectedView === 'angles'
-                ? 'opacity-100 translate-y-0 scale-100'
-                : 'pointer-events-none opacity-0 -translate-y-1 scale-95'
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-semibold text-[#5F5E5A]">Choose a formula:</span>
+        {[
+          ['exterior', 'Exterior angles'],
+          ['triangles', 'Sum of interior angles'],
+          ['angles', 'Interior angle'],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setSelectedView(id)}
+            className={`rounded-full border px-4 py-1.5 text-sm font-bold ${
+              selectedView === id
+                ? 'border-[#1E2D5A] bg-[#1E2D5A] text-white'
+                : 'border-[#E0DDD6] bg-white text-[#5F5E5A] hover:border-[#1E2D5A]'
             }`}
-            style={regularMode && regularPhase !== 'idle' && regularPhase !== 'done' ? { animation: 'polygonEquationBoxStrobe 2000ms ease-in-out both' } : undefined}
+            aria-pressed={selectedView === id}
           >
-            <p className="text-[12px] font-black uppercase text-[#6B64B8]">Each interior angle</p>
-            <p className="font-mono text-lg font-black leading-tight text-[#1A1A2E]">
-              <span
-                className="inline-block text-[#534AB7]"
-                style={sumGlow ? { animation: 'polygonValueGlow 2000ms ease-in-out both' } : undefined}
-              >
-                {sum}°
-              </span>
-              <span className={`inline-block transition-opacity duration-200 ${showSidesStep ? 'opacity-100' : 'opacity-20'}`}> ÷ </span>
-              <span
-                className={`inline-block text-[#0F6E56] transition-opacity duration-200 ${showSidesStep ? 'opacity-100' : 'opacity-20'}`}
-                style={sidesGlow ? { animation: 'polygonValueGlow 2000ms ease-in-out both' } : undefined}
-              >
-                {sides}
-              </span>
-              <span className={`inline-block transition-opacity duration-200 ${showAnswerStep ? 'opacity-100' : 'opacity-0'}`}> = </span>
-              <span
-                className={`inline-block text-[#D85A30] ${showAnswerStep ? 'opacity-100' : 'opacity-0'}`}
-                style={answerGlow ? { animation: 'polygonEquationReveal 360ms ease-out both, polygonValueGlow 2000ms ease-in-out both' } : undefined}
-              >
-                {formatAngleValue(regularAngle)}°
-              </span>
-            </p>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div ref={wrapRef} className="relative h-[300px] w-full overflow-visible rounded-xl border border-[#E0DDD6] bg-white">
+        {regularMode ? (
+          <div
+            className="absolute right-3 top-3 z-10 flex items-center gap-2 rounded-full border border-[#9ED8C5] bg-[#E7F7F1] px-3 py-1 text-xs font-black text-[#0F6E56] shadow-sm"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="h-2.5 w-2.5 rounded-full bg-[#1D9E75]" />
+            Regular polygon
           </div>
-        </div>
-        <div
-          className={`pointer-events-none absolute bottom-3 left-3 z-10 flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black shadow-sm ${
-            regularMode
-              ? 'border-[#9ED8C5] bg-[#E7F7F1] text-[#0F6E56]'
-              : 'border-[#F2B8A2] bg-[#FFF1EB] text-[#A43F1D]'
-          }`}
-          role="status"
-          aria-live="polite"
-        >
-          <span className={`h-2.5 w-2.5 rounded-full ${regularMode ? 'bg-[#1D9E75]' : 'bg-[#D85A30]'}`} />
-          {regularMode ? 'Regular polygon — equal sides and angles' : 'Irregular polygon — vertices have moved'}
-        </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => resetPolygon(sides)}
+            className="absolute right-3 top-3 z-10 flex items-center gap-2 rounded-full border border-[#F2B8A2] bg-[#FFF1EB] px-3 py-1 text-xs font-black text-[#A43F1D] shadow-sm hover:bg-[#FFE4D9]"
+            title="Reset to a regular polygon"
+          >
+            <span className="h-2.5 w-2.5 rounded-full bg-[#D85A30]" />
+            Irregular polygon · reset
+          </button>
+        )}
         <canvas
           ref={canvasRef}
           width={canvasWidth}
@@ -584,46 +529,33 @@ export default function PolygonInteriorAngles() {
         />
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2">
+      <div className="flex gap-2">
         {summaryCards.map((card, index) => (
           <div
-            key={card.label}
-            className="rounded-xl border border-[#E0DDD6] bg-white p-3"
-            style={index === 0 && sidesGlow
-              ? { animation: 'polygonCardGlow 2000ms ease-in-out both', borderColor: '#0F6E56' }
-              : index === 1 && sumGlow
-                ? { animation: 'polygonCardGlow 2000ms ease-in-out both', borderColor: colors.purple }
-                : undefined}
+            key={`${card.label}-${index}`}
+            className={`rounded-xl border border-[#E0DDD6] bg-white p-3 text-center ${card.compact ? 'shrink-0' : card.pills ? 'min-w-0 basis-0' : 'w-[168px] shrink-0'}`}
+            style={card.pills ? { flexGrow: card.grow ?? 1 } : undefined}
           >
             <p className="text-[11px] font-black uppercase text-[#8A8780]">{card.label}</p>
-            <p className="text-lg font-black" style={{ color: card.color }}>{card.value}</p>
+            {card.pills ? (
+              <div className="mt-1 flex flex-col items-center text-lg font-black leading-tight">
+                {card.pills.map((parts, pillIndex) => (
+                  <p
+                    key={pillIndex}
+                    className={`w-full whitespace-nowrap ${pillIndex > 0 ? 'mt-1.5 border-t border-dashed border-[#E0DDD6] pt-1.5' : ''}`}
+                  >
+                    {parts.map((part, partIndex) => (
+                      <span key={partIndex} style={{ color: part.c }}>{part.t}</span>
+                    ))}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-lg font-black leading-tight" style={{ color: card.color }}>{card.value}</p>
+            )}
           </div>
         ))}
       </div>
-
-      <div className="flex flex-wrap gap-2">
-        {[
-          ['exterior', 'Exterior angles', colors.orange],
-          ['triangles', 'Sum of interior angles', colors.teal],
-          ['angles', 'Interior angle', colors.purple],
-        ].map(([id, label, color]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setSelectedView(id)}
-            className={`rounded-full border px-3 py-2 text-sm font-semibold ${selectedView === id ? 'bg-white' : 'bg-white text-[#5F5E5A]'}`}
-            style={{ borderColor: selectedView === id ? color : colors.border, color: selectedView === id ? color : undefined }}
-            aria-pressed={selectedView === id}
-          >
-            <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ backgroundColor: color }} />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <section className="rounded-xl border-l-4 border-[#A8A1FF] bg-[#EEEDFE] px-3 py-2 text-sm font-semibold leading-snug text-[#343070]">
-        {insight}
-      </section>
     </div>
   )
 }
