@@ -3092,24 +3092,24 @@ input[type="number"] {
 }
 
 .compound-cut-draw {
-  animation: compound-cut-draw 560ms ease-out both;
+  animation: compound-cut-draw 280ms ease-out both;
   stroke-dasharray: 600;
 }
 
 .compound-cut-invalid {
-  animation: compound-cut-invalid 460ms ease-in-out both;
+  animation: compound-cut-invalid 260ms ease-in-out both;
   transform-box: fill-box;
   transform-origin: center;
 }
 
 .compound-piece-separate {
-  animation: compound-piece-separate 760ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: compound-piece-separate 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   transform-box: fill-box;
   transform-origin: center;
 }
 
 .compound-formula-enter {
-  animation: compound-formula-enter 340ms ease-out both;
+  animation: compound-formula-enter 220ms ease-out both;
   animation-delay: var(--compound-delay);
 }
 
