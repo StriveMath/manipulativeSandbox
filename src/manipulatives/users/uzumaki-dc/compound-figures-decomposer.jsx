@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 const grid = { columns: 10, rows: 8, left: 48, top: 16, cell: 40 }
 const svgSize = { width: 500, height: 360 }
 const epsilon = 0.0001
-const maximumPieces = 6
+const maximumPieces = 8
 
 const pieceTones = [
   { fill: '#d1fae5', stroke: '#059669', text: '#047857' },
@@ -134,7 +134,7 @@ const segmentsIntersect = (firstStart, firstEnd, secondStart, secondEnd) => {
   )
 }
 
-const isAllowedGridEdge = (start, end) => {
+const isAllowedOutlineEdge = (start, end) => {
   const horizontal = Math.abs(start.y - end.y) < epsilon
   const vertical = Math.abs(start.x - end.x) < epsilon
   const diagonal = Math.abs(Math.abs(start.x - end.x) - Math.abs(start.y - end.y)) < epsilon
@@ -250,9 +250,7 @@ const splitPolygon = (points, start, end) => {
 }
 
 const validateCutForPiece = (piece, start, end) => {
-  if (!isAllowedGridEdge(start, end)) {
-    return { valid: false, message: 'Cuts must follow a horizontal, vertical, or diagonal grid line.' }
-  }
+  if (samePoint(start, end)) return { valid: false, message: 'Choose two different boundary points.' }
   if (!pointOnPolygonBoundary(start, piece.points) || !pointOnPolygonBoundary(end, piece.points)) {
     return { valid: false, message: 'Start and finish the cut on this piece\'s boundary.' }
   }
@@ -297,16 +295,30 @@ const validateCutForPiece = (piece, start, end) => {
   return { valid: true, result }
 }
 
+const greatestCommonDivisor = (first, second) => {
+  let current = Math.abs(first)
+  let remainder = Math.abs(second)
+  while (remainder !== 0) {
+    const nextRemainder = current % remainder
+    current = remainder
+    remainder = nextRemainder
+  }
+  return current
+}
+
 const enumerateBoundaryPoints = (points) => {
   const boundary = new Map()
   points.forEach((start, index) => {
     const end = points[(index + 1) % points.length]
-    const steps = Math.max(Math.abs(end.x - start.x), Math.abs(end.y - start.y))
+    const deltaX = end.x - start.x
+    const deltaY = end.y - start.y
+    const steps = greatestCommonDivisor(deltaX, deltaY)
+    const stepX = steps === 0 ? 0 : deltaX / steps
+    const stepY = steps === 0 ? 0 : deltaY / steps
     for (let step = 0; step <= steps; step += 1) {
-      const amount = steps === 0 ? 0 : step / steps
       const point = {
-        x: Math.round(start.x + (end.x - start.x) * amount),
-        y: Math.round(start.y + (end.y - start.y) * amount),
+        x: start.x + stepX * step,
+        y: start.y + stepY * step,
       }
       boundary.set(pointKey(point), point)
     }
@@ -428,7 +440,6 @@ export default function CompoundFiguresDecomposer() {
   const pointerState = useRef(null)
   const [mode, setMode] = useState('preset')
   const [presetId, setPresetId] = useState(presets[0].id)
-  const [sourcePolygon, setSourcePolygon] = useState(presets[0].points)
   const [pieces, setPieces] = useState([createPiece('piece-1', presets[0].points)])
   const [cuts, setCuts] = useState([])
   const [history, setHistory] = useState([])
@@ -437,13 +448,12 @@ export default function CompoundFiguresDecomposer() {
   const [cutStart, setCutStart] = useState(null)
   const [previewPoint, setPreviewPoint] = useState(null)
   const [keyboardPoint, setKeyboardPoint] = useState({ x: 1, y: 1 })
+  const [keyboardCursorVisible, setKeyboardCursorVisible] = useState(false)
   const [feedback, setFeedback] = useState('Draw a cut from one boundary point to another.')
   const [animation, setAnimation] = useState(null)
-  const [previousStrategy, setPreviousStrategy] = useState(null)
+  const [hasMadeFirstCut, setHasMadeFirstCut] = useState(false)
 
   const classifications = useMemo(() => pieces.map((piece) => classifyPiece(piece.points)), [pieces])
-  const complete = pieces.length > 0 && classifications.every((item) => item.kind !== 'compound')
-  const totalArea = classifications.reduce((sum, item) => sum + item.area, 0)
   const boundaryPoints = useMemo(() => {
     const points = new Map()
     pieces.forEach((piece) => {
@@ -457,39 +467,40 @@ export default function CompoundFiguresDecomposer() {
 
   const resetDecomposition = (polygon, message = 'Draw a cut from one boundary point to another.') => {
     nextPieceId.current = 2
-    setSourcePolygon(polygon)
     setPieces([createPiece('piece-1', polygon)])
     setCuts([])
     setHistory([])
     setCutStart(null)
     setPreviewPoint(null)
     setAnimation(null)
-    setPreviousStrategy(null)
+    setHasMadeFirstCut(false)
     setFeedback(message)
   }
 
-  const selectPreset = (id) => {
-    const preset = presets.find((item) => item.id === id) ?? presets[0]
-    setPresetId(preset.id)
-    resetDecomposition(preset.points)
-  }
-
-  const switchMode = (nextMode) => {
-    if (nextMode === mode || animation) return
-    setMode(nextMode)
-    if (nextMode === 'preset') {
-      selectPreset(presetId)
-      return
-    }
+  const selectFigure = (id) => {
+    if (animation) return
+    setPresetId(id)
     setCustomVertices([])
     setCustomClosed(false)
-    setSourcePolygon([])
-    setPieces([])
-    setCuts([])
-    setHistory([])
-    setPreviousStrategy(null)
-    setCutStart(null)
-    setFeedback('Click grid points to outline a compound figure.')
+    setKeyboardPoint({ x: 1, y: 1 })
+    setKeyboardCursorVisible(false)
+    setHasMadeFirstCut(false)
+
+    if (id === 'custom') {
+      setMode('build')
+      setPieces([])
+      setCuts([])
+      setHistory([])
+      setCutStart(null)
+      setPreviewPoint(null)
+      setFeedback('Click grid points to outline a compound figure.')
+      return
+    }
+
+    const preset = presets.find((item) => item.id === id) ?? presets[0]
+    setMode('preset')
+    setPresetId(preset.id)
+    resetDecomposition(preset.points)
   }
 
   const screenToGrid = (clientX, clientY) => {
@@ -515,7 +526,7 @@ export default function CompoundFiguresDecomposer() {
     }
     if (customVertices.length > 0) {
       const last = customVertices[customVertices.length - 1]
-      if (!isAllowedGridEdge(last, point)) {
+      if (!isAllowedOutlineEdge(last, point)) {
         setFeedback('Edges must be horizontal, vertical, or diagonal grid lines.')
         return
       }
@@ -537,7 +548,7 @@ export default function CompoundFiguresDecomposer() {
     }
     const first = customVertices[0]
     const last = customVertices[customVertices.length - 1]
-    if (!isAllowedGridEdge(last, first)) {
+    if (!isAllowedOutlineEdge(last, first)) {
       setFeedback('The closing edge must be horizontal, vertical, or diagonal.')
       return
     }
@@ -567,7 +578,7 @@ export default function CompoundFiguresDecomposer() {
       return
     }
     if (pieces.length >= maximumPieces) {
-      setFeedback('Six pieces is the readability limit. Undo a cut or try another strategy.')
+      setFeedback('Eight pieces is the readability limit. Undo a cut or try another strategy.')
       return
     }
 
@@ -605,6 +616,7 @@ export default function CompoundFiguresDecomposer() {
     setHistory((current) => [...current, { pieces: clonePieces(pieces), cuts: [...cuts] }])
     setPieces(nextPieces)
     setCuts((current) => [...current, { id: `cut-${nextPieceId.current}`, start, end }])
+    setHasMadeFirstCut(true)
     setCutStart(null)
     setPreviewPoint(null)
     setFeedback('The pieces separated. Continue until every piece is a rectangle or triangle.')
@@ -624,6 +636,7 @@ export default function CompoundFiguresDecomposer() {
 
   const handleSvgPointerDown = (event) => {
     if (animation) return
+    setKeyboardCursorVisible(false)
     const point = screenToGrid(event.clientX, event.clientY)
     if (!point) return
     if (mode === 'build' && !customClosed) {
@@ -670,6 +683,7 @@ export default function CompoundFiguresDecomposer() {
     }[event.key]
     if (movement) {
       event.preventDefault()
+      setKeyboardCursorVisible(true)
       setKeyboardPoint((current) => ({
         x: Math.max(0, Math.min(grid.columns, current.x + movement.x)),
         y: Math.max(0, Math.min(grid.rows, current.y + movement.y)),
@@ -702,19 +716,6 @@ export default function CompoundFiguresDecomposer() {
     setFeedback('The latest cut was undone.')
   }
 
-  const tryAnotherCut = () => {
-    if (history.length === 0 || animation) return
-    if (complete) {
-      setPreviousStrategy({ pieces: pieces.length, total: totalArea })
-    }
-    nextPieceId.current = 2
-    setPieces([createPiece('piece-1', sourcePolygon)])
-    setCuts([])
-    setHistory([])
-    setCutStart(null)
-    setFeedback('Try a different cut. The total area should stay the same.')
-  }
-
   const resetAll = () => {
     if (animation) return
     setMode('preset')
@@ -722,14 +723,9 @@ export default function CompoundFiguresDecomposer() {
     setCustomVertices([])
     setCustomClosed(false)
     setKeyboardPoint({ x: 1, y: 1 })
+    setKeyboardCursorVisible(false)
     resetDecomposition(presets[0].points)
   }
-
-  const equation = complete
-    ? `${classifications.map((item) => formatNumber(item.area)).join(' + ')} = ${formatNumber(totalArea)} square units`
-    : pieces.length > 1
-      ? `${classifications.filter((item) => item.kind !== 'compound').map((item) => formatNumber(item.area)).join(' + ') || '?'} + …`
-      : 'Decompose the figure into rectangles and triangles.'
 
   const cutPreview = cutStart && previewPoint && !samePoint(cutStart, previewPoint)
     ? { start: gridToSvg(cutStart), end: gridToSvg(previewPoint) }
@@ -737,60 +733,50 @@ export default function CompoundFiguresDecomposer() {
 
   return (
     <div className="box-border flex h-[498px] flex-col overflow-hidden bg-slate-50 p-3 text-slate-800">
-      <header className="grid h-[48px] shrink-0 grid-cols-[146px_160px_minmax(0,1fr)] items-center gap-2 rounded border border-slate-200 bg-white px-2 shadow-sm">
-        <div className="grid grid-cols-2 overflow-hidden rounded border border-slate-300">
-          {[
-            { id: 'preset', label: 'Presets' },
-            { id: 'build', label: 'Build' },
-          ].map((item) => (
-            <button
-              className={`h-8 text-[12px] font-black ${mode === item.id ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
-              disabled={Boolean(animation)}
-              key={item.id}
-              onClick={() => switchMode(item.id)}
-              type="button"
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+      <header className="grid h-[48px] shrink-0 grid-cols-[200px_minmax(0,1fr)] items-center gap-2 rounded border border-slate-200 bg-white px-2 shadow-sm">
+        <label className="text-[9px] font-black uppercase text-slate-500">
+          Figure
+          <select
+            aria-label="Choose a compound figure"
+            className="mt-0.5 h-7 w-full rounded border border-slate-300 bg-white px-1 text-[11px] font-black text-slate-800"
+            disabled={Boolean(animation)}
+            onChange={(event) => selectFigure(event.target.value)}
+            value={presetId}
+          >
+            {presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
+            <option value="custom">Custom figure</option>
+          </select>
+        </label>
 
-        {mode === 'preset' ? (
-          <label className="text-[9px] font-black uppercase text-slate-500">
-            Figure
-            <select
-              aria-label="Choose a compound figure"
-              className="mt-0.5 h-7 w-full rounded border border-slate-300 bg-white px-1 text-[11px] font-black text-slate-800"
-              disabled={Boolean(animation)}
-              onChange={(event) => selectPreset(event.target.value)}
-              value={presetId}
-            >
-              {presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
-            </select>
-          </label>
-        ) : (
+        <div className="flex min-w-0 items-center justify-end gap-1">
+          {mode === 'build' && (
           <div className="grid grid-cols-3 gap-1">
             <button className="h-8 rounded border border-slate-300 bg-white text-[10px] font-black disabled:opacity-40" disabled={customVertices.length === 0 || customClosed} onClick={() => setCustomVertices((current) => current.slice(0, -1))} type="button">Undo vertex</button>
             <button className="h-8 rounded border border-emerald-300 bg-emerald-50 text-[10px] font-black text-emerald-800 disabled:opacity-40" disabled={customVertices.length < 3 || customClosed} onClick={closeCustomFigure} type="button">Close</button>
             <button className="h-8 rounded border border-slate-300 bg-white text-[10px] font-black disabled:opacity-40" disabled={customVertices.length === 0 || customClosed} onClick={() => { setCustomVertices([]); setFeedback('Click grid points to outline a compound figure.') }} type="button">Clear</button>
           </div>
-        )}
-
-        <div className="flex min-w-0 items-center justify-end gap-1">
+          )}
           <div className={`mr-auto rounded px-2 py-1 text-[10px] font-black ${interactionReady ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-400'}`}>
             {interactionReady ? 'Cut tool active' : 'Build the outline'}
           </div>
           <button className="h-8 rounded border border-slate-300 bg-white px-2 text-[10px] font-black disabled:opacity-35" disabled={history.length === 0 || Boolean(animation)} onClick={undoCut} type="button">Undo cut</button>
-          <button className={`h-8 rounded border px-2 text-[10px] font-black disabled:opacity-35 ${complete && history.length > 0 ? 'compound-ready-button border-sky-400 bg-sky-50 text-sky-800' : 'border-slate-300 bg-white text-slate-600'}`} disabled={history.length === 0 || Boolean(animation)} onClick={tryAnotherCut} type="button">Try another</button>
           <button className="h-8 rounded bg-slate-900 px-2 text-[10px] font-black text-white disabled:opacity-40" disabled={Boolean(animation)} onClick={resetAll} type="button">Reset</button>
         </div>
       </header>
 
       <main className="mt-2 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_210px] gap-2">
         <section className="relative min-h-0 overflow-hidden rounded border border-slate-200 bg-white shadow-sm">
+          {(mode === 'build' && !customClosed) || !hasMadeFirstCut ? (
+            <div className="compound-instruction-enter pointer-events-none absolute left-10 right-10 top-1 z-10 rounded border border-sky-200 bg-sky-50/95 px-3 py-1 text-center text-[10px] font-bold text-sky-800 shadow-sm">
+              {mode === 'build' && !customClosed
+                ? 'Select grid points to outline a figure, then select the first point or Close.'
+                : 'Click between two boundary points to cut, or select two points using click or Enter.'}
+            </div>
+          ) : null}
           <svg
             aria-label={mode === 'build' && !customClosed ? 'Custom compound figure builder grid' : 'Compound figure cutting grid'}
             className="h-full w-full touch-none outline-none focus:ring-2 focus:ring-sky-400"
+            onBlur={() => setKeyboardCursorVisible(false)}
             onKeyDown={handleGridKeyDown}
             onPointerDown={handleSvgPointerDown}
             onPointerMove={handleSvgPointerMove}
@@ -874,28 +860,17 @@ export default function CompoundFiguresDecomposer() {
               )
             })}
 
-            <g className="pointer-events-none">
-              <circle cx={gridToSvg(keyboardPoint).x} cy={gridToSvg(keyboardPoint).y} fill="none" r="9" stroke="#0284c7" strokeDasharray="3 2" strokeWidth="2" />
-            </g>
+            {keyboardCursorVisible && (
+              <g className="pointer-events-none">
+                <circle cx={gridToSvg(keyboardPoint).x} cy={gridToSvg(keyboardPoint).y} fill="none" r="9" stroke="#0284c7" strokeDasharray="3 2" strokeWidth="2" />
+              </g>
+            )}
           </svg>
-          <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-white/95 px-2 py-1 text-[9px] font-bold text-slate-500 shadow-sm">
-            Arrow keys move the cursor · Enter selects · Esc cancels
-          </div>
         </section>
 
         <FormulaPanel pieces={pieces} />
       </main>
-
-      <footer className="mt-2 grid h-[64px] shrink-0 grid-cols-[minmax(0,1fr)_250px] gap-2">
-        <section className={`grid min-w-0 content-center rounded border px-4 shadow-sm ${complete ? 'compound-total-reveal border-sky-300 bg-sky-50' : 'border-slate-200 bg-white'}`}>
-          <div className="text-[9px] font-black uppercase text-slate-400">Decomposition equation</div>
-          <div className={`truncate font-black tabular-nums ${complete ? 'text-[20px] text-sky-700' : 'text-[15px] text-slate-700'}`}>{equation}</div>
-          {previousStrategy && <div className="text-[9px] font-black text-violet-700">Previous: {previousStrategy.pieces} pieces = {formatNumber(previousStrategy.total)} square units</div>}
-        </section>
-        <section className={`grid content-center rounded border px-3 text-[11px] font-bold leading-4 ${complete ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-amber-300 bg-amber-50 text-amber-900'}`} aria-live="polite">
-          {complete ? `All ${pieces.length} pieces are measurable. Try another decomposition.` : feedback}
-        </section>
-      </footer>
+      <div className="sr-only" aria-live="polite">{feedback}</div>
     </div>
   )
 }
