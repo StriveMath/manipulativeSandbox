@@ -258,6 +258,45 @@ function PlaceValueTable({
   )
 }
 
+function ShiftGuide({ direction, zeroCount }) {
+  const arrow = direction === 'multiply' ? '←' : '→'
+  const zeroLabel = zeroCount === 1 ? 'zero' : 'zeros'
+  const shiftLabel = zeroCount === 1 ? 'shift' : 'shifts'
+
+  return (
+    <div className={`mt-2 grid h-[54px] ${chartGridClass}`}>
+      <div />
+      <div className="col-span-9 flex items-center justify-center gap-4 rounded border border-amber-200 bg-amber-50/70 px-4">
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
+          <span className="flex items-center gap-0.5 tabular-nums text-base font-black">
+            <span className="text-slate-950">1</span>
+            {Array.from({ length: zeroCount }, (_, index) => (
+              <span className="rounded-sm bg-amber-200 px-0.5 text-amber-800" key={index}>0</span>
+            ))}
+          </span>
+          <span>has</span>
+          <span className="rounded bg-amber-200 px-2 py-1 tabular-nums font-black text-amber-900">
+            {zeroCount} {zeroLabel}
+          </span>
+        </div>
+        <span className="text-sm font-black text-amber-500">=</span>
+        <div className="flex items-center gap-2">
+          <div aria-hidden="true" className="flex min-w-20 items-center justify-center gap-1 text-2xl font-black leading-none text-amber-600">
+            {zeroCount === 0
+              ? <span className="text-sm text-slate-400">no movement</span>
+              : Array.from({ length: zeroCount }, (_, index) => (
+                <span key={index}>{arrow}</span>
+              ))}
+          </div>
+          <span className="text-xs font-bold text-slate-600">
+            {zeroCount} {shiftLabel}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function PowerOf10BlobExplorer() {
   const [startingNumber, setStartingNumber] = useState('3.6')
   const [shift, setShift] = useState(0)
@@ -473,6 +512,11 @@ export default function PowerOf10BlobExplorer() {
         onPointerUp={finishDrag}
         originalCards={originalCards}
         resultCards={resultCards}
+      />
+
+      <ShiftGuide
+        direction={displayDirection}
+        zeroCount={Math.abs(displayShift)}
       />
 
       <div aria-live="polite" className="sr-only" role="status">

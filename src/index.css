@@ -1129,16 +1129,19 @@ input[type="number"] {
 }
 
 @keyframes power-zero-fade {
-  from {
+  0% {
     opacity: 1;
   }
-  to {
+  15% {
+    opacity: 0.35;
+  }
+  100% {
     opacity: 0;
   }
 }
 
 .power-zero-fade {
-  animation: power-zero-fade 5s ease-out forwards;
+  animation: power-zero-fade 5s linear forwards;
 }
 
 @keyframes blob-digit-shift {
