@@ -8,7 +8,7 @@ import AlgebraTiles from './users/michael-jones/algebra-tiles.jsx'
 import BalanceScaleEquations from './users/michael-jones/balance-scale-equations.jsx'
 import CoordinateTreasureMap from './approved/coordinate-treasure-map.jsx'
 import PercentageBarModel from './users/vero1013/percentage-bar-model.tsx'
-import TriangleAreaApp from './users/vero1013/area-of-a-triangle.tsx'
+import TriangleAreaApp from './approved/area-of-a-triangle.tsx'
 import TrapezoidAreaApp from './users/vero1013/area-of-trapezoid.tsx'
 import AreaModelMultiplication from './users/uzumaki-dc/area-model-multiplication.jsx'
 import AddingSubtractingFractions from './users/uzumaki-dc/adding-subtracting-fractions.jsx'
@@ -57,12 +57,12 @@ import ParallelogramArea from './approved/parallelogram-area.jsx'
 import PizzaRemainder from './users/michael-jones/pizza-remainder.jsx'
 import RoundingNumberLine from './users/michael-jones/rounding-number-line.jsx'
 import PlaceValueDisks from './users/uzumaki-dc/place-value-disks.jsx'
-import PowerOf10BlobExplorer from './users/uzumaki-dc/power-of-10-blob-explorer.jsx'
+import PowerOf10BlobExplorer from './approved/power-of-10-blob-explorer.jsx'
 import PowersOf10PlaceValueShift from './users/uzumaki-dc/powers-of-10-place-value-shift.jsx'
 import ProportionalVsNonProportionalGraphs from './users/uzumaki-dc/proportional-vs-non-proportional-graphs.jsx'
 import RationalVsIrrationalNumbers from './users/uzumaki-dc/rational-vs-irrational-numbers.jsx'
 import ScaleDrawingsMaps from './users/uzumaki-dc/scale-drawings-maps.jsx'
-import PolygonInteriorAngles from './users/ashakv1712/polygon-interior-angles.jsx'
+import PolygonInteriorAngles from './approved/polygon-interior-angles.jsx'
 import ProbabilitySpinner from './users/ashakv1712/probability-spinner.jsx'
 import RatioBalanceScale from './users/ashakv1712/ratio-balance-scale.jsx'
 import ScatterLineFit from './users/ashakv1712/scatter-line-fit.jsx'
@@ -360,8 +360,8 @@ const allManipulatives = [
     id: 'polygon-interior-angles',
     name: 'Polygon Interior Angles',
     component: PolygonInteriorAngles,
-    ownerSlug: 'ashakv1712',
-    ownerName: 'ashakv1712',
+    ownerSlug: 'approved',
+    ownerName: 'Approved Manipulatives',
   },
   {
     id: 'probability-spinner',
@@ -437,8 +437,8 @@ const allManipulatives = [
     id: 'area-of-a-triangle',
     name: 'Area of a triangle',
     component: TriangleAreaApp,
-    ownerSlug: 'vero1013',
-    ownerName: 'Vero1013',
+    ownerSlug: 'approved',
+    ownerName: 'Approved Manipulatives',
   },
   {
     id: 'area-of-trapezoid',
@@ -626,8 +626,8 @@ const allManipulatives = [
     id: 'power-of-10-blob-explorer',
     name: 'Multiplying & Dividing by Powers of 10',
     component: PowerOf10BlobExplorer,
-    ownerSlug: 'uzumaki-dc',
-    ownerName: 'Uzumaki-DC',
+    ownerSlug: 'approved',
+    ownerName: 'Approved Manipulatives',
   },
   {
     id: 'two-factor-trees',
