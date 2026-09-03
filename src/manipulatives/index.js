@@ -58,7 +58,6 @@ import PizzaRemainder from './users/michael-jones/pizza-remainder.jsx'
 import RoundingNumberLine from './users/michael-jones/rounding-number-line.jsx'
 import PlaceValueDisks from './users/uzumaki-dc/place-value-disks.jsx'
 import PowerOf10BlobExplorer from './approved/power-of-10-blob-explorer.jsx'
-import PowersOf10PlaceValueShift from './users/uzumaki-dc/powers-of-10-place-value-shift.jsx'
 import ProportionalVsNonProportionalGraphs from './users/uzumaki-dc/proportional-vs-non-proportional-graphs.jsx'
 import RationalVsIrrationalNumbers from './users/uzumaki-dc/rational-vs-irrational-numbers.jsx'
 import ScaleDrawingsMaps from './users/uzumaki-dc/scale-drawings-maps.jsx'
@@ -612,13 +611,6 @@ const allManipulatives = [
     id: 'decimal-number-line',
     name: 'Decimal Number Line',
     component: DecimalNumberLine,
-    ownerSlug: 'uzumaki-dc',
-    ownerName: 'Uzumaki-DC',
-  },
-  {
-    id: 'powers-of-10-place-value-shift',
-    name: 'Powers of 10 Place Value Shift',
-    component: PowersOf10PlaceValueShift,
     ownerSlug: 'uzumaki-dc',
     ownerName: 'Uzumaki-DC',
   },
