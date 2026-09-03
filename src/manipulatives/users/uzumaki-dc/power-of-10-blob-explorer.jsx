@@ -15,6 +15,12 @@ const places = [
 const chartGridClass = 'grid-cols-[78px_repeat(9,minmax(0,1fr))]'
 const chartMinPlace = places.at(-1).value
 const chartMaxPlace = places[0].value
+const zeroShades = [
+  { background: 'bg-amber-100', text: 'text-amber-700' },
+  { background: 'bg-amber-200', text: 'text-amber-800' },
+  { background: 'bg-amber-300', text: 'text-amber-900' },
+  { background: 'bg-amber-400', text: 'text-amber-950' },
+]
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
@@ -258,22 +264,42 @@ function PlaceValueTable({
   )
 }
 
+function PowerFactorInput({ onBlur, onChange, value }) {
+  return (
+    <label className="relative flex h-11 w-28 items-center justify-center rounded border border-amber-300 bg-amber-50 px-2 text-2xl font-black tabular-nums focus-within:border-amber-500">
+      <input
+        aria-label="Power of ten"
+        className="absolute inset-0 z-10 h-full w-full cursor-text bg-transparent px-2 text-center text-transparent caret-amber-700 outline-none"
+        inputMode="numeric"
+        onBlur={onBlur}
+        onChange={onChange}
+        onFocus={(event) => event.target.select()}
+        value={value}
+      />
+      <span aria-hidden="true" className="pointer-events-none flex items-center justify-center gap-0.5">
+        {value.split('').map((digit, index) => {
+          if (digit !== '0') {
+            return <span className="text-slate-950" key={index}>{digit}</span>
+          }
+
+          const zeroIndex = value.slice(0, index).replace(/[^0]/g, '').length
+          const shade = zeroShades[Math.min(zeroIndex, zeroShades.length - 1)]
+          return (
+            <span className={`rounded-sm px-0.5 ${shade.background} ${shade.text}`} key={index}>
+              {digit}
+            </span>
+          )
+        })}
+      </span>
+    </label>
+  )
+}
+
 function ZeroCount({ zeroCount }) {
-  const factor = String(10 ** zeroCount)
   const zeroLabel = zeroCount === 1 ? 'zero' : 'zeros'
 
   return (
-    <div className="mt-3 flex items-center justify-center gap-2 text-xs font-bold text-slate-600">
-      <span>Zeros in {factor}:</span>
-      <span className="flex min-w-12 items-center justify-center gap-1">
-        {zeroCount === 0
-          ? <span className="text-slate-400">none</span>
-          : Array.from({ length: zeroCount }, (_, index) => (
-            <span className="rounded bg-amber-200 px-1.5 py-0.5 tabular-nums font-black text-amber-900" key={index}>
-              0
-            </span>
-          ))}
-      </span>
+    <div className="mt-3 flex items-center justify-center text-xs font-bold text-slate-600">
       <span className="rounded bg-slate-100 px-2 py-1 tabular-nums font-black text-slate-700">
         {zeroCount} {zeroLabel}
       </span>
@@ -283,10 +309,10 @@ function ZeroCount({ zeroCount }) {
 
 function ShiftArrowRow({ direction, shiftCount }) {
   const arrow = direction === 'multiply' ? '←' : '→'
-  const arrowPlaces = new Set(
+  const arrowIndexes = new Map(
     Array.from(
       { length: shiftCount },
-      (_, index) => direction === 'multiply' ? index : -index,
+      (_, index) => [direction === 'multiply' ? index : -index, index],
     ),
   )
 
@@ -296,14 +322,15 @@ function ShiftArrowRow({ direction, shiftCount }) {
         Shifts
       </div>
       {places.map((place) => {
-        const hasArrow = arrowPlaces.has(place.value)
+        const arrowIndex = arrowIndexes.get(place.value)
+        const shade = arrowIndex == null ? null : zeroShades[arrowIndex]
         return (
           <div
-            className={`flex items-center justify-center border-r border-slate-200 last:border-r-0 ${hasArrow ? 'bg-amber-50' : ''}`}
+            className={`flex items-center justify-center border-r border-slate-200 last:border-r-0 ${shade?.background ?? ''}`}
             key={place.value}
           >
-            {hasArrow && (
-              <span aria-hidden="true" className="text-3xl font-black leading-none text-amber-600">
+            {shade && (
+              <span aria-hidden="true" className={`text-3xl font-black leading-none ${shade.text}`}>
                 {arrow}
               </span>
             )}
@@ -506,10 +533,7 @@ export default function PowerOf10BlobExplorer() {
           >
             {displayDirection === 'multiply' ? '×' : '÷'}
           </button>
-          <input
-            aria-label="Power of ten"
-            className="h-11 w-28 rounded border border-amber-300 bg-amber-50 px-2 text-center text-2xl font-black tabular-nums text-amber-700 outline-none focus:border-amber-500"
-            inputMode="numeric"
+          <PowerFactorInput
             onBlur={() => setFactorInput(String(10 ** Math.abs(shift)))}
             onChange={(event) => changeFactor(event.target.value)}
             value={displayFactor}
