@@ -258,40 +258,60 @@ function PlaceValueTable({
   )
 }
 
-function ShiftGuide({ direction, zeroCount }) {
-  const arrow = direction === 'multiply' ? '←' : '→'
+function ZeroCount({ zeroCount }) {
+  const factor = String(10 ** zeroCount)
   const zeroLabel = zeroCount === 1 ? 'zero' : 'zeros'
-  const shiftLabel = zeroCount === 1 ? 'shift' : 'shifts'
 
   return (
-    <div className={`mt-2 grid h-[54px] ${chartGridClass}`}>
-      <div />
-      <div className="col-span-9 flex items-center justify-center gap-4 rounded border border-amber-200 bg-amber-50/70 px-4">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
-          <span className="flex items-center gap-0.5 tabular-nums text-base font-black">
-            <span className="text-slate-950">1</span>
-            {Array.from({ length: zeroCount }, (_, index) => (
-              <span className="rounded-sm bg-amber-200 px-0.5 text-amber-800" key={index}>0</span>
-            ))}
-          </span>
-          <span>has</span>
-          <span className="rounded bg-amber-200 px-2 py-1 tabular-nums font-black text-amber-900">
-            {zeroCount} {zeroLabel}
-          </span>
-        </div>
-        <span className="text-sm font-black text-amber-500">=</span>
-        <div className="flex items-center gap-2">
-          <div aria-hidden="true" className="flex min-w-20 items-center justify-center gap-1 text-2xl font-black leading-none text-amber-600">
-            {zeroCount === 0
-              ? <span className="text-sm text-slate-400">no movement</span>
-              : Array.from({ length: zeroCount }, (_, index) => (
-                <span key={index}>{arrow}</span>
-              ))}
+    <div className="mt-3 flex items-center justify-center gap-2 text-xs font-bold text-slate-600">
+      <span>Zeros in {factor}:</span>
+      <span className="flex min-w-12 items-center justify-center gap-1">
+        {zeroCount === 0
+          ? <span className="text-slate-400">none</span>
+          : Array.from({ length: zeroCount }, (_, index) => (
+            <span className="rounded bg-amber-200 px-1.5 py-0.5 tabular-nums font-black text-amber-900" key={index}>
+              0
+            </span>
+          ))}
+      </span>
+      <span className="rounded bg-slate-100 px-2 py-1 tabular-nums font-black text-slate-700">
+        {zeroCount} {zeroLabel}
+      </span>
+    </div>
+  )
+}
+
+function ShiftArrowRow({ direction, shiftCount }) {
+  const arrow = direction === 'multiply' ? '←' : '→'
+  const arrowPlaces = new Set(
+    Array.from(
+      { length: shiftCount },
+      (_, index) => direction === 'multiply' ? index : -index,
+    ),
+  )
+
+  return (
+    <div className={`mt-1 grid h-[42px] overflow-hidden rounded border border-slate-200 bg-white ${chartGridClass}`}>
+      <div className="flex items-center border-r border-slate-200 bg-slate-50 px-2 text-[10px] font-black uppercase tracking-wide text-slate-500">
+        Shifts
+      </div>
+      {places.map((place) => {
+        const hasArrow = arrowPlaces.has(place.value)
+        return (
+          <div
+            className={`flex items-center justify-center border-r border-slate-200 last:border-r-0 ${hasArrow ? 'bg-amber-50' : ''}`}
+            key={place.value}
+          >
+            {hasArrow && (
+              <span aria-hidden="true" className="text-3xl font-black leading-none text-amber-600">
+                {arrow}
+              </span>
+            )}
           </div>
-          <span className="text-xs font-bold text-slate-600">
-            {zeroCount} {shiftLabel}
-          </span>
-        </div>
+        )
+      })}
+      <div className="sr-only">
+        {shiftCount} {shiftCount === 1 ? 'shift' : 'shifts'} {direction === 'multiply' ? 'left' : 'right'}.
       </div>
     </div>
   )
@@ -467,7 +487,7 @@ export default function PowerOf10BlobExplorer() {
 
   return (
     <div className="box-border h-[500px] w-[800px] overflow-hidden bg-slate-50 px-4 py-3 text-slate-700">
-      <div className="mb-3 rounded border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <div className="mb-3 rounded border border-slate-200 bg-white px-4 py-4 shadow-sm">
         <div className="mb-2 text-center text-[10px] font-black uppercase tracking-wide text-slate-400">
           Math operation
         </div>
@@ -499,6 +519,7 @@ export default function PowerOf10BlobExplorer() {
             <FormattedResult cards={displayCards} />
           </span>
         </div>
+        <ZeroCount zeroCount={Math.abs(displayShift)} />
       </div>
 
       <PlaceValueTable
@@ -514,9 +535,9 @@ export default function PowerOf10BlobExplorer() {
         resultCards={resultCards}
       />
 
-      <ShiftGuide
+      <ShiftArrowRow
         direction={displayDirection}
-        zeroCount={Math.abs(displayShift)}
+        shiftCount={Math.abs(displayShift)}
       />
 
       <div aria-live="polite" className="sr-only" role="status">
