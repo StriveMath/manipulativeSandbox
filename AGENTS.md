@@ -81,6 +81,29 @@ State indicators
 - When an action can be undone (reset to regular after dragging), the pill
   becomes the button that undoes it, and only then.
 
+Composition and learning flow
+
+- Establish clear regions for the model, explanation, and controls; prevent
+  overlap and visual clutter.
+- Align mathematical notation consistently across steps, including operators,
+  fractions, symbols, units, and values.
+- Break animations into meaningful learning stages so each transformation and
+  its purpose are understandable.
+- Preserve visual identity—colour, shape, labels, and borders—while objects
+  transform so learners can track them.
+
+Interaction
+
+- Prefer direct manipulation when it makes the concept or relationship easier
+  to understand.
+- Make interaction targets generous and show the effect of each action
+  immediately across all related representations.
+- Reveal guidance and valid next actions contextually; remove instructions once
+  they are no longer needed.
+- Reset only the state named by the control and preserve unrelated user choices.
+- Use consistent visual encoding for the same concept, and keep motion short,
+  cancellable, and non-blocking.
+
 ## Verification
 
 After code changes, run targeted lint checks and `npm run build` when practical.
