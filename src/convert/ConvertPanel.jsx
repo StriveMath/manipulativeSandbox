@@ -18,7 +18,7 @@ export default function ConvertPanel() {
   const [modelId, setModelId] = useState('')
   const [preflight, setPreflight] = useState(null)
   const [selected, setSelected] = useState(null)
-  const [busy, setBusy] = useState(false)
+  const [busyMode, setBusyMode] = useState(null)
   const [error, setError] = useState(null)
 
   /** Conversion results this session, keyed by owner/id, for the bundle export. */
@@ -53,37 +53,50 @@ export default function ConvertPanel() {
   const activeKey = selected ? keyFor(selected.ownerSlug, selected.id) : null
   const activeResult = activeKey ? results[activeKey] : null
   const convertedCount = Object.keys(results).length
+  const busy = busyMode !== null
+  const rebuilding = busyMode === 'rebuild'
 
-  const runConversion = useCallback(async () => {
-    if (!selected || !modelId) return
-    setBusy(true)
-    setError(null)
-    setLiveState(null)
+  const runConversion = useCallback(
+    async ({ instruction } = {}) => {
+      if (!selected || !modelId) return false
+      const rebuild = Boolean(instruction)
+      if (rebuild && !activeResult) return false
 
-    try {
-      const response = await fetch('/api/convert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ownerSlug: selected.ownerSlug,
-          id: selected.id,
-          model: modelId,
-        }),
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error ?? 'Conversion failed')
+      setBusyMode(rebuild ? 'rebuild' : 'convert')
+      setError(null)
+      setLiveState(null)
 
-      setResults((previous) => ({
-        ...previous,
-        [keyFor(selected.ownerSlug, selected.id)]: data,
-      }))
-      setReloadKey((value) => value + 1)
-    } catch (caught) {
-      setError(caught.message)
-    } finally {
-      setBusy(false)
-    }
-  }, [selected, modelId])
+      try {
+        const response = await fetch('/api/convert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ownerSlug: selected.ownerSlug,
+            id: selected.id,
+            model: modelId,
+            ...(rebuild
+              ? { instruction, previous: activeResult.conversion }
+              : {}),
+          }),
+        })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error ?? 'Conversion failed')
+
+        setResults((previous) => ({
+          ...previous,
+          [keyFor(selected.ownerSlug, selected.id)]: data,
+        }))
+        setReloadKey((value) => value + 1)
+        return true
+      } catch (caught) {
+        setError(caught.message)
+        return false
+      } finally {
+        setBusyMode(null)
+      }
+    },
+    [selected, modelId, activeResult],
+  )
 
   const exportOne = () => {
     if (!activeResult) return
@@ -129,7 +142,7 @@ export default function ConvertPanel() {
           modelId={modelId}
           onModelChange={setModelId}
           busy={busy}
-          onConvert={runConversion}
+          onConvert={() => runConversion()}
           hasResult={Boolean(activeResult)}
           onExportOne={exportOne}
           onExportAll={exportAll}
@@ -153,16 +166,17 @@ export default function ConvertPanel() {
             />
           )}
 
-          {busy && (
+          {busyMode === 'convert' && (
             <EmptyState message="Converting. This usually takes 60–90 seconds." />
           )}
 
-          {activeResult && !busy && (
+          {activeResult && busyMode !== 'convert' && (
             <ResultView
               result={activeResult}
               liveState={liveState}
               onStateChange={setLiveState}
               reloadKey={reloadKey}
+              rebuilding={rebuilding}
               onReset={() => {
                 setLiveState(null)
                 setReloadKey((value) => value + 1)
@@ -170,6 +184,15 @@ export default function ConvertPanel() {
             />
           )}
         </main>
+
+        {activeResult && (
+          <RebuildBar
+            key={activeKey}
+            busy={busy}
+            rebuilding={rebuilding}
+            onRebuild={(instruction) => runConversion({ instruction })}
+          />
+        )}
       </div>
     </div>
   )
@@ -330,7 +353,14 @@ function EmptyState({ message }) {
   )
 }
 
-function ResultView({ result, liveState, onStateChange, reloadKey, onReset }) {
+function ResultView({
+  result,
+  liveState,
+  onStateChange,
+  reloadKey,
+  onReset,
+  rebuilding,
+}) {
   const { conversion, meta, source } = result
   const seconds = (meta.durationMs / 1000).toFixed(0)
 
@@ -343,7 +373,15 @@ function ResultView({ result, liveState, onStateChange, reloadKey, onReset }) {
   )
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[minmax(0,1.35fr)_minmax(280px,1fr)] gap-4">
+    <div className="relative grid h-full min-h-0 grid-cols-[minmax(0,1.35fr)_minmax(280px,1fr)] gap-4">
+      {rebuilding && (
+        <div className="absolute inset-0 z-10 flex items-start justify-center bg-slate-950/60 pt-6">
+          <p className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200">
+            Rebuilding from your notes. This usually takes 60–90 seconds.
+          </p>
+        </div>
+      )}
+
       <div className="flex min-h-0 flex-col gap-2">
         <div className="flex shrink-0 items-center justify-between">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -408,6 +446,54 @@ function ResultView({ result, liveState, onStateChange, reloadKey, onReset }) {
         </Section>
       </div>
     </div>
+  )
+}
+
+function RebuildBar({ busy, rebuilding, onRebuild }) {
+  const [instruction, setInstruction] = useState('')
+  const trimmed = instruction.trim()
+
+  const submit = async () => {
+    if (!trimmed || busy) return
+    const ok = await onRebuild(trimmed)
+    if (ok) setInstruction('')
+  }
+
+  return (
+    <form
+      className="flex shrink-0 items-end gap-2 border-t border-slate-800 bg-slate-900 px-4 py-3"
+      onSubmit={(event) => {
+        event.preventDefault()
+        submit()
+      }}
+    >
+      <label className="min-w-0 flex-1">
+        <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          Rebuild this conversion
+        </span>
+        <textarea
+          value={instruction}
+          onChange={(event) => setInstruction(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault()
+              submit()
+            }
+          }}
+          rows={2}
+          disabled={busy}
+          placeholder="e.g. Make the Hide answers toggle larger, keep everything else."
+          className="w-full resize-none rounded border border-slate-600 bg-white px-2.5 py-2 text-xs text-slate-900 placeholder:text-slate-400 disabled:bg-slate-200"
+        />
+      </label>
+      <button
+        type="submit"
+        disabled={busy || !trimmed}
+        className="rounded bg-blue-500 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
+      >
+        {rebuilding ? 'Rebuilding…' : 'Rebuild'}
+      </button>
+    </form>
   )
 }
 

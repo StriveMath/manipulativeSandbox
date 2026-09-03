@@ -6,6 +6,7 @@
  * them in one list makes a retirement a one-line fix.
  */
 export const CONVERSION_MODELS = [
+  { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', provider: 'openai' },
   { id: 'gpt-5.1', label: 'GPT-5.1', provider: 'openai' },
   { id: 'gpt-5', label: 'GPT-5', provider: 'openai' },
   { id: 'gpt-5-mini', label: 'GPT-5 mini (cheap, for iterating)', provider: 'openai' },

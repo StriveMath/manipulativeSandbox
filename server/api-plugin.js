@@ -25,8 +25,12 @@ import {
  * `npm run preview` deliberately does not serve these routes.
  */
 
-/** Requests are small — ids and a model name — so anything large is a bug. */
-const MAX_BODY_BYTES = 1024 * 1024
+/**
+ * First convert is tiny (ids + a model name). Rebuild sends the current
+ * converted file back, which can be a few hundred KB.
+ */
+const MAX_BODY_BYTES = 2 * 1024 * 1024
+const MAX_INSTRUCTION_CHARS = 8000
 
 function sendJson(res, status, body) {
   const payload = JSON.stringify(body)
@@ -110,9 +114,71 @@ async function handlePreflight(res, root) {
   sendJson(res, 200, { manipulatives: results })
 }
 
+function parsePreviousConversion(raw) {
+  if (raw === undefined || raw === null) return null
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new SourceError('previous must be a conversion object', 400)
+  }
+  if (typeof raw.code !== 'string' || !raw.code.trim()) {
+    throw new SourceError('previous.code is required', 400)
+  }
+  if (
+    typeof raw.props !== 'object' ||
+    raw.props === null ||
+    Array.isArray(raw.props)
+  ) {
+    throw new SourceError('previous.props must be an object', 400)
+  }
+  if (
+    typeof raw.state !== 'object' ||
+    raw.state === null ||
+    Array.isArray(raw.state)
+  ) {
+    throw new SourceError('previous.state must be an object', 400)
+  }
+
+  const notes = Array.isArray(raw.notes)
+    ? raw.notes.filter((note) => typeof note === 'string')
+    : []
+
+  return {
+    title: typeof raw.title === 'string' ? raw.title : '',
+    prompt: typeof raw.prompt === 'string' ? raw.prompt : '',
+    caption: typeof raw.caption === 'string' ? raw.caption : null,
+    canvasHeight:
+      typeof raw.canvasHeight === 'number' ? raw.canvasHeight : undefined,
+    props: raw.props,
+    state: raw.state,
+    code: raw.code,
+    notes,
+  }
+}
+
+function parseRebuildFields(body) {
+  const instruction =
+    typeof body.instruction === 'string' ? body.instruction.trim() : ''
+  const previous = parsePreviousConversion(body.previous)
+
+  if (instruction && !previous) {
+    throw new SourceError('Rebuild needs the current conversion in previous', 400)
+  }
+  if (previous && !instruction) {
+    throw new SourceError('Rebuild needs a non-empty instruction', 400)
+  }
+  if (instruction.length > MAX_INSTRUCTION_CHARS) {
+    throw new SourceError(
+      `Instruction is too long (${instruction.length} chars; max ${MAX_INSTRUCTION_CHARS})`,
+      400,
+    )
+  }
+
+  return { instruction: instruction || null, previous }
+}
+
 async function handleConvert(req, res, { root, env }) {
   const body = await readJsonBody(req)
   const { ownerSlug, id, model: modelId } = body
+  const { instruction, previous } = parseRebuildFields(body)
 
   if (typeof ownerSlug !== 'string' || typeof id !== 'string') {
     throw new SourceError('Expected { ownerSlug, id, model }', 400)
@@ -148,6 +214,8 @@ async function handleConvert(req, res, { root, env }) {
     relativePath,
     source,
     helpers,
+    previous,
+    instruction,
   })
 
   sendJson(res, 200, {

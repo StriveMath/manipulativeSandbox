@@ -129,6 +129,23 @@ The rules above are the contract. These are the mechanics of this request.
   a feature is worse than one that admits to it.
 `.trim()
 
+const REBUILD_CONTRACT = `
+## Incremental rebuild
+
+You already converted this manipulative. The user is asking for a revision of
+that conversion, not a fresh start.
+
+- Edit the current conversion. Do not recode from the original unless the
+  instruction says to restore something.
+- Change what they asked for. Leave everything else — visuals, interactions,
+  props, state shape, prompt, caption, canvas height — as it is.
+- Do not "improve" unrelated layout, copy, or state.
+- Still obey the Live contract above if the instruction would break it; note
+  that in \`notes\` instead of silently ignoring the request.
+- In \`notes\`, list what you changed this round. Repeat a previous note only
+  if it still applies.
+`.trim()
+
 async function readIfPresent(filePath) {
   try {
     return await readFile(filePath, 'utf8')
@@ -185,7 +202,7 @@ ${converted}
 `.trim()
 }
 
-async function buildSystemPrompt(root, { includeExample }) {
+async function buildSystemPrompt(root, { includeExample, rebuild }) {
   const agentsPath = path.join(root, 'src', 'live', 'AGENTS.md')
   const instructions = await readIfPresent(agentsPath)
   if (!instructions) {
@@ -196,6 +213,7 @@ async function buildSystemPrompt(root, { includeExample }) {
   }
 
   const sections = [instructions.trim(), OUTPUT_CONTRACT]
+  if (rebuild) sections.push(REBUILD_CONTRACT)
 
   if (includeExample) {
     const example = await buildReferenceExample(root)
@@ -205,27 +223,70 @@ async function buildSystemPrompt(root, { includeExample }) {
   return sections.join('\n\n---\n\n')
 }
 
+function appendHelpers(parts, helpers) {
+  if (!helpers?.length) return
+  parts.push(
+    'It depends on these local modules, directly or through each other. ' +
+      'Their real source is below — inline what is actually used, keeping the exact ' +
+      'colours, easing and behaviour. Do not substitute your own versions, and do not ' +
+      'carry the imports over: the output must be one self-contained file.',
+  )
+  for (const helper of helpers) {
+    parts.push(
+      `### ${helper.relativePath} (imported as \`${helper.specifier}\`)`,
+      '```jsx\n' + helper.source + '\n```',
+    )
+  }
+}
+
 function buildUserPrompt({ relativePath, source, helpers }) {
   const parts = [
     `Convert this approved sandbox manipulative. Source file: \`${relativePath}\`.`,
     '```jsx\n' + source + '\n```',
   ]
+  appendHelpers(parts, helpers)
+  return parts.join('\n\n')
+}
 
-  if (helpers?.length) {
-    parts.push(
-      'It depends on these local modules, directly or through each other. ' +
-        'Their real source is below — inline what is actually used, keeping the exact ' +
-        'colours, easing and behaviour. Do not substitute your own versions, and do not ' +
-        'carry the imports over: the output must be one self-contained file.',
-    )
-    for (const helper of helpers) {
-      parts.push(
-        `### ${helper.relativePath} (imported as \`${helper.specifier}\`)`,
-        '```jsx\n' + helper.source + '\n```',
-      )
-    }
+function buildRebuildPrompt({
+  relativePath,
+  source,
+  helpers,
+  previous,
+  instruction,
+}) {
+  const meta = {
+    title: previous.title,
+    prompt: previous.prompt,
+    caption: previous.caption ?? null,
+    canvasHeight: previous.canvasHeight,
   }
 
+  const parts = [
+    `Incrementally update the converted manipulative. Source file: \`${relativePath}\`.`,
+    'Apply only the requested changes to the current conversion. Keep everything else.',
+    `## Requested changes\n\n${instruction}`,
+    '## Current conversion — edit this',
+    '### title, prompt, caption, canvasHeight\n\n```json\n' +
+      JSON.stringify(meta, null, 2) +
+      '\n```',
+    '### props\n\n```json\n' + JSON.stringify(previous.props, null, 2) + '\n```',
+    '### state\n\n```json\n' + JSON.stringify(previous.state, null, 2) + '\n```',
+    '### code\n\n```jsx\n' + previous.code + '\n```',
+  ]
+
+  if (previous.notes?.length) {
+    parts.push(
+      '### notes from the previous conversion\n\n' +
+        previous.notes.map((note) => `- ${note}`).join('\n'),
+    )
+  }
+
+  parts.push(
+    '## Original sandbox component (reference only — do not recode from this unless asked to restore something)',
+    '```jsx\n' + source + '\n```',
+  )
+  appendHelpers(parts, helpers)
   return parts.join('\n\n')
 }
 
@@ -309,12 +370,28 @@ export async function convertManipulative({
   relativePath,
   source,
   helpers,
+  previous,
+  instruction,
 }) {
   const languageModel = resolveModel({ model, env })
+  const rebuild = Boolean(previous && instruction)
 
   const [system, prompt] = await Promise.all([
-    buildSystemPrompt(root, { includeExample: id !== REFERENCE_ID }),
-    Promise.resolve(buildUserPrompt({ relativePath, source, helpers })),
+    buildSystemPrompt(root, {
+      includeExample: !rebuild && id !== REFERENCE_ID,
+      rebuild,
+    }),
+    Promise.resolve(
+      rebuild
+        ? buildRebuildPrompt({
+            relativePath,
+            source,
+            helpers,
+            previous,
+            instruction,
+          })
+        : buildUserPrompt({ relativePath, source, helpers }),
+    ),
   ])
 
   let result
