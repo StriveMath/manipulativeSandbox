@@ -387,8 +387,8 @@ export default function App() {
                 <div className="flex h-full w-full flex-col items-center justify-center font-extrabold text-[20px] text-gray-900">
 
                   {!showBase && (
-                    <div className="flex w-full flex-col items-center gap-5">
-                      <span className="text-blue-700 text-3xl">b</span>
+                    <div className="flex w-full flex-col items-center gap-4">
+                      <span className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-blue-700/60">Base</span>
                       <div className="grid grid-cols-[18px_auto] items-center gap-x-2">
                         <span>=</span>
                         <Fraction numerator={<>2 &times; <span className="text-emerald-700">A</span></>} denominator={<span className="text-orange-700">h</span>} />
@@ -399,14 +399,14 @@ export default function App() {
                       </div>
                       <div className="grid grid-cols-[18px_auto] items-center gap-x-2">
                         <span>=</span>
-                        <span className="text-blue-700 text-3xl">{formatNum(base)}</span>
+                        <span className="text-blue-700 text-xl">{formatNum(base)}</span>
                       </div>
                     </div>
                   )}
 
                   {!showHeight && (
-                    <div className="flex w-full flex-col items-center gap-5">
-                      <span className="text-orange-700 text-3xl">h</span>
+                    <div className="flex w-full flex-col items-center gap-4">
+                      <span className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-orange-700/60">Height</span>
                       <div className="grid grid-cols-[18px_auto] items-center gap-x-2">
                         <span>=</span>
                         <Fraction numerator={<>2 &times; <span className="text-emerald-700">A</span></>} denominator={<span className="text-blue-700">b</span>} />
@@ -417,14 +417,14 @@ export default function App() {
                       </div>
                       <div className="grid grid-cols-[18px_auto] items-center gap-x-2">
                         <span>=</span>
-                        <span className="text-orange-700 text-3xl">{formatNum(height)}</span>
+                        <span className="text-orange-700 text-xl">{formatNum(height)}</span>
                       </div>
                     </div>
                   )}
 
                   {(showBase && showHeight) && (
-                    <div className="flex w-full flex-col items-center gap-5">
-                      <span className="text-emerald-700 text-3xl">Area</span>
+                    <div className="flex w-full flex-col items-center gap-4">
+                      <span className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700/60">Area</span>
                       <div className="grid grid-cols-[18px_28px_18px_42px_18px_42px] items-center justify-center gap-x-1">
                         <span>=</span>
                         <Fraction numerator="1" denominator="2" />
@@ -443,7 +443,7 @@ export default function App() {
                       </div>
                       <div className="grid grid-cols-[18px_auto] items-center gap-x-2">
                         <span>=</span>
-                        <span className="text-emerald-700 text-3xl">{showArea ? formatNum(area) : '?'}</span>
+                        <span className="text-emerald-700 text-xl">{showArea ? formatNum(area) : '?'}</span>
                       </div>
                     </div>
                   )}
