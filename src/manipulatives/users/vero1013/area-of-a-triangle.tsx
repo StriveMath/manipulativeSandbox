@@ -20,9 +20,17 @@ const Checkbox = ({ label, checked, onChange, color }) => (
   </label>
 );
 
+const Fraction = ({ numerator, denominator }) => (
+  <span className="inline-flex flex-col items-center align-middle leading-none">
+    <span className="w-full border-b-2 border-gray-900 px-0.5 pb-1 text-center">{numerator}</span>
+    <span className="pt-1">{denominator}</span>
+  </span>
+);
+
 export default function App() {
   const CANVAS_W = 800;
-  const CANVAS_H = 440;
+  const CANVAS_H = 388;
+  const VISUAL_W = 560;
   const SCALE = 25;
 
   // Adjusted initial Y positions to be slightly higher so labels don't get covered by the banner
@@ -39,7 +47,6 @@ export default function App() {
   const [showHeight, setShowHeight] = useState(true);
   const [showArea, setShowArea] = useState(true);
 
-  // Animation Slider State (0 to 1)
   const [animProgress, setAnimProgress] = useState(0);
 
   const svgRef = useRef(null);
@@ -59,7 +66,6 @@ export default function App() {
   // Geometric logic for Proof Types
   const isCWithinBase = cX >= aX && cX <= bX;
   const isObtuseRight = cX > bX;
-  const isObtuseLeft = cX < aX;
 
   // Midpoints for Rectangle folding animation (Acute/Right Triangles)
   const midLeftX = (aX + cX) / 2;
@@ -67,13 +73,17 @@ export default function App() {
   const midRightX = (bX + cX) / 2;
   const midRightY = (aY + cY) / 2;
 
-  // Dimensions for Subtraction Proof (Obtuse Triangles)
-  const bigBasePixels = isObtuseRight ? cX - aX : bX - cX;
-  const smallBasePixels = isObtuseRight ? cX - bX : aX - cX;
-  const bigBase = bigBasePixels / SCALE;
-  const smallBase = smallBasePixels / SCALE;
-  const bigArea = 0.5 * bigBase * height;
-  const smallArea = 0.5 * smallBase * height;
+  const flipProgress = Math.min(animProgress / 0.45, 1);
+  const cutProgress = Math.min(Math.max((animProgress - 0.45) / 0.13, 0), 1);
+  const separationProgress = Math.min(Math.max((animProgress - 0.58) / 0.1, 0), 1);
+  const slideProgress = Math.min(Math.max((animProgress - 0.68) / 0.32, 0), 1);
+  const obtusePivotX = isObtuseRight ? midLeftX : midRightX;
+  const obtusePivotY = isObtuseRight ? midLeftY : midRightY;
+  const cutX = isObtuseRight ? bX : aX;
+  const cutGap = 14 * separationProgress;
+  const sliceShiftX = isObtuseRight
+    ? cutGap - (basePixels + cutGap) * slideProgress
+    : -cutGap + (basePixels + cutGap) * slideProgress;
 
   // Toggle Logic - Enforces only one "unknown" at a time
   const handleToggle = (field) => {
@@ -112,15 +122,14 @@ export default function App() {
 
     if (dragNode === 'A') {
       newX = Math.max(20, Math.min(newX, bX - snap));
-      // Increased the bottom margin constraint (CANVAS_H - 170) to prevent the base label from being pushed under the banner
-      newY = Math.max(cY + snap, Math.min(newY, CANVAS_H - 170));
+      newY = Math.max(cY + snap, Math.min(newY, CANVAS_H - 70));
       setAX(newX);
       setAY(newY);
     } else if (dragNode === 'B') {
-      newX = Math.max(aX + snap, Math.min(newX, CANVAS_W - 20));
+      newX = Math.max(aX + snap, Math.min(newX, VISUAL_W - 20));
       setBX(newX);
     } else if (dragNode === 'C') {
-      newX = Math.max(20, Math.min(newX, CANVAS_W - 20));
+      newX = Math.max(20, Math.min(newX, VISUAL_W - 20));
       newY = Math.max(20, Math.min(newY, aY - snap));
       setCY(newY);
       setCX(newX);
@@ -139,39 +148,23 @@ export default function App() {
   }
 
   return (
-    // Full screen centering wrapper
-    <div className="min-h-screen w-full bg-[#eef2f6] flex items-center justify-center p-4">
-
-      {/* Fixed 800x500 Module */}
-      <div className="w-[800px] h-[500px] bg-white border border-gray-200 rounded-xl shadow-xl flex flex-col font-sans select-none overflow-hidden relative">
+    <div className="relative flex h-[500px] w-[800px] select-none flex-col overflow-hidden rounded-xl border border-gray-200 bg-white font-sans shadow-xl">
 
         {/* Header and Controls */}
-        <div className="h-[60px] bg-[#f8fafc] px-6 border-b border-[#e2e8f0] flex justify-between items-center z-10 shrink-0">
+        <div className="z-10 flex h-[60px] shrink-0 items-center justify-between border-b border-[#e2e8f0] bg-[#f8fafc] px-6">
           <h1 className="text-[#0f172a] text-xl font-bold tracking-tight m-0">Triangle Area</h1>
 
-          <div className="flex space-x-6 items-center">
-            <div onClick={() => handleToggle('base')}>
-              <Checkbox label="Base" checked={showBase} color="#3b82f6" />
-            </div>
-            <div onClick={() => handleToggle('height')}>
-              <Checkbox label="Height" checked={showHeight} color="#f97316" />
-            </div>
-            <div onClick={() => handleToggle('area')}>
-              <Checkbox label="Area" checked={showArea} color="#10b981" />
-            </div>
-
-            {/* Dynamic Proof Animation Slider */}
-            <div className="flex items-center space-x-2 ml-4 border-l border-gray-300 pl-6">
-              <span className="text-sm font-semibold text-gray-700">Visual Proof:</span>
-              <input
-                type="range"
-                min="0" max="100"
-                value={Math.round(animProgress * 100)}
-                onChange={(e) => setAnimProgress(parseFloat(e.target.value) / 100)}
-                onInput={(e) => setAnimProgress(parseFloat(e.target.value) / 100)}
-                className="w-24 cursor-pointer accent-orange-500"
-              />
-            </div>
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-semibold text-gray-700">Visual proof</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={Math.round(animProgress * 100)}
+              onChange={(e) => setAnimProgress(parseFloat(e.target.value) / 100)}
+              onInput={(e) => setAnimProgress(parseFloat(e.target.value) / 100)}
+              className="w-[420px] cursor-pointer accent-orange-500"
+            />
           </div>
         </div>
 
@@ -186,22 +179,41 @@ export default function App() {
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
           >
+            <defs>
+              <clipPath id="obtuse-stationary" clipPathUnits="userSpaceOnUse">
+                <rect
+                  x={isObtuseRight ? -CANVAS_W : aX}
+                  y="0"
+                  width={isObtuseRight ? CANVAS_W + bX : CANVAS_W - aX}
+                  height={CANVAS_H}
+                />
+              </clipPath>
+              <clipPath id="obtuse-moving" clipPathUnits="userSpaceOnUse">
+                <rect
+                  x={isObtuseRight ? bX : 0}
+                  y="0"
+                  width={isObtuseRight ? CANVAS_W - bX : aX}
+                  height={CANVAS_H}
+                />
+              </clipPath>
+            </defs>
+
             {/* Grid */}
             <g className="pointer-events-none">{gridLines}</g>
+            <rect x={VISUAL_W} y="0" width={CANVAS_W - VISUAL_W} height={CANVAS_H} fill="#f8fafc" />
+            <line x1={VISUAL_W} y1="0" x2={VISUAL_W} y2={CANVAS_H} stroke="#e2e8f0" strokeWidth="2" />
 
             {/* Base Line Extension (if C is outside bounds) */}
             {cX < aX && <line x1={cX} y1={aY} x2={aX} y2={aY} stroke="#94a3b8" strokeDasharray="5,5" strokeWidth="2" />}
             {cX > bX && <line x1={bX} y1={aY} x2={cX} y2={aY} stroke="#94a3b8" strokeDasharray="5,5" strokeWidth="2" />}
 
-            {/* --- VISUAL PROOF LOGIC --- */}
-
-            {/* 1. Rectangle Proof (For Acute/Right Triangles) */}
             {animProgress > 0 && isCWithinBase && (
               <>
                 <rect
                   x={aX} y={cY} width={basePixels} height={heightPixels}
                   fill="none" stroke="#f97316" strokeWidth="2" strokeDasharray="4,4"
-                  opacity={animProgress} className="pointer-events-none transition-none"
+                  opacity={animProgress}
+                  className="pointer-events-none"
                 />
                 {cX > aX && (
                   <polygon
@@ -209,7 +221,7 @@ export default function App() {
                     fill="rgba(249, 115, 22, 0.15)"
                     stroke="#f97316" strokeWidth="1.5"
                     transform={`rotate(${180 * animProgress}, ${midLeftX}, ${midLeftY})`}
-                    className="pointer-events-none transition-none"
+                    className="pointer-events-none"
                   />
                 )}
                 {cX < bX && (
@@ -218,43 +230,81 @@ export default function App() {
                     fill="rgba(249, 115, 22, 0.15)"
                     stroke="#f97316" strokeWidth="1.5"
                     transform={`rotate(${-180 * animProgress}, ${midRightX}, ${midRightY})`}
-                    className="pointer-events-none transition-none"
+                    className="pointer-events-none"
                   />
                 )}
               </>
             )}
 
-            {/* 2. Subtraction Proof (For Obtuse Triangles) */}
             {animProgress > 0 && !isCWithinBase && (
               <>
-                {/* Big bounding right triangle (Dashed Blue) */}
-                <polygon
-                  points={isObtuseRight ? `${aX},${aY} ${cX},${aY} ${cX},${cY}` : `${bX},${aY} ${cX},${aY} ${cX},${cY}`}
-                  fill="rgba(59, 130, 246, 0.05)"
-                  stroke="#3b82f6" strokeWidth="2" strokeDasharray="6,4"
-                  opacity={animProgress}
-                  className="pointer-events-none transition-none"
+                <g clipPath="url(#obtuse-stationary)">
+                  <polygon
+                    points={`${aX},${aY} ${bX},${aY} ${cX},${cY}`}
+                    fill="rgba(16, 185, 129, 0.15)"
+                    stroke="#10b981"
+                    strokeWidth="2"
+                    className="pointer-events-none"
+                  />
+                  <polygon
+                    points={`${aX},${aY} ${bX},${aY} ${cX},${cY}`}
+                    fill="rgba(249, 115, 22, 0.18)"
+                    stroke="#f97316"
+                    strokeWidth="2"
+                    transform={`rotate(${isObtuseRight ? 180 * flipProgress : -180 * flipProgress}, ${obtusePivotX}, ${obtusePivotY})`}
+                    className="pointer-events-none"
+                  />
+                </g>
+                <g clipPath="url(#obtuse-moving)" transform={`translate(${sliceShiftX}, 0)`}>
+                  <polygon
+                    points={`${aX},${aY} ${bX},${aY} ${cX},${cY}`}
+                    fill="rgba(16, 185, 129, 0.15)"
+                    stroke="#10b981"
+                    strokeWidth="2"
+                    className="pointer-events-none"
+                  />
+                  <polygon
+                    points={`${aX},${aY} ${bX},${aY} ${cX},${cY}`}
+                    fill="rgba(249, 115, 22, 0.18)"
+                    stroke="#f97316"
+                    strokeWidth="2"
+                    transform={`rotate(${isObtuseRight ? 180 * flipProgress : -180 * flipProgress}, ${obtusePivotX}, ${obtusePivotY})`}
+                    className="pointer-events-none"
+                  />
+                </g>
+                <line
+                  x1={cutX}
+                  y1={cY}
+                  x2={cutX}
+                  y2={cY + (aY - cY) * cutProgress}
+                  stroke="#475569"
+                  strokeWidth="2"
+                  opacity={cutProgress}
+                  className="pointer-events-none"
                 />
-                {/* Small empty triangle that gets subtracted (Animated Red) */}
-                <polygon
-                  points={isObtuseRight ? `${bX},${aY} ${cX},${aY} ${cX},${cY}` : `${aX},${aY} ${cX},${aY} ${cX},${cY}`}
-                  fill="rgba(239, 68, 68, 0.25)"
-                  stroke="#ef4444" strokeWidth="1.5"
-                  transform={`translate(0, ${animProgress * 50})`}
-                  opacity={1 - (animProgress * 0.7)}
-                  className="pointer-events-none transition-none"
+                <line
+                  x1={cutX}
+                  y1={cY}
+                  x2={cutX}
+                  y2={cY + (aY - cY) * cutProgress}
+                  stroke="#475569"
+                  strokeWidth="2"
+                  opacity={cutProgress}
+                  transform={`translate(${sliceShiftX}, 0)`}
+                  className="pointer-events-none"
                 />
               </>
             )}
 
-            {/* Main Original Triangle */}
-            <polygon
-              points={`${aX},${aY} ${bX},${aY} ${cX},${cY}`}
-              fill="rgba(16, 185, 129, 0.15)"
-              stroke="#10b981"
-              strokeWidth="2"
-              className="pointer-events-none"
-            />
+            {(animProgress === 0 || isCWithinBase) && (
+              <polygon
+                points={`${aX},${aY} ${bX},${aY} ${cX},${cY}`}
+                fill="rgba(16, 185, 129, 0.15)"
+                stroke="#10b981"
+                strokeWidth="2"
+                className="pointer-events-none"
+              />
+            )}
 
             {/* Bold Base Line */}
             <line x1={aX} y1={aY} x2={bX} y2={aY} stroke="#3b82f6" strokeWidth="3" className="pointer-events-none" />
@@ -306,26 +356,9 @@ export default function App() {
               </g>
             )}
 
-            {/* Small Base Dimension for Subtraction Proof */}
-            {animProgress > 0 && !isCWithinBase && (
-              <g className="pointer-events-none" opacity={animProgress}>
-                <line
-                  x1={isObtuseRight ? bX : cX} y1={aY + 25}
-                  x2={isObtuseRight ? cX : aX} y2={aY + 25}
-                  stroke="#ef4444" strokeDasharray="5,5" strokeWidth="2"
-                />
-                <line x1={isObtuseRight ? bX : cX} y1={aY + 18} x2={isObtuseRight ? bX : cX} y2={aY + 32} stroke="#ef4444" strokeWidth="2" />
-                <line x1={isObtuseRight ? cX : aX} y1={aY + 18} x2={isObtuseRight ? cX : aX} y2={aY + 32} stroke="#ef4444" strokeWidth="2" />
-                <rect x={(isObtuseRight ? (bX + cX)/2 : (aX + cX)/2) - 25} y={aY + 35} width={50} height={24} fill="rgba(255,255,255,0.85)" rx={4}/>
-                <text x={isObtuseRight ? (bX + cX)/2 : (aX + cX)/2} y={aY + 52} fill="#ef4444" textAnchor="middle" className="font-bold text-sm">
-                  {formatNum(smallBase)}
-                </text>
-              </g>
-            )}
-
             {/* Height Label positioned on the line */}
             {showHeight && (() => {
-              const labelX = cX + 8;
+              const labelX = Math.min(cX + 8, VISUAL_W - 78);
               const labelY = (cY + aY)/2 - 12;
               return (
                 <g className="pointer-events-none">
@@ -337,118 +370,102 @@ export default function App() {
               );
             })()}
 
-            {/* Standard Area Formula (Hidden during animation to make room for proof banners) */}
-            {animProgress === 0 && (
-              <foreignObject x="0" y={aY + 70} width={CANVAS_W} height="100" className="pointer-events-none">
-                <div className="w-full h-full flex justify-center items-start font-extrabold text-xl md:text-2xl text-gray-900">
+            {animProgress > 0 && isCWithinBase && showHeight && (() => {
+              const labelX = Math.min(bX + 8, VISUAL_W - 78);
+              const labelY = (cY + aY)/2 - 12;
+              return (
+                <g className="pointer-events-none">
+                  <rect x={labelX} y={labelY} width={70} height={24} fill="rgba(255,255,255,0.85)" rx={4}/>
+                  <text x={labelX + 4} y={labelY + 17} fill="#c2410c" textAnchor="start" className="font-bold text-sm">
+                    h = {formatNum(height)}
+                  </text>
+                </g>
+              );
+            })()}
+
+            <foreignObject x="570" y="24" width="220" height="340" className="pointer-events-none">
+                <div className="flex h-full w-full flex-col items-center justify-center font-extrabold text-[20px] text-gray-900">
 
                   {!showBase && (
-                    <div className="flex items-center space-x-3">
-                      <span className="text-blue-700">b</span>
-                      <span>=</span>
-                      <div className="flex flex-col items-center leading-none">
-                        <span className="border-b-[2.5px] border-gray-900 px-2 pb-1">2 &times; <span className="text-emerald-700">A</span></span>
-                        <span className="text-orange-700 pt-1">h</span>
+                    <div className="flex w-full flex-col items-center gap-5">
+                      <span className="text-blue-700 text-3xl">b</span>
+                      <div className="grid grid-cols-[18px_auto] items-center gap-x-2">
+                        <span>=</span>
+                        <Fraction numerator={<>2 &times; <span className="text-emerald-700">A</span></>} denominator={<span className="text-orange-700">h</span>} />
                       </div>
-                      <span>=</span>
-                      <div className="flex flex-col items-center leading-none">
-                        <span className="border-b-[2.5px] border-gray-900 px-2 pb-1">2 &times; <span className="text-emerald-700">{formatNum(area)}</span></span>
-                        <span className="text-orange-700 pt-1">{formatNum(height)}</span>
+                      <div className="grid grid-cols-[18px_auto] items-center gap-x-2">
+                        <span>=</span>
+                        <Fraction numerator={<>2 &times; <span className="text-emerald-700">{formatNum(area)}</span></>} denominator={<span className="text-orange-700">{formatNum(height)}</span>} />
                       </div>
-                      <span>=</span>
-                      <span className="text-blue-700 text-3xl">{formatNum(base)}</span>
+                      <div className="grid grid-cols-[18px_auto] items-center gap-x-2">
+                        <span>=</span>
+                        <span className="text-blue-700 text-3xl">{formatNum(base)}</span>
+                      </div>
                     </div>
                   )}
 
                   {!showHeight && (
-                    <div className="flex items-center space-x-3">
-                      <span className="text-orange-700">h</span>
-                      <span>=</span>
-                      <div className="flex flex-col items-center leading-none">
-                        <span className="border-b-[2.5px] border-gray-900 px-2 pb-1">2 &times; <span className="text-emerald-700">A</span></span>
-                        <span className="text-blue-700 pt-1">b</span>
+                    <div className="flex w-full flex-col items-center gap-5">
+                      <span className="text-orange-700 text-3xl">h</span>
+                      <div className="grid grid-cols-[18px_auto] items-center gap-x-2">
+                        <span>=</span>
+                        <Fraction numerator={<>2 &times; <span className="text-emerald-700">A</span></>} denominator={<span className="text-blue-700">b</span>} />
                       </div>
-                      <span>=</span>
-                      <div className="flex flex-col items-center leading-none">
-                        <span className="border-b-[2.5px] border-gray-900 px-2 pb-1">2 &times; <span className="text-emerald-700">{formatNum(area)}</span></span>
-                        <span className="text-blue-700 pt-1">{formatNum(base)}</span>
+                      <div className="grid grid-cols-[18px_auto] items-center gap-x-2">
+                        <span>=</span>
+                        <Fraction numerator={<>2 &times; <span className="text-emerald-700">{formatNum(area)}</span></>} denominator={<span className="text-blue-700">{formatNum(base)}</span>} />
                       </div>
-                      <span>=</span>
-                      <span className="text-orange-700 text-3xl">{formatNum(height)}</span>
+                      <div className="grid grid-cols-[18px_auto] items-center gap-x-2">
+                        <span>=</span>
+                        <span className="text-orange-700 text-3xl">{formatNum(height)}</span>
+                      </div>
                     </div>
                   )}
 
                   {(showBase && showHeight) && (
-                    <div className="flex items-center space-x-3">
-                      <span className="text-emerald-700">Area</span>
-                      <span>=</span>
-                      <div className="flex flex-col items-center leading-none">
-                        <span className="border-b-[2.5px] border-gray-900 px-1 pb-1">1</span>
-                        <span className="pt-1">2</span>
+                    <div className="flex w-full flex-col items-center gap-5">
+                      <span className="text-emerald-700 text-3xl">Area</span>
+                      <div className="grid grid-cols-[18px_28px_18px_42px_18px_42px] items-center justify-center gap-x-1">
+                        <span>=</span>
+                        <Fraction numerator="1" denominator="2" />
+                        <span>&times;</span>
+                        <span className="text-center text-blue-700">b</span>
+                        <span>&times;</span>
+                        <span className="text-center text-orange-700">h</span>
                       </div>
-                      <span>&times;</span>
-                      <span className="text-blue-700">b</span>
-                      <span>&times;</span>
-                      <span className="text-orange-700">h</span>
-                      <span>=</span>
-                      <div className="flex flex-col items-center leading-none">
-                        <span className="border-b-[2.5px] border-gray-900 px-1 pb-1">1</span>
-                        <span className="pt-1">2</span>
+                      <div className="grid grid-cols-[18px_28px_18px_42px_18px_42px] items-center justify-center gap-x-1">
+                        <span>=</span>
+                        <Fraction numerator="1" denominator="2" />
+                        <span>&times;</span>
+                        <span className="text-center text-blue-700">{formatNum(base)}</span>
+                        <span>&times;</span>
+                        <span className="text-center text-orange-700">{formatNum(height)}</span>
                       </div>
-                      <span>&times;</span>
-                      <span className="text-blue-700">{formatNum(base)}</span>
-                      <span>&times;</span>
-                      <span className="text-orange-700">{formatNum(height)}</span>
-                      <span>=</span>
-                      <span className="text-emerald-700 text-3xl">{showArea ? formatNum(area) : '?'}</span>
+                      <div className="grid grid-cols-[18px_auto] items-center gap-x-2">
+                        <span>=</span>
+                        <span className="text-emerald-700 text-3xl">{showArea ? formatNum(area) : '?'}</span>
+                      </div>
                     </div>
                   )}
 
                 </div>
               </foreignObject>
-            )}
+
           </svg>
 
-          {/* Dynamic Proof Banners */}
-          {animProgress > 0 && (
-            <div className={`absolute bottom-0 left-0 w-full ${isCWithinBase ? 'h-[90px]' : 'h-[105px]'} bg-[#fff7ed] border-t-2 border-[#fed7aa] flex flex-col items-center justify-center pointer-events-none z-20 shadow-inner`}>
+        </div>
 
-               {isCWithinBase ? (
-                 <>
-                   <div className="text-[#d97706] font-bold text-[17px] mb-1">
-                     The triangle is exactly half of its bounding rectangle!
-                   </div>
-                   <div className="text-gray-900 font-extrabold text-[17px]">
-                     Rectangle Area = <span className="text-blue-700">b</span> &times; <span className="text-orange-700">h</span> = <span className="text-blue-700">{formatNum(base)}</span> &times; <span className="text-orange-700">{formatNum(height)}</span> = {formatNum(base * height)}
-                   </div>
-                   <div className="text-gray-900 font-extrabold text-[15px] mt-0.5 opacity-80">
-                     Triangle Area = <span className="text-emerald-700">{formatNum(area)}</span> (Rectangle Area &divide; 2)
-                   </div>
-                 </>
-               ) : (
-                 <>
-                   <div className="text-[#d97706] font-bold text-[17px] mb-1">
-                     Subtraction Proof (Obtuse Triangles)
-                   </div>
-                   <div className="text-gray-900 font-extrabold text-[16px] mb-1">
-                     <span className="text-blue-600">Large Triangle</span> &minus; <span className="text-red-500">Small Triangle</span> = <span className="text-emerald-600">Main Area</span>
-                   </div>
-                   <div className="flex items-center space-x-2 text-gray-900 font-extrabold text-[15px]">
-                     <span className="text-blue-600">&frac12; &times; ({formatNum(bigBase)} &times; {formatNum(height)})</span>
-                     <span>&minus;</span>
-                     <span className="text-red-500">&frac12; &times; ({formatNum(smallBase)} &times; {formatNum(height)})</span>
-                     <span>=</span>
-                     <span>{formatNum(bigArea)} &minus; {formatNum(smallArea)}</span>
-                     <span>=</span>
-                     <span className="text-emerald-600 text-xl">{formatNum(area)}</span>
-                   </div>
-                 </>
-               )}
-            </div>
-          )}
-
+        <div className="flex h-[52px] shrink-0 items-center justify-center gap-12 border-t border-[#e2e8f0] bg-[#f8fafc]">
+          <div onClick={() => handleToggle('base')}>
+            <Checkbox label="Base" checked={showBase} color="#3b82f6" />
+          </div>
+          <div onClick={() => handleToggle('height')}>
+            <Checkbox label="Height" checked={showHeight} color="#f97316" />
+          </div>
+          <div onClick={() => handleToggle('area')}>
+            <Checkbox label="Area" checked={showArea} color="#10b981" />
+          </div>
         </div>
       </div>
-    </div>
   );
 }
