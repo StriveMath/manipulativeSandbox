@@ -14,7 +14,7 @@ import AreaModelMultiplication from './users/uzumaki-dc/area-model-multiplicatio
 import AddingSubtractingFractions from './users/uzumaki-dc/adding-subtracting-fractions.jsx'
 import AddingSubtractingIntegers from './users/uzumaki-dc/adding-subtracting-integers.jsx'
 import AreaCircumferenceCircle from './users/uzumaki-dc/area-circumference-circle.jsx'
-import CompoundFiguresDecomposer from './users/uzumaki-dc/compound-figures-decomposer.jsx'
+import CompoundFiguresDecomposer from './approved/compound-figures-decomposer.jsx'
 import DecimalHundredthsGrid from './users/uzumaki-dc/decimal-hundredths-grid.jsx'
 import DecimalNumberLine from './users/uzumaki-dc/decimal-number-line.jsx'
 import DecimalPlaceValueDisks from './users/uzumaki-dc/decimal-place-value-disks.jsx'
@@ -542,8 +542,8 @@ const allManipulatives = [
     id: 'compound-figures-decomposer',
     name: 'Compound Figures Decomposer',
     component: CompoundFiguresDecomposer,
-    ownerSlug: 'uzumaki-dc',
-    ownerName: 'Uzumaki-DC',
+    ownerSlug: 'approved',
+    ownerName: 'Approved Manipulatives',
   },
   {
     id: 'fractions-number-line',
