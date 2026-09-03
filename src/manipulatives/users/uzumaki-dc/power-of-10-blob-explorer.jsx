@@ -26,14 +26,16 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
 const sanitizeNumberInput = (value) => {
   const cleaned = value.replace(/[^\d.]/g, '')
+  if (cleaned === '') return ''
   const [integer = '', ...decimalParts] = cleaned.split('.')
   const decimal = decimalParts.join('')
   if (cleaned.includes('.')) return `${(integer || '0').slice(0, 4)}.${decimal.slice(0, 4)}`
-  return (integer || '0').slice(0, 4)
+  return integer.slice(0, 4)
 }
 
 const normalizeNumberText = (value) => {
   const sanitized = sanitizeNumberInput(value)
+  if (sanitized === '') return '0'
   const [rawInteger, rawDecimal = ''] = sanitized.split('.')
   const integer = rawInteger.replace(/^0+(?=\d)/, '') || '0'
   const decimal = rawDecimal.replace(/0+$/, '')
@@ -269,23 +271,23 @@ function PowerFactorInput({ onBlur, onChange, value }) {
     <label className="relative flex h-11 w-28 items-center justify-center rounded border border-amber-300 bg-amber-50 px-2 text-2xl font-black tabular-nums focus-within:border-amber-500">
       <input
         aria-label="Power of ten"
-        className="absolute inset-0 z-10 h-full w-full cursor-text bg-transparent px-2 text-center text-transparent caret-amber-700 outline-none"
+        className="absolute inset-0 z-10 h-full w-full cursor-text bg-transparent px-2 text-center text-2xl font-black tabular-nums text-transparent caret-amber-700 outline-none"
         inputMode="numeric"
         onBlur={onBlur}
         onChange={onChange}
         onFocus={(event) => event.target.select()}
         value={value}
       />
-      <span aria-hidden="true" className="pointer-events-none flex items-center justify-center gap-0.5">
+      <span aria-hidden="true" className="pointer-events-none flex items-center justify-center">
         {value.split('').map((digit, index) => {
           if (digit !== '0') {
-            return <span className="text-slate-950" key={index}>{digit}</span>
+            return <span className="inline-flex w-[1ch] justify-center text-slate-950" key={index}>{digit}</span>
           }
 
           const zeroIndex = value.slice(0, index).replace(/[^0]/g, '').length
           const shade = zeroShades[Math.min(zeroIndex, zeroShades.length - 1)]
           return (
-            <span className={`rounded-sm px-0.5 ${shade.background} ${shade.text}`} key={index}>
+            <span className={`inline-flex w-[1ch] justify-center rounded-sm ${shade.background} ${shade.text}`} key={index}>
               {digit}
             </span>
           )
