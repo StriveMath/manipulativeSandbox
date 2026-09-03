@@ -54,7 +54,7 @@ import AddingFractionsArea from './users/michael-jones/adding-fractions-area.jsx
 import NumberLineAddSubtract from './users/ashakv1712/number-line-add-subtract.jsx'
 import NumberLineExplorer from './approved/number-line-explorer.jsx'
 import ParallelogramArea from './approved/parallelogram-area.jsx'
-import PizzaRemainder from './users/michael-jones/pizza-remainder.jsx'
+import PizzaRemainder from './approved/pizza-remainder.jsx'
 import RoundingNumberLine from './users/michael-jones/rounding-number-line.jsx'
 import PlaceValueDisks from './users/uzumaki-dc/place-value-disks.jsx'
 import PowerOf10BlobExplorer from './approved/power-of-10-blob-explorer.jsx'
@@ -170,8 +170,8 @@ const allManipulatives = [
     id: 'pizza-remainder',
     name: 'Pizza Remainder',
     component: PizzaRemainder,
-    ownerSlug: 'michael-jones',
-    ownerName: 'Michael / M Jones',
+    ownerSlug: 'approved',
+    ownerName: 'Approved Manipulatives',
   },
   {
     id: 'multiplying-fractions-area',
