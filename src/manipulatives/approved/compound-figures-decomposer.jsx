@@ -401,34 +401,57 @@ function DimensionLabels({ classification, tone }) {
   )
 }
 
-function FormulaPanel({ pieces }) {
+function FormulaPanel({ answersVisible, classifications, complete, pieces, totalArea }) {
   return (
-    <aside className="grid min-h-0 grid-rows-[auto_1fr] rounded border border-slate-200 bg-white p-2 shadow-sm">
-      <div>
-        <div className="text-[11px] font-black uppercase text-slate-500">Area pieces</div>
-        <div className="text-[10px] font-semibold text-slate-400">Colors match the figure.</div>
-      </div>
-      <div className="mt-1 grid min-h-0 content-start gap-1">
-        {pieces.map((piece, index) => {
-          const classification = classifyPiece(piece.points)
-          const tone = pieceTones[piece.toneIndex % pieceTones.length]
-          return (
-            <div
-              className={`compound-formula-enter rounded border px-2 py-1 ${classification.kind === 'compound' ? 'border-dashed border-slate-300 bg-slate-50' : 'border-slate-200 bg-white shadow-sm'}`}
-              key={piece.id}
-              style={{ '--compound-delay': `${index * 70}ms` }}
-            >
-              <div className="flex items-center justify-between gap-2 text-[10px] font-black uppercase">
-                <span style={{ color: tone.text }}>Piece {index + 1}</span>
-                <span className="text-slate-400">{classification.kind}</span>
-              </div>
-              <div className={`mt-0.5 font-black tabular-nums ${pieces.length > 4 ? 'text-[11px]' : 'text-[13px]'}`} style={{ color: classification.kind === 'compound' ? '#64748b' : tone.text }}>
-                {formulaForPiece(classification)}
+    <aside className="flex min-h-0 flex-col overflow-hidden rounded border border-slate-200 bg-white p-2 shadow-sm">
+      <div className="text-xs font-black uppercase text-slate-500">Area pieces</div>
+      {answersVisible && (
+        <>
+          <div className={`mt-2 grid min-h-0 content-start gap-1.5 ${pieces.length > 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {pieces.map((piece, index) => {
+              const classification = classifications[index]
+              const tone = pieceTones[pieces[index].toneIndex % pieceTones.length]
+              return (
+                <div
+                  className={`compound-formula-enter min-w-0 rounded border px-2 py-1.5 ${classification.kind === 'compound' ? 'border-dashed' : 'shadow-sm'}`}
+                  key={piece.id}
+                  style={{
+                    '--compound-delay': `${index * 45}ms`,
+                    backgroundColor: classification.kind === 'compound' ? '#f8fafc' : tone.fill,
+                    borderColor: classification.kind === 'compound' ? '#cbd5e1' : tone.stroke,
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-1 text-[11px] font-black uppercase">
+                    <span style={{ color: tone.text }}>P{index + 1}</span>
+                    <span className="text-slate-400">{classification.kind}</span>
+                  </div>
+                  <div className="mt-0.5 text-[12px] font-black leading-tight tabular-nums" style={{ color: classification.kind === 'compound' ? '#64748b' : tone.text }}>
+                    {formulaForPiece(classification)}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          {complete && (
+            <div className="mt-auto rounded border border-emerald-200 bg-emerald-50 px-2 py-1.5">
+              <div className="text-[10px] font-black uppercase text-slate-500">Total area</div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-1 text-[12px] font-black tabular-nums">
+                {classifications.map((classification, index) => {
+                  const tone = pieceTones[pieces[index].toneIndex % pieceTones.length]
+                  return (
+                    <span className="contents" key={pieces[index].id}>
+                      {index > 0 && <span className="text-slate-400">+</span>}
+                      <span style={{ color: tone.text }}>{formatNumber(classification.area)}</span>
+                    </span>
+                  )
+                })}
+                <span className="text-slate-400">=</span>
+                <span className="text-emerald-800">{formatNumber(totalArea)} square units</span>
               </div>
             </div>
-          )
-        })}
-      </div>
+          )}
+        </>
+      )}
     </aside>
   )
 }
@@ -451,9 +474,12 @@ export default function CompoundFiguresDecomposer() {
   const [keyboardCursorVisible, setKeyboardCursorVisible] = useState(false)
   const [feedback, setFeedback] = useState('Draw a cut from one boundary point to another.')
   const [animation, setAnimation] = useState(null)
-  const [hasMadeFirstCut, setHasMadeFirstCut] = useState(false)
+  const [answersVisible, setAnswersVisible] = useState(true)
+  const [instructionVisible, setInstructionVisible] = useState(true)
 
   const classifications = useMemo(() => pieces.map((piece) => classifyPiece(piece.points)), [pieces])
+  const complete = pieces.length > 0 && classifications.every((item) => item.kind !== 'compound')
+  const totalArea = classifications.reduce((sum, item) => sum + item.area, 0)
   const boundaryPoints = useMemo(() => {
     const points = new Map()
     pieces.forEach((piece) => {
@@ -461,30 +487,52 @@ export default function CompoundFiguresDecomposer() {
     })
     return [...points.values()]
   }, [pieces])
-  const interactionReady = (mode === 'preset' || customClosed) && !animation
+  const cutGuidance = useMemo(() => {
+    if (!cutStart) return { pieceIds: new Set(), endpointKeys: new Set() }
+
+    const pieceIds = new Set(
+      pieces
+        .filter((piece) => pointOnPolygonBoundary(cutStart, piece.points))
+        .map((piece) => piece.id),
+    )
+    const endpointKeys = new Set(
+      boundaryPoints
+        .filter((point) => {
+          if (samePoint(point, cutStart)) return false
+          return pieces.filter((piece) => validateCutForPiece(piece, cutStart, point).valid).length === 1
+        })
+        .map(pointKey),
+    )
+    return { pieceIds, endpointKeys }
+  }, [boundaryPoints, cutStart, pieces])
+  const interactionReady = mode === 'preset' || customClosed
 
   useEffect(() => () => window.clearTimeout(animationTimer.current), [])
 
+  const clearAnimation = () => {
+    window.clearTimeout(animationTimer.current)
+    setAnimation(null)
+  }
+
   const resetDecomposition = (polygon, message = 'Draw a cut from one boundary point to another.') => {
+    clearAnimation()
     nextPieceId.current = 2
     setPieces([createPiece('piece-1', polygon)])
     setCuts([])
     setHistory([])
     setCutStart(null)
     setPreviewPoint(null)
-    setAnimation(null)
-    setHasMadeFirstCut(false)
     setFeedback(message)
   }
 
   const selectFigure = (id) => {
-    if (animation) return
+    clearAnimation()
+    setInstructionVisible(true)
     setPresetId(id)
     setCustomVertices([])
     setCustomClosed(false)
     setKeyboardPoint({ x: 1, y: 1 })
     setKeyboardCursorVisible(false)
-    setHasMadeFirstCut(false)
 
     if (id === 'custom') {
       setMode('build')
@@ -515,7 +563,7 @@ export default function CompoundFiguresDecomposer() {
   }
 
   const addCustomVertex = (point) => {
-    if (customClosed || animation) return
+    if (customClosed) return
     if (customVertices.length >= 3 && samePoint(point, customVertices[0])) {
       closeCustomFigure()
       return
@@ -573,6 +621,7 @@ export default function CompoundFiguresDecomposer() {
   }
 
   const applyCut = (start, end) => {
+    clearAnimation()
     if (!interactionReady || samePoint(start, end)) {
       setFeedback('Choose two different boundary points for the cut.')
       return
@@ -582,18 +631,21 @@ export default function CompoundFiguresDecomposer() {
       return
     }
 
-    const candidates = pieces
+    const validations = pieces
       .map((piece, index) => ({ piece, index, validation: validateCutForPiece(piece, start, end) }))
+    const candidates = validations
       .filter((candidate) => candidate.validation.valid)
 
     if (candidates.length !== 1) {
+      const relevantFailure = validations.find(({ piece }) =>
+        pointOnPolygonBoundary(start, piece.points) && pointOnPolygonBoundary(end, piece.points))
       setFeedback(
         candidates.length > 1
           ? 'This cut crosses more than one piece. Cut one piece at a time.'
-          : 'Keep the cut inside one piece and finish on its boundary.'
+          : relevantFailure?.validation.message ?? 'Keep the cut inside one piece and finish on its boundary.'
       )
       setAnimation({ type: 'invalid', cut: { start, end } })
-      animationTimer.current = window.setTimeout(() => setAnimation(null), 480)
+      animationTimer.current = window.setTimeout(() => setAnimation(null), 280)
       return
     }
 
@@ -616,12 +668,11 @@ export default function CompoundFiguresDecomposer() {
     setHistory((current) => [...current, { pieces: clonePieces(pieces), cuts: [...cuts] }])
     setPieces(nextPieces)
     setCuts((current) => [...current, { id: `cut-${nextPieceId.current}`, start, end }])
-    setHasMadeFirstCut(true)
     setCutStart(null)
     setPreviewPoint(null)
     setFeedback('The pieces separated. Continue until every piece is a rectangle or triangle.')
     setAnimation({ type: 'valid', cut: { start, end }, pieceIds: [firstId, secondId] })
-    animationTimer.current = window.setTimeout(() => setAnimation(null), 780)
+    animationTimer.current = window.setTimeout(() => setAnimation(null), 380)
   }
 
   const handleBoundarySelection = (point) => {
@@ -635,7 +686,8 @@ export default function CompoundFiguresDecomposer() {
   }
 
   const handleSvgPointerDown = (event) => {
-    if (animation) return
+    clearAnimation()
+    setInstructionVisible(false)
     setKeyboardCursorVisible(false)
     const point = screenToGrid(event.clientX, event.clientY)
     if (!point) return
@@ -674,7 +726,7 @@ export default function CompoundFiguresDecomposer() {
   }
 
   const handleGridKeyDown = (event) => {
-    if (animation) return
+    clearAnimation()
     const movement = {
       ArrowLeft: { x: -1, y: 0 },
       ArrowRight: { x: 1, y: 0 },
@@ -683,6 +735,7 @@ export default function CompoundFiguresDecomposer() {
     }[event.key]
     if (movement) {
       event.preventDefault()
+      setInstructionVisible(false)
       setKeyboardCursorVisible(true)
       setKeyboardPoint((current) => ({
         x: Math.max(0, Math.min(grid.columns, current.x + movement.x)),
@@ -691,12 +744,14 @@ export default function CompoundFiguresDecomposer() {
       return
     }
     if (event.key === 'Escape') {
+      setInstructionVisible(false)
       setCutStart(null)
       setFeedback('Cut cancelled. Choose a new boundary point.')
       return
     }
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
+      setInstructionVisible(false)
       if (mode === 'build' && !customClosed) addCustomVertex(keyboardPoint)
       else {
         const point = nearestBoundaryPoint(keyboardPoint)
@@ -707,7 +762,8 @@ export default function CompoundFiguresDecomposer() {
   }
 
   const undoCut = () => {
-    if (history.length === 0 || animation) return
+    if (history.length === 0) return
+    clearAnimation()
     const previous = history[history.length - 1]
     setPieces(clonePieces(previous.pieces))
     setCuts(previous.cuts)
@@ -716,15 +772,25 @@ export default function CompoundFiguresDecomposer() {
     setFeedback('The latest cut was undone.')
   }
 
-  const resetAll = () => {
-    if (animation) return
-    setMode('preset')
-    setPresetId(presets[0].id)
-    setCustomVertices([])
-    setCustomClosed(false)
+  const resetCuts = () => {
+    clearAnimation()
+    setInstructionVisible(true)
     setKeyboardPoint({ x: 1, y: 1 })
     setKeyboardCursorVisible(false)
-    resetDecomposition(presets[0].points)
+
+    if (mode === 'build') {
+      if (customClosed) {
+        resetDecomposition(customVertices, 'Figure ready. Draw a cut between two boundary points.')
+      } else {
+        setCutStart(null)
+        setPreviewPoint(null)
+        setFeedback('Click grid points to outline a compound figure.')
+      }
+      return
+    }
+
+    const preset = presets.find((item) => item.id === presetId) ?? presets[0]
+    resetDecomposition(preset.points)
   }
 
   const cutPreview = cutStart && previewPoint && !samePoint(cutStart, previewPoint)
@@ -733,13 +799,12 @@ export default function CompoundFiguresDecomposer() {
 
   return (
     <div className="box-border flex h-[498px] flex-col overflow-hidden bg-slate-50 p-3 text-slate-800">
-      <header className="grid h-[48px] shrink-0 grid-cols-[200px_minmax(0,1fr)] items-center gap-2 rounded border border-slate-200 bg-white px-2 shadow-sm">
-        <label className="text-[9px] font-black uppercase text-slate-500">
-          Figure
+      <header className="grid h-[50px] shrink-0 grid-cols-[330px_minmax(0,1fr)] items-center gap-2 rounded border border-slate-200 bg-white px-2 shadow-sm">
+        <label className="flex items-center gap-2 text-sm font-black text-slate-700">
+          Figure:
           <select
             aria-label="Choose a compound figure"
-            className="mt-0.5 h-7 w-full rounded border border-slate-300 bg-white px-1 text-[11px] font-black text-slate-800"
-            disabled={Boolean(animation)}
+            className="h-8 w-56 rounded border border-slate-300 bg-white px-2 text-xs font-black text-slate-800"
             onChange={(event) => selectFigure(event.target.value)}
             value={presetId}
           >
@@ -748,34 +813,36 @@ export default function CompoundFiguresDecomposer() {
           </select>
         </label>
 
-        <div className="flex min-w-0 items-center justify-end gap-1">
-          {mode === 'build' && (
-          <div className="grid grid-cols-3 gap-1">
-            <button className="h-8 rounded border border-slate-300 bg-white text-[10px] font-black disabled:opacity-40" disabled={customVertices.length === 0 || customClosed} onClick={() => setCustomVertices((current) => current.slice(0, -1))} type="button">Undo vertex</button>
-            <button className="h-8 rounded border border-emerald-300 bg-emerald-50 text-[10px] font-black text-emerald-800 disabled:opacity-40" disabled={customVertices.length < 3 || customClosed} onClick={closeCustomFigure} type="button">Close</button>
-            <button className="h-8 rounded border border-slate-300 bg-white text-[10px] font-black disabled:opacity-40" disabled={customVertices.length === 0 || customClosed} onClick={() => { setCustomVertices([]); setFeedback('Click grid points to outline a compound figure.') }} type="button">Clear</button>
-          </div>
-          )}
-          <div className={`mr-auto rounded px-2 py-1 text-[10px] font-black ${interactionReady ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-400'}`}>
-            {interactionReady ? 'Cut tool active' : 'Build the outline'}
-          </div>
-          <button className="h-8 rounded border border-slate-300 bg-white px-2 text-[10px] font-black disabled:opacity-35" disabled={history.length === 0 || Boolean(animation)} onClick={undoCut} type="button">Undo cut</button>
-          <button className="h-8 rounded bg-slate-900 px-2 text-[10px] font-black text-white disabled:opacity-40" disabled={Boolean(animation)} onClick={resetAll} type="button">Reset</button>
+        <div className="flex min-w-0 items-center justify-end gap-2 opacity-75 transition-opacity hover:opacity-100 focus-within:opacity-100">
+          <button className="h-8 rounded border border-slate-300 bg-white px-3 text-xs font-black" onClick={() => setAnswersVisible((visible) => !visible)} type="button">
+            {answersVisible ? 'Hide answer' : 'Show answer'}
+          </button>
+          <button className="h-8 rounded border border-slate-300 bg-white px-3 text-xs font-black disabled:opacity-35" disabled={history.length === 0} onClick={undoCut} type="button">Undo cut</button>
+          <button className="h-8 rounded bg-slate-900 px-3 text-xs font-black text-white" onClick={resetCuts} type="button">Reset cuts</button>
         </div>
       </header>
 
-      <main className="mt-2 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_210px] gap-2">
+      <main className="mt-2 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_250px] gap-2">
         <section className="relative min-h-0 overflow-hidden rounded border border-slate-200 bg-white shadow-sm">
-          {(mode === 'build' && !customClosed) || !hasMadeFirstCut ? (
-            <div className="compound-instruction-enter pointer-events-none absolute left-10 right-10 top-1 z-10 rounded border border-sky-200 bg-sky-50/95 px-3 py-1 text-center text-[10px] font-bold text-sky-800 shadow-sm">
-              {mode === 'build' && !customClosed
-                ? 'Select grid points to outline a figure, then select the first point or Close.'
-                : 'Click between two boundary points to cut, or select two points using click or Enter.'}
+          {instructionVisible && (
+            <div className="compound-instruction-enter pointer-events-none absolute left-8 right-8 top-1 z-10 rounded border border-sky-200 bg-sky-50/95 px-3 py-1 text-center text-[11px] font-bold text-sky-800 shadow-sm">
+              {feedback}
             </div>
-          ) : null}
+          )}
+          <div aria-live="polite" className="sr-only" role="status">
+            {complete ? `Complete: the pieces total ${formatNumber(totalArea)} square units.` : feedback}
+          </div>
+
+          {mode === 'build' && !customClosed && (
+            <div className="absolute right-2 top-10 z-10 grid grid-cols-3 gap-1 rounded border border-slate-200 bg-white/95 p-1 shadow-sm">
+              <button className="h-8 rounded border border-slate-300 bg-white px-2 text-[11px] font-black disabled:opacity-40" disabled={customVertices.length === 0} onClick={() => setCustomVertices((current) => current.slice(0, -1))} type="button">Undo</button>
+              <button className="h-8 rounded border border-emerald-300 bg-emerald-50 px-2 text-[11px] font-black text-emerald-800 disabled:opacity-40" disabled={customVertices.length < 3} onClick={closeCustomFigure} type="button">Close</button>
+              <button className="h-8 rounded border border-slate-300 bg-white px-2 text-[11px] font-black disabled:opacity-40" disabled={customVertices.length === 0} onClick={() => { setCustomVertices([]); setFeedback('Click grid points to outline a compound figure.') }} type="button">Clear</button>
+            </div>
+          )}
           <svg
             aria-label={mode === 'build' && !customClosed ? 'Custom compound figure builder grid' : 'Compound figure cutting grid'}
-            className="h-full w-full touch-none outline-none focus:ring-2 focus:ring-sky-400"
+            className="h-full w-full touch-none cursor-crosshair outline-none focus:ring-2 focus:ring-sky-400"
             onBlur={() => setKeyboardCursorVisible(false)}
             onKeyDown={handleGridKeyDown}
             onPointerDown={handleSvgPointerDown}
@@ -817,6 +884,7 @@ export default function CompoundFiguresDecomposer() {
               const classification = classifications[index]
               const center = polygonCenter(piece.points)
               const isAnimating = animation?.type === 'valid' && animation.pieceIds.includes(piece.id)
+              const isSelectedPiece = cutGuidance.pieceIds.has(piece.id)
               return (
                 <g
                   className={isAnimating ? 'compound-piece-separate' : ''}
@@ -828,7 +896,14 @@ export default function CompoundFiguresDecomposer() {
                     '--compound-return-y': `${piece.motion.y * -0.14}px`,
                   }}
                 >
-                  <polygon fill={tone.fill} points={polygonSvgPoints(piece.points)} stroke={tone.stroke} strokeLinejoin="round" strokeWidth="3" />
+                  <polygon
+                    fill={tone.fill}
+                    opacity={cutStart && !isSelectedPiece ? 0.55 : 1}
+                    points={polygonSvgPoints(piece.points)}
+                    stroke={isSelectedPiece ? '#f59e0b' : tone.stroke}
+                    strokeLinejoin="round"
+                    strokeWidth={isSelectedPiece ? 5 : 3}
+                  />
                   <text fill={tone.text} fontSize="13" fontWeight="900" paintOrder="stroke" stroke="white" strokeWidth="4" textAnchor="middle" x={center.x} y={center.y + 4}>P{index + 1}</text>
                   <DimensionLabels classification={classification} tone={tone} />
                 </g>
@@ -852,10 +927,25 @@ export default function CompoundFiguresDecomposer() {
             {interactionReady && boundaryPoints.map((point) => {
               const svgPoint = gridToSvg(point)
               const selected = cutStart && samePoint(cutStart, point)
+              const validEndpoint = cutStart && cutGuidance.endpointKeys.has(pointKey(point))
+              const dimmed = cutStart && !selected && !validEndpoint
               return (
-                <g aria-label={`Boundary point ${point.x}, ${point.y}`} key={pointKey(point)} role="button">
-                  <circle cx={svgPoint.x} cy={svgPoint.y} fill="transparent" r="11" />
-                  <circle className={selected ? 'compound-boundary-selected' : 'compound-boundary-point'} cx={svgPoint.x} cy={svgPoint.y} fill={selected ? '#f59e0b' : '#ffffff'} r={selected ? 5 : 3} stroke={selected ? '#b45309' : '#475569'} strokeWidth="2" />
+                <g
+                  aria-label={`Boundary point ${point.x}, ${point.y}${validEndpoint ? ', valid cut endpoint' : ''}`}
+                  key={pointKey(point)}
+                  opacity={dimmed ? 0.18 : 1}
+                  role="button"
+                >
+                  <circle cx={svgPoint.x} cy={svgPoint.y} fill="transparent" r="14" />
+                  <circle
+                    className={selected ? 'compound-boundary-selected' : 'compound-boundary-point'}
+                    cx={svgPoint.x}
+                    cy={svgPoint.y}
+                    fill={selected ? '#f59e0b' : validEndpoint ? '#dcfce7' : '#ffffff'}
+                    r={selected ? 6 : validEndpoint ? 5 : 3.5}
+                    stroke={selected ? '#b45309' : validEndpoint ? '#059669' : '#475569'}
+                    strokeWidth={validEndpoint ? 3 : 2}
+                  />
                 </g>
               )
             })}
@@ -868,9 +958,8 @@ export default function CompoundFiguresDecomposer() {
           </svg>
         </section>
 
-        <FormulaPanel pieces={pieces} />
+        <FormulaPanel answersVisible={answersVisible} classifications={classifications} complete={complete} pieces={pieces} totalArea={totalArea} />
       </main>
-      <div className="sr-only" aria-live="polite">{feedback}</div>
     </div>
   )
 }
