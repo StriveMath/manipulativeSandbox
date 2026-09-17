@@ -1,3 +1,4 @@
+import TriangleInequality from './users/ashakv1712/triangle-inequality.jsx'
 import AngleRelationships from './users/ashakv1712/angle-relationships.jsx'
 import AddingUnlikeFractions from './users/ashakv1712/adding-unlike-fractions.jsx'
 import BoxPlotBuilder from './users/ashakv1712/box-plot-builder.jsx'
@@ -89,6 +90,13 @@ const owners = [
 ]
 
 const allManipulatives = [
+  {
+    id: 'triangle-inequality',
+    name: 'Triangle Inequality',
+    component: TriangleInequality,
+    ownerSlug: 'ashakv1712',
+    ownerName: 'ashakv1712',
+  },
   {
     id: 'percent-park-designer',
     name: 'Percent Park Designer',
